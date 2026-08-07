@@ -1,0 +1,17 @@
+# robots.txt for estetika.zvenfit.ru
+
+User-agent: *
+Allow: /
+
+# Yandex
+User-agent: Yandex
+Allow: /
+Host: estetika.zvenfit.ru
+Crawl-delay: 1
+
+# Google
+User-agent: Googlebot
+Allow: /
+
+# Sitemap
+Sitemap: https://estetika.zvenfit.ru/sitemap.xml

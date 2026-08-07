@@ -1,0 +1,128 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+  S3_BUCKET: 'zvenfit-estetika-frontend'
+  FUNCTION_NAME: 'zvenfit-estetika-telegram-lead'
+  YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+  ALLOWED_ORIGINS: 'https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy-function:
+    runs-on: ubuntu-latest
+    outputs:
+      function_url: ${{ steps.get-url.outputs.url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Authenticate with service account
+        env:
+          YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
+        run: |
+          echo "$YC_SA_KEY" > /tmp/sa-key.json
+          yc config profile create ci-profile
+          yc config set service-account-key /tmp/sa-key.json
+          yc config set folder-id ${{ env.YC_FOLDER_ID }}
+          rm /tmp/sa-key.json
+
+      - name: Deploy Cloud Function
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
+        run: bash scripts/deploy-telegram-lead.sh
+
+      - name: Get function URL
+        id: get-url
+        run: |
+          URL=$(yc serverless function get --name="${FUNCTION_NAME}" --format=json | jq -r '.http_invoke_url // empty')
+          if [ -z "$URL" ]; then
+            echo "ERROR: Failed to get function URL" >&2
+            exit 1
+          fi
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "Function URL: ${URL}"
+
+  deploy-site:
+    runs-on: ubuntu-latest
+    needs: [deploy-function]
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint:public
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Build site
+        env:
+          LEAD_API_URL: ${{ needs.deploy-function.outputs.function_url }}
+          YANDEX_METRIKA_ID: ${{ vars.YANDEX_METRIKA_ID }}
+          ASSET_VERSION: ${{ vars.ASSET_VERSION || github.run_number }}
+          SITE_URL: https://estetika.zvenfit.ru
+        run: |
+          if [ -z "$LEAD_API_URL" ]; then
+            echo "ERROR: LEAD_API_URL is empty" >&2
+            exit 1
+          fi
+          npm run build
+          node scripts/check-build.cjs
+
+      - name: Upload assets to Yandex Object Storage
+        uses: docker://amazon/aws-cli:2.25.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          AWS_REGION: ru-1
+          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
+        with:
+          args: >
+            s3 sync ./dist s3://${{ env.S3_BUCKET }}
+            --delete
+            --exclude "*.html"
+
+      - name: Upload HTML (no-cache)
+        uses: docker://amazon/aws-cli:2.25.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          AWS_REGION: ru-1
+          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
+        with:
+          args: >
+            s3 sync ./dist s3://${{ env.S3_BUCKET }}
+            --delete
+            --exclude "*"
+            --include "*.html"
+            --cache-control "no-cache, must-revalidate"
+            --metadata-directive REPLACE

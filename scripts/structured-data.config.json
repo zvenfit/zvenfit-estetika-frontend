@@ -1,0 +1,39 @@
+{
+  "siteUrl": "https://estetika.zvenfit.ru",
+  "assetsCdnBase": "https://storage.yandexcloud.net/zvenfit-estetika",
+  "organization": {
+    "@type": "BeautySalon",
+    "name": "Звенfit Эстетика",
+    "description": "Косметология в Звенигороде: аппаратные методики, уходы, индивидуальный подход специалиста с высшим медицинским образованием.",
+    "telephone": "+79688440088",
+    "email": "info@zvenfit.ru",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Нахабинское шоссе, д. 7А",
+      "addressLocality": "Звенигород",
+      "addressCountry": "RU"
+    },
+    "openingHours": "Mo-Su 08:00-22:00",
+    "logo": "https://storage.yandexcloud.net/zvenfit-estetika/images/logo/apple-touch-180.png",
+    "sameAs": ["https://vk.com/zvenfit.estetika"]
+  },
+  "openGraph": {
+    "image": "https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-photo.webp",
+    "siteName": "Звенfit Эстетика"
+  },
+  "pages": {
+    "/": {
+      "title": "Звенfit Эстетика — косметология в Звенигороде",
+      "description": "Аппаратная косметология и уходы в Звенигороде. Индивидуальный подход, современные методики. Запись на консультацию онлайн."
+    },
+    "/form/": {
+      "title": "Запись на консультацию — Звенfit Эстетика",
+      "description": "Оставьте заявку — мы свяжемся с вами удобным способом: звонок, WhatsApp, Telegram или Макс."
+    },
+    "/404.html": {
+      "title": "Страница не найдена — Звенfit Эстетика",
+      "description": "Запрошенная страница не существует. Вернитесь на главную или оставьте заявку на консультацию.",
+      "noindex": true
+    }
+  }
+}

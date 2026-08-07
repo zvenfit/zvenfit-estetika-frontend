@@ -1,0 +1,44 @@
+---
+description: ZvenFit Estetika core architecture and agent constraints
+alwaysApply: true
+---
+
+# ZvenFit Estetika — core rules
+
+Static Webflow landing (cosmetology). Source: `public/`, `scripts/`, `functions/`. **Never edit `dist/`.**
+
+After changes: `npm run build` or `npm run dev:watch`.
+
+## APIs (injected at build)
+
+- Lead + newsletter: `functions/telegram-lead/` → `window.ZVENFIT_LEAD_API`
+
+## CDN vs site bucket
+
+- HTML references CDN: `https://storage.yandexcloud.net/zvenfit-estetika/...`
+- CI deploys lean `dist/` to `zvenfit-estetika-frontend` bucket
+- Mutable CDN assets: manual `npm run upload:assets` (vendor CSS and webflow.js only)
+- Images and fonts: managed directly in CDN; `upload:assets` must never touch them
+
+## Build
+
+`scripts/build-static.cjs` injects Metrika, UTM, OG, JSON-LD at `</head>`.
+SEO config: `scripts/structured-data.config.json`.
+
+## Raw Webflow
+
+Save exports to `upload/` (gitignored). Port markup to `public/`.
+
+## Secrets
+
+No tokens in HTML/JS. Env / GitHub Secrets only.
+
+## Verify
+
+`npm run lint:public` and `npm run test:build`. Full guide: `AGENTS.md`.
+
+## Deploy
+
+**Site bucket:** via GitHub Actions only — do not manually sync unless user asks.
+
+**CDN bucket:** manual `upload:assets` for vendor CSS/webflow.js. Images and fonts are excluded from sync; legal HTML ships with the site.

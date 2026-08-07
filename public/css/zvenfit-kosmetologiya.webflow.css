@@ -1,0 +1,2563 @@
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Regular.ttf') format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBold.ttf') format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Medium.ttf') format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBoldOblique.ttf') format("truetype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Oblique.ttf') format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Involve;
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-MediumOblique.ttf') format("truetype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sourceserif 4 48 Pt";
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-LightItalic.ttf') format("truetype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sourceserif 4 48 Pt";
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Light.ttf') format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sourceserif 4 48 Pt";
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Italic.ttf') format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sourceserif 4 48 Pt";
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Regular.ttf') format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --white: white;
+  --black: #161616;
+  --powder: #bb7a8c;
+  --pink: #efdae0;
+  --block: 10px;
+  --beige: #f6f0ea;
+  --transparent: transparent;
+  --dark-beige: #ecdfd3;
+}
+
+.w-layout-blockcontainer {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+
+.w-layout-vflex {
+  flex-direction: column;
+  align-items: flex-start;
+  display: flex;
+}
+
+.w-layout-hflex {
+  flex-direction: row;
+  align-items: flex-start;
+  display: flex;
+}
+
+.w-layout-grid {
+  grid-row-gap: 16px;
+  grid-column-gap: 16px;
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-columns: 1fr;
+  display: grid;
+}
+
+@media screen and (max-width: 991px) {
+  .w-layout-blockcontainer {
+    max-width: 728px;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .w-layout-blockcontainer {
+    max-width: none;
+  }
+}
+
+.logo {
+  justify-content: flex-start;
+  align-items: center;
+  display: flex;
+}
+
+.container {
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+}
+
+.body {
+  margin-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 140%;
+  overflow: visible;
+}
+
+.body.center {
+  text-align: center;
+}
+
+.body.italic {
+  text-align: right;
+  font-style: italic;
+}
+
+.section {
+  flex-flow: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1400px;
+  height: 65px;
+  display: flex;
+  position: absolute;
+  top: 0%;
+  bottom: auto;
+}
+
+.navbar {
+  flex-flow: row;
+  display: flex;
+}
+
+.menu {
+  z-index: 100;
+  background-color: var(--white);
+  width: 100%;
+  max-width: 100%;
+  height: 65px;
+  box-shadow: none;
+  color: var(--black);
+  flex-flow: row;
+  justify-content: center;
+  align-items: center;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: fixed;
+  inset: 0% 0% auto;
+}
+
+.menu-item {
+  text-decoration: none;
+  -webkit-text-decoration-color: var(--black);
+  text-decoration-color: var(--black);
+  vertical-align: baseline;
+  flex: 0 auto;
+  display: inline-block;
+}
+
+.navigation {
+  grid-column-gap: 40px;
+  grid-row-gap: 40px;
+  flex-flow: row;
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-columns: 1fr;
+  justify-content: flex-start;
+  align-items: center;
+  display: flex;
+}
+
+.button {
+  border: 2px solid var(--powder);
+  background-color: var(--powder);
+  max-width: none;
+  color: var(--white);
+  border-radius: 5px;
+  padding: 10px 40px;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 140%;
+  text-decoration: none;
+}
+
+.button:hover {
+  border: 2px solid var(--powder);
+  background-color: var(--pink);
+  color: var(--powder);
+}
+
+.main-screen {
+  margin-top: 65px;
+}
+
+.menu-txt {
+  color: var(--black);
+}
+
+.main {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 65px;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.main-wrap {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: row;
+  flex: 0 auto;
+  grid-template-rows: auto;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: row;
+  place-content: start;
+  place-items: start stretch;
+  width: 100%;
+  display: grid;
+}
+
+.main-block {
+  border-radius: var(--block);
+  background-color: var(--beige);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-text-bg.webp');
+  background-position: 50%;
+  background-size: cover;
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: center;
+  width: 695px;
+  height: 695px;
+  padding: 60px;
+  display: flex;
+}
+
+.image {
+  border-radius: var(--block);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-photo.webp');
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: scroll;
+  width: 695px;
+  height: 695px;
+}
+
+.image.form {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/form-photo.webp');
+  background-position: 50%;
+  background-size: cover;
+  height: 800px;
+}
+
+.main-txt-wrap {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  display: flex;
+}
+
+.heading {
+  text-align: left;
+  letter-spacing: -2px;
+  text-transform: uppercase;
+  margin-top: 0;
+  margin-bottom: 0;
+  font-family: "Sourceserif 4 48 Pt", Times New Roman, sans-serif;
+  font-size: 50px;
+  font-weight: 400;
+  line-height: 110%;
+}
+
+.heading.center {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.heading.italic {
+  font-style: italic;
+}
+
+.divider {
+  height: 150px;
+}
+
+.why {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+._3-columns {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: row;
+  flex: 0 auto;
+  grid-template-rows: auto;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: row;
+  place-content: start;
+  place-items: start stretch;
+  width: 100%;
+  display: grid;
+}
+
+.why-txt-wrap {
+  flex-flow: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  margin-bottom: 30px;
+  display: flex;
+}
+
+.quote-wrap {
+  max-width: 400px;
+}
+
+.why-card {
+  border-radius: var(--block);
+  background-color: var(--beige);
+  width: 460px;
+  height: 500px;
+  padding: 30px;
+}
+
+.why-card.pink {
+  background-color: var(--pink);
+}
+
+.why-card.pink._11 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-pink-01.webp');
+  background-position: 0 0;
+  background-size: auto;
+}
+
+.why-card.pink._2 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-pink-02.webp');
+}
+
+.why-card.pink._3 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-pink-03.webp');
+}
+
+.why-card._1 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-01.webp');
+  background-position: 0 0;
+  background-size: auto;
+}
+
+.why-card._2 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-02.webp');
+  background-position: 0 0;
+  background-size: auto;
+}
+
+.why-card._3 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-03.webp');
+  background-position: 0 0;
+  background-size: auto;
+}
+
+.body-copy {
+  margin-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.body-copy.center {
+  text-align: center;
+}
+
+.body-copy.italic {
+  text-align: right;
+  font-style: italic;
+}
+
+.heading-2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 130%;
+}
+
+.tabs {
+  margin-top: 20px;
+  margin-bottom: 40px;
+}
+
+.tab-link-tab-3 {
+  border: 1px solid var(--powder);
+  background-color: var(--transparent);
+  color: var(--powder);
+  border-radius: 5px;
+  padding: 10px 20px;
+}
+
+.tab-link-tab-3.w--current {
+  background-color: var(--pink);
+}
+
+.tab-link-tab-2 {
+  border: 1px solid var(--powder);
+  background-color: var(--transparent);
+  color: var(--powder);
+  border-radius: 5px;
+  padding: 10px 20px;
+}
+
+.tab-link-tab-2.w--current {
+  background-color: var(--pink);
+}
+
+.tab-link-tab-1 {
+  border: 1px solid var(--powder);
+  background-color: var(--transparent);
+  color: var(--black);
+  border-radius: 5px;
+  padding: 10px 20px;
+}
+
+.tab-link-tab-1.w--current {
+  border: 1px solid var(--powder);
+  background-color: var(--pink);
+  color: var(--powder);
+  border-radius: 5px;
+  padding: 10px 20px;
+}
+
+.tabs-menu {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  margin-bottom: 20px;
+  display: flex;
+}
+
+.services {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.services-photo {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/vacuum-roller-massage.webp');
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  width: 100%;
+  height: 300px;
+}
+
+.services-photo._1.other {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/skin-cleansing.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._1 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/vacuum-roller-massage.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._2 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/rf-lifting.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._3 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/hydropiling.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._4 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/gas-liquid-peeling.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._5 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/ultrasound-phoresis.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._6 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/microcurrent-guasha.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._7 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/darsonval.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._8 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/microneedling.webp');
+  background-position: 50%;
+}
+
+.services-photo.face._9 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/revixan-photodynamic.webp');
+  background-position: 50%;
+  background-size: cover;
+}
+
+.services-photo.body._1 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/vacuum-roller-massage.webp');
+  background-position: 50%;
+}
+
+.services-photo.body._2 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/cavitation.webp');
+}
+
+.services-photo.body._3 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/rotational-massage.webp');
+}
+
+.services-photo.body._4 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/laser-epilation.webp');
+}
+
+.services-photo.body._5 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/pressotherapy.webp');
+}
+
+.services-photo.body._6 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/revixan-regeneration.webp');
+  background-position: 50%;
+  background-size: cover;
+}
+
+.services-photo._2.other {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/peels-and-care.webp');
+  background-position: 50%;
+}
+
+.services-photo._3.other {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/home-care-consultation.webp');
+  background-position: 50%;
+}
+
+.services-photo._4.other {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/pro-cosmetics.webp');
+  background-position: 50%;
+}
+
+.services-card-txt-wrap {
+  border-top: 1px solid var(--powder);
+  padding: 30px;
+}
+
+.services-card {
+  border: 1px solid var(--powder);
+  border-radius: var(--block);
+  max-width: 460px;
+}
+
+.text-block {
+  color: var(--powder);
+}
+
+.quote {
+  text-align: center;
+  max-width: 900px;
+  font-size: 23px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 140%;
+}
+
+.quote.left {
+  text-align: left;
+  max-width: none;
+}
+
+.center-align {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  display: flex;
+}
+
+.about {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.image-2 {
+  border-radius: var(--block);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/about/team-photo.webp');
+  background-position: 40%;
+  background-size: cover;
+  width: 695px;
+  height: 695px;
+}
+
+.about-block {
+  border-radius: var(--block);
+  background-color: var(--pink);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/about/text-block-bg.webp');
+  background-position: 0 0;
+  background-size: auto;
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: center;
+  width: 695px;
+  height: 695px;
+  padding: 40px 30px 30px;
+  display: flex;
+}
+
+.about-txt-wrap {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-self: flex-start;
+  align-items: flex-start;
+  width: auto;
+  display: flex;
+}
+
+.equipment {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: block;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.h2 {
+  text-align: left;
+  letter-spacing: -2px;
+  text-transform: uppercase;
+  margin-top: 0;
+  margin-bottom: 0;
+  font-family: "Sourceserif 4 48 Pt", Times New Roman, sans-serif;
+  font-size: 50px;
+  font-weight: 400;
+  line-height: 110%;
+}
+
+.h2.center {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.h2.italic {
+  font-size: 40px;
+  font-style: italic;
+}
+
+.h2.italic.center {
+  max-width: 1000px;
+}
+
+.equipment-txt-wrap {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 100%;
+  margin-bottom: 30px;
+  display: flex;
+}
+
+.equipment-card {
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  border-radius: var(--block);
+  background-color: var(--beige);
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 460px;
+  height: 800px;
+  padding: 30px;
+  display: flex;
+}
+
+.icon {
+  color: var(--powder);
+  border-radius: 0;
+  font-size: 30px;
+}
+
+.icon-2 {
+  color: var(--powder);
+  font-size: 30px;
+}
+
+.left-arrow {
+  border: 2px solid var(--pink);
+  background-color: var(--pink);
+  border-radius: 5px;
+  width: 70px;
+  height: 50px;
+  margin-top: auto;
+  margin-bottom: auto;
+  inset: -130px 80px auto auto;
+}
+
+.left-arrow:hover {
+  border: 2px solid var(--powder);
+  background-color: var(--white);
+}
+
+.right-arrow {
+  border: 2px solid var(--pink);
+  background-color: var(--pink);
+  border-radius: 5px;
+  width: 70px;
+  height: 50px;
+  margin-top: auto;
+  margin-bottom: auto;
+  inset: -130px 0% auto auto;
+}
+
+.right-arrow:hover {
+  border-color: var(--powder);
+  background-color: var(--white);
+}
+
+.slide {
+  vertical-align: baseline;
+}
+
+.slider {
+  background-color: var(--transparent);
+  height: 800px;
+}
+
+.fitness {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.fitness-block {
+  border-radius: var(--block);
+  background-color: var(--beige);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 695px;
+  height: 500px;
+  padding: 40px 30px;
+  display: flex;
+}
+
+.image-3 {
+  border-radius: var(--block);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/cross-promo/fitness-gym.webp');
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  width: 695px;
+  height: 500px;
+}
+
+.activity {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.activity-block {
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  border-radius: var(--block);
+  background-color: var(--pink);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  height: auto;
+  padding: 40px 30px;
+  display: flex;
+}
+
+.text-field {
+  width: 650px;
+  height: 55px;
+  color: var(--black);
+  border: 1px #000;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  padding: 15px 30px;
+}
+
+.form-block {
+  margin-bottom: 0;
+}
+
+.brands {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: center;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.grid {
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  grid-template-rows: auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+  place-content: stretch;
+  place-items: center;
+  width: 100%;
+  margin-top: 30px;
+}
+
+.grid2 {
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  grid-template-rows: auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  place-items: center;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.qa {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.logos-title-small {
+  border-bottom: 1px solid #e4ebf3;
+  padding: 60px 30px;
+  position: relative;
+}
+
+.container-2 {
+  width: 100%;
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.clients-tag {
+  text-align: center;
+  margin-bottom: 32px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.clients-wrapper-three {
+  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: -10px;
+  display: flex;
+}
+
+.clients-image-three {
+  margin-bottom: 10px;
+  margin-left: 15px;
+  margin-right: 15px;
+}
+
+.qa-accordion-item {
+  z-index: 0;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-self: flex-start;
+  align-items: center;
+  width: 100%;
+  margin-left: 0;
+  margin-right: auto;
+  display: flex;
+  overflow: hidden;
+}
+
+.qa-accordion {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: column;
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-columns: 1fr;
+  align-self: flex-start;
+  width: 100%;
+  margin-top: 30px;
+  margin-left: 0;
+  margin-right: auto;
+  display: flex;
+}
+
+.qa-toggle {
+  border-radius: var(--block);
+  background-color: var(--beige);
+  flex: 1;
+  align-self: center;
+  width: 100%;
+  height: 90px;
+  margin-left: 0;
+  margin-right: auto;
+  padding: 30px;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.qa-toggle.w--open {
+  flex: 1;
+}
+
+.icon-3 {
+  z-index: 0;
+  color: var(--transparent);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/icons/ui-chevron.svg');
+  background-position: 50%;
+  background-size: auto;
+  margin-top: 30px;
+  margin-right: 30px;
+  font-size: 30px;
+}
+
+.qa-hover {
+  z-index: 5;
+  background-color: var(--dark-beige);
+  opacity: 0;
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/icons/ui-chevron.svg');
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: 30px 30px;
+  background-attachment: scroll;
+  border-radius: 100px;
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  inset: 20px 20px 20px auto;
+}
+
+.text-block-2 {
+  margin-top: 3px;
+}
+
+.qa-dropdown {
+  border-radius: var(--block);
+  background-color: var(--dark-beige);
+  margin-top: 5px;
+  padding: 30px;
+  display: block;
+  position: static;
+}
+
+.div-block {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: row;
+  display: flex;
+}
+
+.footer {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: flex;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.footer-txt {
+  color: var(--powder);
+  margin-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 140%;
+}
+
+.footer-txt.center {
+  text-align: center;
+}
+
+.footer-txt.italic {
+  text-align: right;
+  font-style: italic;
+}
+
+.link {
+  color: var(--powder);
+  -webkit-text-stroke-color: var(--powder);
+}
+
+.footer-txt-wrap {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: column;
+  display: flex;
+}
+
+.socials {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+}
+
+.inst-warning {
+  color: var(--powder);
+  margin-bottom: 40px;
+  font-size: 15px;
+}
+
+.inst-warning.services {
+  max-width: 460px;
+  color: var(--black);
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-style: italic;
+  line-height: 150%;
+}
+
+.inst-warning.form {
+  color: #16161699;
+  margin-bottom: 10px;
+}
+
+.socials-wrap {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+}
+
+.footer-link-txt {
+  color: var(--powder);
+  margin-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 140%;
+}
+
+.footer-link-txt.center {
+  text-align: center;
+}
+
+.footer-link-txt.italic {
+  text-align: right;
+  font-style: italic;
+}
+
+.footer-divider {
+  height: 20px;
+}
+
+.footer-block {
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  border-radius: var(--block);
+  background-color: var(--pink);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/footer/block-bg.webp');
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: contain;
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  height: auto;
+  padding: 40px 30px;
+  display: flex;
+}
+
+.activity-txt-img-wrap {
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.image-4 {
+  width: 200px;
+  height: 200px;
+  position: static;
+  inset: 0% 30px 0% auto;
+}
+
+.footer-h-txt-wrap {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: auto;
+  display: flex;
+}
+
+.activity-txt-wrap {
+  grid-column-gap: 20px;
+  grid-row-gap: 20px;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: 850px;
+  display: flex;
+}
+
+.menu_mobile {
+  z-index: 100;
+  background-color: var(--white);
+  width: 100%;
+  max-width: 100%;
+  height: 65px;
+  box-shadow: none;
+  color: var(--black);
+  flex-flow: row;
+  justify-content: center;
+  align-items: center;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: none;
+  position: fixed;
+  inset: 0% 0% auto;
+}
+
+.button-menu {
+  background-color: var(--powder);
+  color: var(--white);
+  border-radius: 5px;
+  padding: 10px 40px;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 140%;
+  text-decoration: none;
+}
+
+.photo-eqiup {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/pressotop.webp');
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  width: 400px;
+  height: 400px;
+}
+
+.photo-eqiup._1 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/cosmo-face-10in1.webp');
+}
+
+.photo-eqiup._2 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/slimboss-5in1.webp');
+}
+
+.photo-eqiup._3 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/laser-one-touch-8.webp');
+}
+
+.photo-eqiup._4 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/revixan.webp');
+  background-position: 50%;
+  background-size: cover;
+}
+
+.photo-eqiup._5 {
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/inbody-720.webp');
+  background-position: 50%;
+  background-size: cover;
+}
+
+.services-flex {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: row;
+  flex: 0 auto;
+  grid-template-rows: auto;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: row;
+  place-content: start;
+  place-items: start stretch;
+  width: 100%;
+  display: flex;
+}
+
+.form-wrap-block {
+  border-radius: var(--block);
+  background-color: var(--beige);
+  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-text-bg.webp');
+  background-position: 50%;
+  background-size: cover;
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: center;
+  width: 695px;
+  height: 800px;
+  padding: 60px;
+  display: flex;
+}
+
+.form-block-2 {
+  width: 100%;
+  margin-top: 30px;
+  margin-bottom: 0;
+}
+
+.form-2 {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  flex-flow: column;
+  display: flex;
+}
+
+.field-label {
+  margin-bottom: 0;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.text-field-2 {
+  border: 1px solid var(--dark-beige);
+  background-color: var(--white);
+  border-radius: 5px;
+  height: 50px;
+  padding: 10px;
+  font-size: 18px;
+  display: block;
+}
+
+.text-field-2:active, .text-field-2:focus {
+  border-color: var(--powder);
+}
+
+.select-field {
+  border: 1px solid var(--dark-beige);
+  background-color: var(--white);
+  border-radius: 5px;
+  height: 50px;
+  font-size: 18px;
+  display: none;
+}
+
+.select-field:active, .select-field:focus {
+  border-color: var(--powder);
+}
+
+.mask {
+  max-width: 1400px;
+}
+
+.equipment-mobile {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: none;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.link-2 {
+  color: var(--powder);
+}
+
+.qa-mobile {
+  width: 100%;
+  max-width: 1400px;
+  height: auto;
+  color: var(--black);
+  flex-flow: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  font-family: Involve, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 140%;
+  text-decoration: none;
+  display: none;
+  position: static;
+  inset: 0% 0% auto;
+}
+
+.success-message {
+  background-color: var(--dark-beige);
+  border-radius: 5px;
+}
+
+.success-message.news {
+  background-color: var(--powder);
+  color: var(--white);
+}
+
+.error-message {
+  background-color: var(--pink);
+  border-radius: 5px;
+}
+
+.error-message.news {
+  color: var(--white);
+  background-color: #774553;
+}
+
+.text-block-6 {
+  text-align: center;
+}
+
+.code-embed {
+  margin-bottom: 10px;
+}
+
+.telegram-field {
+  border: 1px solid var(--dark-beige);
+  background-color: var(--white);
+  border-radius: 5px;
+  height: 50px;
+  margin-top: 10px;
+  padding: 10px;
+  font-size: 18px;
+  display: block;
+}
+
+.telegram-field:active, .telegram-field:focus {
+  border-color: var(--powder);
+}
+
+.telegram-label {
+  margin-bottom: 0;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.telegram-wrapper {
+  display: none;
+}
+
+.form-honeypot {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.link-3 {
+  color: var(--powder);
+}
+
+.link-block {
+  color: var(--black);
+  border: 1px #000;
+  text-decoration: none;
+}
+
+@media screen and (max-width: 991px) {
+  .logo, .logo.w--current {
+    max-width: 150px;
+  }
+
+  .body, .body.center, .body.italic {
+    font-size: 18px;
+  }
+
+  .menu {
+    max-width: 640px;
+    display: none;
+  }
+
+  .main {
+    max-width: 640px;
+    margin-top: 80px;
+    overflow: hidden;
+  }
+
+  .main-wrap {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(auto, auto);
+  }
+
+  .main-block {
+    width: 100%;
+    height: 450px;
+  }
+
+  .image {
+    display: none;
+  }
+
+  .heading {
+    font-size: 40px;
+  }
+
+  .divider {
+    height: 120px;
+  }
+
+  .why {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  ._3-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .why-txt-wrap {
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .quote-wrap {
+    max-width: 300px;
+  }
+
+  .why-card.pink._11 {
+    background-position: 50% 100%;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 100%;
+    height: 400px;
+  }
+
+  .why-card.pink._2, .why-card.pink._3 {
+    background-position: 50% 100%;
+    background-size: contain;
+  }
+
+  .why-card._1, .why-card._2, .why-card._3 {
+    background-position: 50% 100%;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 100%;
+    height: 400px;
+  }
+
+  .heading-2 {
+    font-size: 20px;
+  }
+
+  .tabs-menu {
+    font-size: 16px;
+  }
+
+  .services {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .services-photo {
+    height: 200px;
+  }
+
+  .services-card-txt-wrap {
+    padding: 20px;
+  }
+
+  .services-card {
+    max-width: 100%;
+  }
+
+  .quote {
+    font-size: 20px;
+  }
+
+  .quote.left {
+    font-size: 18px;
+  }
+
+  .center-align {
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+  }
+
+  .about {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .image-2 {
+    width: 100%;
+    max-width: 640px;
+    height: 350px;
+  }
+
+  .about-block {
+    width: 100%;
+    height: auto;
+  }
+
+  .about-txt-wrap {
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+  }
+
+  .equipment {
+    max-width: 640px;
+    display: none;
+    overflow: hidden;
+  }
+
+  .h2.italic {
+    font-size: 30px;
+    font-style: normal;
+  }
+
+  .equipment-card {
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    height: 500px;
+  }
+
+  .left-arrow {
+    top: auto;
+    bottom: 0%;
+    left: 0%;
+  }
+
+  .right-arrow {
+    inset: auto 0% 0% 80px;
+  }
+
+  .slider {
+    height: 560px;
+  }
+
+  .fitness {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .fitness-block {
+    width: 100%;
+    height: 300px;
+  }
+
+  .image-3 {
+    width: 100%;
+    height: 350px;
+    display: inline-flex;
+  }
+
+  .activity {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .text-field {
+    width: 580px;
+  }
+
+  .brands {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+  }
+
+  .grid2 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .qa {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .container-2 {
+    max-width: 728px;
+  }
+
+  .clients-image-three {
+    margin-bottom: 30px;
+  }
+
+  .text-block-2 {
+    font-size: 20px;
+  }
+
+  .footer {
+    max-width: 640px;
+    overflow: hidden;
+  }
+
+  .footer-txt {
+    font-size: 18px;
+  }
+
+  .footer-txt-wrap {
+    width: 500px;
+  }
+
+  .inst-warning {
+    width: 500px;
+    font-size: 12px;
+  }
+
+  .inst-warning.services {
+    max-width: 280px;
+  }
+
+  .inst-warning.form {
+    line-height: 140%;
+  }
+
+  .footer-link-txt {
+    font-size: 16px;
+  }
+
+  .image-4 {
+    width: 150px;
+    height: 150px;
+    display: none;
+  }
+
+  .menu_mobile {
+    justify-content: space-between;
+    align-items: center;
+    max-width: 640px;
+    height: 80px;
+    display: flex;
+  }
+
+  .dropdown-toggle {
+    background-color: var(--powder);
+    color: var(--white);
+    border-radius: 5px;
+    padding: 10px 50px 10px 30px;
+    display: flex;
+  }
+
+  .dropdown-toggle:hover {
+    background-color: var(--pink);
+    color: var(--powder);
+  }
+
+  .dropdown {
+    margin-left: auto;
+    margin-right: 0;
+    font-weight: 400;
+  }
+
+  .text-block-3 {
+    font-weight: 500;
+  }
+
+  .icon-4 {
+    margin-right: 20px;
+  }
+
+  .dropdown-list {
+    text-align: center;
+    border-radius: 5px;
+    margin-top: 10px;
+  }
+
+  .dropdown-list.w--open {
+    background-color: var(--pink);
+    font-weight: 400;
+  }
+
+  .button-menu {
+    margin-left: 10px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .dropdown-link, .dropdown-link-2, .dropdown-link-3 {
+    color: var(--powder);
+    font-weight: 500;
+  }
+
+  .photo-eqiup {
+    width: 250px;
+    height: 250px;
+  }
+
+  .services-flex {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-wrap-block {
+    width: 100%;
+    height: auto;
+  }
+
+  .mask {
+    max-width: 640px;
+  }
+
+  .equipment-mobile {
+    max-width: 640px;
+    display: block;
+    overflow: hidden;
+  }
+
+  .dropdown-link-4 {
+    color: var(--powder);
+    font-weight: 500;
+  }
+
+  .qa-mobile {
+    max-width: 640px;
+    overflow: hidden;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .body.center {
+    font-size: 18px;
+  }
+
+  .body.italic {
+    text-align: left;
+    font-size: 16px;
+  }
+
+  .main {
+    max-width: 480px;
+  }
+
+  .main-block {
+    height: 450px;
+  }
+
+  .heading {
+    max-width: 350px;
+    font-size: 35px;
+  }
+
+  .heading.center {
+    font-size: 40px;
+  }
+
+  .divider {
+    height: 100px;
+  }
+
+  .why {
+    max-width: 480px;
+  }
+
+  ._3-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .why-txt-wrap {
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+    flex-flow: column;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .quote-wrap {
+    max-width: 400px;
+  }
+
+  .why-card.pink._11 {
+    background-image: none;
+    background-position: 0 0;
+    background-repeat: repeat;
+    background-size: auto;
+    width: 100%;
+    height: auto;
+  }
+
+  .why-card.pink._2, .why-card.pink._3 {
+    background-image: none;
+    background-position: 0 0;
+    background-repeat: repeat;
+    background-size: auto;
+  }
+
+  .why-card._1 {
+    background-image: none;
+    background-position: 0 0;
+    background-size: auto;
+    width: 100%;
+    height: auto;
+  }
+
+  .why-card._2, .why-card._3 {
+    background-image: none;
+    background-position: 0 0;
+    background-repeat: repeat;
+    background-size: auto;
+    width: 100%;
+    height: auto;
+  }
+
+  .tabs {
+    margin-top: 10px;
+    margin-bottom: 30px;
+  }
+
+  .tab-link-tab-3, .tab-link-tab-2, .tab-link-tab-1, .tab-link-tab-1.w--current {
+    padding: 5px 10px;
+  }
+
+  .tabs-menu {
+    flex-flow: wrap;
+    margin-bottom: 10px;
+  }
+
+  .services {
+    max-width: 480px;
+  }
+
+  .services-photo {
+    background-position: 50%;
+    width: 100%;
+    height: 200px;
+  }
+
+  .services-card {
+    max-width: 100%;
+  }
+
+  .text-block {
+    font-size: 15px;
+  }
+
+  .tabs-content {
+    overflow: visible;
+  }
+
+  .quote {
+    font-size: 18px;
+  }
+
+  .about, .equipment {
+    max-width: 480px;
+  }
+
+  .equipment-txt-wrap {
+    margin-bottom: 20px;
+  }
+
+  .equipment-card {
+    width: 100%;
+    height: 600px;
+    margin-top: -20px;
+  }
+
+  .slider {
+    height: 680px;
+    padding-top: 0;
+  }
+
+  .fitness {
+    max-width: 480px;
+  }
+
+  .image-3 {
+    height: 250px;
+  }
+
+  .activity {
+    max-width: 480px;
+  }
+
+  .activity-block {
+    grid-column-gap: 20px;
+    grid-row-gap: 20px;
+  }
+
+  .text-field {
+    width: 380px;
+    height: auto;
+    margin-bottom: 10px;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    padding-left: 20px;
+  }
+
+  .brands {
+    max-width: 480px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+
+  .qa {
+    max-width: 480px;
+  }
+
+  .logos-title-small {
+    padding: 60px 15px;
+  }
+
+  .clients-wrapper-three {
+    margin-bottom: -30px;
+  }
+
+  .clients-image-three {
+    margin-bottom: 30px;
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+
+  .qa-accordion {
+    margin-top: 10px;
+  }
+
+  .qa-toggle {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .icon-3 {
+    margin-top: 20px;
+  }
+
+  .qa-hover {
+    top: 10px;
+  }
+
+  .div-block {
+    grid-column-gap: 0px;
+    grid-row-gap: 0px;
+    flex-flow: column;
+  }
+
+  .footer {
+    max-width: 480px;
+  }
+
+  .footer-txt-wrap {
+    width: 350px;
+  }
+
+  .inst-warning {
+    width: 350px;
+    margin-bottom: 10px;
+    line-height: 135%;
+  }
+
+  .footer-block {
+    background-size: cover;
+  }
+
+  .menu_mobile {
+    max-width: 480px;
+  }
+
+  .text-block-3, .dropdown-list, .button-menu {
+    font-size: 16px;
+  }
+
+  .text-block-4, .text-block-5 {
+    font-size: 15px;
+  }
+
+  .photo-eqiup {
+    background-position: 50%;
+    width: 300px;
+    height: 400px;
+  }
+
+  .services-flex {
+    grid-template-columns: 1fr;
+  }
+
+  .form-wrap-block {
+    height: auto;
+  }
+
+  .form-2 {
+    grid-column-gap: 5px;
+    grid-row-gap: 5px;
+  }
+
+  .field-label {
+    font-size: 18px;
+  }
+
+  .text-field-2, .select-field {
+    font-size: 16px;
+  }
+
+  .mask {
+    max-width: 600px;
+  }
+
+  .equipment-mobile, .qa-mobile {
+    max-width: 480px;
+  }
+
+  .telegram-field {
+    font-size: 16px;
+  }
+
+  .telegram-label {
+    font-size: 18px;
+  }
+}
+
+@media screen and (max-width: 479px) {
+  .logo, .logo.w--current {
+    max-width: 120px;
+  }
+
+  .body, .body.center {
+    font-size: 16px;
+  }
+
+  .body.italic {
+    font-size: 15px;
+  }
+
+  .button {
+    padding-left: 20px;
+    padding-right: 20px;
+    font-size: 15px;
+  }
+
+  .main {
+    max-width: 350px;
+  }
+
+  .main-block {
+    height: 350px;
+    padding: 40px 20px;
+  }
+
+  .image {
+    width: 100%;
+    height: 200px;
+    display: none;
+  }
+
+  .heading {
+    max-width: 300px;
+    font-size: 30px;
+  }
+
+  .heading.center {
+    font-size: 30px;
+  }
+
+  .divider {
+    height: 70px;
+  }
+
+  .why {
+    max-width: 350px;
+  }
+
+  ._3-columns {
+    grid-auto-flow: row;
+    height: 100%;
+  }
+
+  .why-txt-wrap {
+    margin-bottom: 20px;
+  }
+
+  .why-card.pink._11, .why-card._1, .why-card._2, .why-card._3 {
+    padding: 20px;
+  }
+
+  .heading-2 {
+    margin-bottom: 5px;
+    font-size: 18px;
+  }
+
+  .tabs {
+    margin-bottom: 20px;
+  }
+
+  .services {
+    max-width: 350px;
+  }
+
+  .services-photo {
+    height: 150px;
+  }
+
+  .services-card-txt-wrap {
+    padding: 20px;
+  }
+
+  .services-card {
+    max-width: 100%;
+  }
+
+  .quote {
+    margin-bottom: 5px;
+    font-size: 16px;
+  }
+
+  .quote.left {
+    font-size: 16px;
+  }
+
+  .about {
+    max-width: 350px;
+  }
+
+  .image-2 {
+    height: 200px;
+  }
+
+  .about-block {
+    padding: 20px;
+  }
+
+  .equipment {
+    max-width: 350px;
+  }
+
+  .h2.italic.center {
+    text-align: left;
+  }
+
+  .equipment-txt-wrap {
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+    margin-bottom: 15px;
+  }
+
+  .equipment-card {
+    height: 600px;
+    margin-top: 0;
+    padding: 20px;
+  }
+
+  .icon, .icon-2 {
+    font-size: 25px;
+  }
+
+  .left-arrow, .right-arrow {
+    height: 40px;
+  }
+
+  .slider {
+    height: 650px;
+  }
+
+  .fitness {
+    max-width: 350px;
+  }
+
+  .fitness-block {
+    padding: 20px;
+  }
+
+  .image-3 {
+    height: 150px;
+  }
+
+  .activity {
+    max-width: 350px;
+  }
+
+  .activity-block {
+    padding: 20px;
+  }
+
+  .text-field {
+    width: 300px;
+  }
+
+  .brands {
+    max-width: 350px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .qa {
+    max-width: 350px;
+    display: none;
+  }
+
+  .container-2 {
+    max-width: none;
+  }
+
+  .clients-wrapper-three {
+    grid-column-gap: 20px;
+    grid-row-gap: 30px;
+    grid-template-rows: auto auto;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-columns: 1fr;
+    justify-items: center;
+    margin-bottom: 0;
+    display: grid;
+  }
+
+  .clients-image-three {
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .qa-accordion-item {
+    max-width: 350px;
+    display: block;
+  }
+
+  .qa-toggle {
+    flex-flow: row;
+    height: 90px;
+    padding-left: 20px;
+    padding-right: 20px;
+    display: block;
+  }
+
+  .icon-3 {
+    margin-right: 20px;
+  }
+
+  .qa-hover {
+    right: 10px;
+  }
+
+  .text-block-2 {
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+    flex-flow: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    max-width: 250px;
+    display: block;
+  }
+
+  .qa-dropdown {
+    padding: 20px;
+  }
+
+  .footer {
+    max-width: 350px;
+  }
+
+  .footer-txt-wrap {
+    grid-column-gap: 5px;
+    grid-row-gap: 5px;
+    width: 300px;
+  }
+
+  .inst-warning {
+    width: 300px;
+  }
+
+  .activity-txt-wrap {
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+  }
+
+  .menu_mobile {
+    max-width: 350px;
+  }
+
+  .menu_mobile.form {
+    justify-content: flex-start;
+    align-items: center;
+  }
+
+  .button-menu {
+    font-size: 15px;
+  }
+
+  .dropdown-link:hover, .dropdown-link:focus, .dropdown-link.w--current, .dropdown-link.w--current:hover, .dropdown-link-2:hover, .dropdown-link-2:active, .dropdown-link-2:focus, .dropdown-link-2.w--current, .dropdown-link-3:hover, .dropdown-link-3:active, .dropdown-link-3:focus, .dropdown-link-3.w--current {
+    color: var(--black);
+  }
+
+  .photo-eqiup {
+    width: 250px;
+    height: 250px;
+    margin-left: 20px;
+  }
+
+  .image-5, .image-6 {
+    margin-left: -10px;
+  }
+
+  .form-wrap-block {
+    height: auto;
+    padding: 40px 20px;
+  }
+
+  .mask {
+    max-width: 500px;
+  }
+
+  .equipment-mobile {
+    max-width: 350px;
+  }
+
+  .link-2 {
+    color: var(--powder);
+  }
+
+  .dropdown-link-4:hover, .dropdown-link-4:active, .dropdown-link-4:focus {
+    color: var(--black);
+  }
+
+  .qa-mobile {
+    max-width: 350px;
+    display: block;
+  }
+}
+
+@media screen and (max-width: 991px) {
+  #w-node-_08c217d5-888f-98bb-b5d2-f04cceb43157-f1f86170 {
+    grid-area: span 1 / span 1 / span 1 / span 1;
+  }
+
+  #w-node-_765e98da-ab8d-6a29-ed7f-12316278f9a2-f1f86170 {
+    order: 1;
+  }
+}
+
+
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBoldOblique.ttf') format('truetype');
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Oblique.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Involve';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-MediumOblique.ttf') format('truetype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sourceserif 4 48 Pt';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-LightItalic.ttf') format('truetype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sourceserif 4 48 Pt';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sourceserif 4 48 Pt';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sourceserif 4 48 Pt';
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

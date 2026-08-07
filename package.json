@@ -1,0 +1,28 @@
+{
+  "name": "zvenfit-estetika-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_ENV=development node scripts/build-static.cjs && concurrently -k \"node mock-server.js\" \"serve dist -l 4173\" --names \"API,WEB\" --prefix-colors \"cyan,green\"",
+    "dev:watch": "NODE_ENV=development concurrently -k \"node mock-server.js\" \"node scripts/watch-static.cjs\" \"serve dist -l 4173\" --names \"API,BUILD,WEB\" --prefix-colors \"cyan,yellow,green\"",
+    "dev:mock": "node mock-server.js",
+    "build": "node scripts/build-static.cjs",
+    "lint:public": "eslint \"public/js/**/*.js\" \"functions/**/*.js\" \"scripts/build-static.cjs\" \"scripts/prepare-cdn-assets.cjs\" \"mock-server.js\" --no-error-on-unmatched-pattern",
+    "test:unit": "node --test tests/unit/*.test.cjs",
+    "test:build": "node scripts/test-build.cjs",
+    "test": "npm run lint:public && npm run test:unit && npm run test:build",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "deploy:yc": "aws s3 sync ./dist \"s3://${YC_S3_BUCKET:-zvenfit-estetika-frontend}\" --delete --exclude \"*.html\" --endpoint-url https://storage.yandexcloud.net --region ru-1 && aws s3 sync ./dist \"s3://${YC_S3_BUCKET:-zvenfit-estetika-frontend}\" --delete --exclude \"*\" --include \"*.html\" --cache-control \"no-cache, must-revalidate\" --metadata-directive REPLACE --endpoint-url https://storage.yandexcloud.net --region ru-1",
+    "upload:assets": "bash scripts/upload-assets.sh",
+    "setup:storage": "bash scripts/setup-storage.sh",
+    "deploy:lead-fn": "bash scripts/deploy-telegram-lead.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "clean-css": "^5.3.3",
+    "concurrently": "^9.2.1",
+    "eslint": "^8.57.1",
+    "serve": "^14.2.4"
+  }
+}

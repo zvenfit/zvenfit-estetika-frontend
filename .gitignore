@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.cdn-upload/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/tests/visual/**/*-snapshots/
+
+# Raw Webflow export (local staging only)
+upload/
+
+# Environment (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Security: keys and service account credentials
+*.key
+*.pem
+*-key.json
+sa-key.json
