@@ -1,134 +1,137 @@
-# Agent guide — ZvenFit Estetika Frontend
+# Руководство для агентов — ZvenFit Estetika Frontend
 
-Краткий контракт для AI-агента и новых контрибьюторов. Backlog: [`TODO.md`](TODO.md).
+Краткий контракт для AI-агентов и новых участников проекта. Список задач: [`TODO.md`](TODO.md).
 
-## Project isolation
+## Изоляция проекта
 
-- This is a standalone local project. Do not connect it to Stefania.
-- Do not use Stefania-specific skills, knowledge bases, memory, personas, workflows, or external Yandex services for work in this repository.
-- Rely only on this repository, its documentation, and general-purpose development tools unless the user explicitly requests otherwise for a specific task.
+- Это самостоятельный локальный проект. Не подключайте его к Стефании.
+- Не используйте для работы в этом репозитории скиллы, базы знаний, память, персоны, процессы Стефании и внешние сервисы Яндекса.
+- Опирайтесь только на этот репозиторий, его документацию и универсальные инструменты разработки, если пользователь явно не попросил иного для конкретной задачи.
 
-## Stack
+## Стек
 
-- **Frontend:** static HTML (Webflow export) in `public/`
-- **Build:** `scripts/build-static.cjs` → `dist/` (gitignored)
-- **Runtime JS:** vanilla JS in `public/js/`
-- **Backend:** 1 Yandex Cloud Function in `functions/telegram-lead/` (lead + newsletter)
-- **CI:** `.github/workflows/main.yml` — deploy function → lint/unit tests → build check → S3
+- **Фронтенд:** статический HTML из Webflow в `public/`
+- **Сборка:** `scripts/build-static.cjs` → `dist/`, который исключён из Git
+- **Клиентский JS:** чистый JavaScript в `public/js/`
+- **Бэкенд:** одна облачная функция Yandex Cloud в `functions/telegram-lead/` для заявок и рассылки
+- **CI:** `.github/workflows/main.yml` — деплой функции → линтер и модульные тесты → проверка сборки → S3
 
-No React/Vite/Next. Almost no TypeScript.
+React, Vite и Next не используются. TypeScript почти отсутствует.
 
-## Source of truth
+## Исходники
 
-| Edit | Do not edit |
-|------|-------------|
+| Редактировать | Не редактировать |
+|---------------|------------------|
 | `public/` | `dist/` |
-| `scripts/` | generated `*.min.css` in dist |
-| `functions/` | committed secrets |
-| `upload/` | raw Webflow (gitignored staging) |
+| `scripts/` | сгенерированные `*.min.css` в `dist/` |
+| `functions/` | закоммиченные секреты |
+| `upload/` | — это локальная промежуточная папка сырого экспорта Webflow |
 
-After HTML/CSS/JS/config changes: `npm run build` or `npm run dev:watch`.
+После изменений HTML, CSS, JS или конфигурации запускайте `npm run build` либо `npm run dev:watch`.
 
-## Architecture
+## Архитектура
 
-```
-Browser (estetika.zvenfit.ru)
-  ├─ site bucket — HTML (including legal), app JS, min site CSS, robots, sitemap
-  ├─ CDN zvenfit-estetika/ — images, vendor CSS, fonts, webflow.js
+```text
+Браузер (estetika.zvenfit.ru)
+  ├─ бакет сайта — HTML, юридические страницы, JS приложения, минифицированный CSS,
+  │                robots и sitemap
+  ├─ CDN zvenfit-estetika/ — изображения, сторонние CSS, шрифты и webflow.js
   └─ POST lead/newsletter → functions/telegram-lead → Telegram
 
-Local dev (npm run dev):
-  mock-server :3000  ← lead POST
-  serve dist :4173   ← static site
+Локальная разработка (npm run dev):
+  мок-сервер :3000  ← POST заявок
+  serve dist :4173  ← статический сайт
 ```
 
-Build injects API URL into `public/js/lead-config.js` → `window.ZVENFIT_LEAD_API`.
+Сборка подставляет URL API в `public/js/lead-config.js`, создавая в `dist/` значение `window.ZVENFIT_LEAD_API`.
 
-## Build pipeline
+## Процесс сборки
 
-`build-static.cjs` injects at `</head>` (no HTML markers required in source):
+`build-static.cjs` добавляет перед `</head>` следующие данные; специальные маркеры в исходном HTML не нужны:
 
-| Injection | Source |
-|-----------|--------|
-| Yandex Metrika | `scripts/snippets/analytics-head.html` + `YANDEX_METRIKA_ID` |
-| UTM attribution | `scripts/snippets/utm-head.html` |
-| Open Graph + canonical | page meta + `scripts/structured-data.config.json` |
-| JSON-LD | `scripts/structured-data.config.json` (skipped for `/404.html`) |
+| Инъекция | Источник |
+|----------|----------|
+| Яндекс Метрика | `scripts/snippets/analytics-head.html` + `YANDEX_METRIKA_ID` |
+| UTM-атрибуция | `scripts/snippets/utm-head.html` |
+| Open Graph и canonical | метаданные страницы + `scripts/structured-data.config.json` |
+| JSON-LD | `scripts/structured-data.config.json`; пропускается для `/404.html` |
 
-Also at build time:
-- minifies `zvenfit-kosmetologiya.webflow.css` → `*.min.css`
-- cache-busts listed JS via `ASSET_VERSION`
-- prunes CDN assets from `dist/` (images, fonts, vendor CSS/JS); keeps legal HTML
-- `public/robots.txt` + `public/sitemap.xml` copied to `dist/` (edit manually, like main repo)
+Также во время сборки:
 
-## Task → file map
+- `zvenfit-kosmetologiya.webflow.css` минифицируется в `*.min.css`;
+- к перечисленным JS добавляется версия кеша из `ASSET_VERSION`;
+- из `dist/` удаляются CDN-ассеты: изображения, шрифты, сторонние CSS и JS; юридические HTML остаются;
+- `public/robots.txt` и `public/sitemap.xml` копируются в `dist/` и обновляются вручную.
 
-| Task | Files |
-|------|-------|
-| Landing markup | `public/index.html` |
-| Lead form UI | `public/form/index.html`, `public/js/lead-form.js` |
-| Newsletter form | `public/index.html` (footer), `public/js/newsletter-form.js` |
-| Lead API / Telegram | `functions/telegram-lead/index.js` |
-| UTM in leads | `public/js/utm-attribution.js`, `docs/utm-attribution-marketing.md` |
-| SEO / JSON-LD | `scripts/structured-data.config.json`, page `<title>` |
-| Site CSS | `public/css/zvenfit-kosmetologiya.webflow.css` |
-| Function tests | `tests/unit/telegram-lead.test.cjs` |
-| Visual tests | `tests/visual/`, `playwright.config.js` |
-| Mutable CDN assets upload (vendor CSS/webflow.js) | `scripts/prepare-cdn-assets.cjs`, `scripts/upload-assets.sh` |
-| Deploy | `.github/workflows/main.yml`, `npm run deploy:yc` |
+## Карта задач и файлов
 
-## Local development
+| Задача | Файлы |
+|--------|-------|
+| Разметка лендинга | `public/index.html` |
+| Интерфейс формы заявки | `public/form/index.html`, `public/js/lead-form.js` |
+| Форма рассылки | `public/index.html` (футер), `public/js/newsletter-form.js` |
+| API заявок и Telegram | `functions/telegram-lead/index.js` |
+| UTM в заявках | `public/js/utm-attribution.js`, `docs/utm-attribution-marketing.md` |
+| SEO и JSON-LD | `scripts/structured-data.config.json`, `<title>` страницы |
+| CSS сайта | `public/css/zvenfit-kosmetologiya.webflow.css` |
+| Тесты функции | `tests/unit/telegram-lead.test.cjs` |
+| Визуальные тесты | `tests/visual/`, `playwright.config.js` |
+| Загрузка изменяемых CDN-ассетов | `scripts/prepare-cdn-assets.cjs`, `scripts/upload-assets.sh` |
+| Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |
+
+## Локальная разработка
 
 ```bash
 cp .env.example .env.development
-npm install
+npm ci
 npm run dev:watch
 ```
 
-Lead form posts to `http://localhost:3000` in dev (via injected `LEAD_API_URL`).
+В режиме разработки форма отправляет заявки на `http://localhost:3000` через подставленный `LEAD_API_URL`.
 
-## Verification
+## Проверка
 
 ```bash
 npm test
-npm run test:visual    # optional local screenshot comparison
+npm run test:visual    # необязательное локальное сравнение скриншотов
 ```
 
-Visual baselines are platform-specific and gitignored; create/update local baselines with `npm run test:visual:update`.
+Эталонные скриншоты зависят от платформы и исключены из Git. Создавайте или обновляйте локальные эталоны командой `npm run test:visual:update`.
 
-Manual smoke:
-- `/` — newsletter form in footer
-- `/form/` — lead form submit, check mock-server log for `utm` when testing with `?utm_source=test`
+Ручной smoke-тест:
 
-## Secrets & security
+- `/` — форма рассылки в футере;
+- `/form/` — отправка заявки; при проверке с `?utm_source=test` в логе мок-сервера должен быть объект `utm`.
 
-- Never commit tokens, SA keys, or real `.env*`
-- Bot token / chat ID: Cloud Function env + GitHub Secrets only
-- CORS: `ALLOWED_ORIGINS` in workflow and function env
+## Секреты и безопасность
 
-## Brand constraints
+- Не коммитьте токены, ключи сервисного аккаунта и реальные `.env*`.
+- Токен бота и ID чата хранятся только в окружении облачной функции и GitHub Secrets.
+- CORS задаётся через `ALLOWED_ORIGINS` в workflow и окружении функции.
 
-Cosmetology / beauty aesthetic — do not replace with generic fitness branding from main `zvenfit-frontend`.
+## Ограничения бренда
 
-## Common mistakes
+Это эстетика косметологии и индустрии красоты. Не заменяйте её универсальным фитнес-оформлением из основного `zvenfit-frontend`.
 
-1. Editing `dist/` directly — lost on next build
-2. Forgetting `npm run upload:assets` after vendor CSS/Webflow JS changes
-3. Using `lint` — use `lint:public` (no `src/`)
-4. Putting images/fonts/vendor assets back into site bucket — `dist/` stays lean except for legal HTML
-5. Expecting `upload:assets` to upload images/fonts — they are intentionally excluded and managed directly in CDN
+## Частые ошибки
 
-## Pages
+1. Редактирование `dist/` вручную: изменения исчезнут при следующей сборке.
+2. Пропуск `npm run upload:assets` после изменения сторонних CSS или Webflow JS.
+3. Запуск `lint` вместо `lint:public`: каталога `src/` в проекте нет.
+4. Возврат изображений, шрифтов или сторонних ассетов в бакет сайта: `dist/` должен оставаться компактным, кроме юридических HTML.
+5. Ожидание, что `upload:assets` загрузит изображения или шрифты: они намеренно исключены и управляются непосредственно в CDN.
 
-Primary pages: `index.html`, `form/index.html`, `404.html`.
+## Страницы
 
-Legal HTML is deployed with the site: `documents/privacy-policy.html`, `documents/personal-data-processing.html`.
+Основные страницы: `index.html`, `form/index.html`, `404.html`.
 
-## Docs index
+Юридические HTML разворачиваются вместе с сайтом: `documents/privacy-policy.html`, `documents/personal-data-processing.html`.
 
-| File | Purpose |
-|------|---------|
-| `README.md` | Architecture, deploy, Webflow workflow |
-| `docs/setup.md` | YC + Telegram + GitHub Secrets |
-| `docs/utm-attribution-marketing.md` | UTM for marketing |
-| `TODO.md` | Backlog + launch blockers |
+## Документация
+
+| Файл | Назначение |
+|------|------------|
+| `README.md` | Архитектура, разработка, проверка, деплой и процесс Webflow |
+| `docs/setup.md` | Настройка Yandex Cloud, Telegram и GitHub Secrets |
+| `docs/utm-attribution-marketing.md` | UTM-атрибуция для маркетинга |
+| `TODO.md` | Backlog и блокеры запуска |

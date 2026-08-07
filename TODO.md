@@ -1,87 +1,89 @@
-# ZvenFit Estetika — backlog
+# ZvenFit Estetika — список задач
 
-Приоритет: **Launch blockers → High → Medium → Optional parity**. Agent guide: [`AGENTS.md`](AGENTS.md).
-
----
-
-## Launch blockers
-
-- [ ] **GitHub Secrets + vars** — `YC_*`, `TELEGRAM_*`, `YANDEX_METRIKA_ID`, optional `ASSET_VERSION`
-- [ ] **CDN runtime assets** — run `npm run upload:assets` before go-live (images/fonts already live in CDN; command updates vendor CSS/webflow.js)
-- [ ] **Cloud Function** — deploy + verify `LEAD_API_URL` in CI build
-- [ ] **DNS + CDN** — `estetika.zvenfit.ru` → site bucket, 404 routing
-- [x] **Initial commit + push** — repository is on `origin/main`; CI can run
-- [ ] **Revoke old Telegram token** if ever exposed in Webflow export / HTML
+Приоритет: **блокеры запуска → высокий → средний → необязательный паритет**. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 ---
 
-## High (post-launch / UX)
+## Блокеры запуска
 
-- [x] **Lead form a11y** — custom select keyboard/ARIA; duplicate IDs if any
-- [ ] **Touch targets** — mobile menu, form buttons ≥44px @ 375px
-- [ ] **`:focus-visible`** on links, buttons, custom select
-- [ ] **Footer / muted text contrast** — WCAG AA on dark background
-- [ ] **`prefers-reduced-motion`** — reduce non-essential animations if added later
-
----
-
-## Medium (polish / SEO)
-
-- [ ] **Partner logos grid** — rename `partners/brand-01..12.webp` to real names when identified
-- [ ] **OG image** — dedicated 1200×630 share image (currently webclip-180)
-- [x] **Legal pages in sitemap** — served from the site bucket
-- [ ] **Newsletter consent copy** — align with privacy policy wording
-- [ ] **Stronger spam protection** — basic honeypot + per-instance IP throttling exist; add Turnstile/reCAPTCHA if abuse appears
+- [ ] **Секреты и переменные GitHub** — `YC_*`, `TELEGRAM_*`, `YANDEX_METRIKA_ID`, необязательный `ASSET_VERSION`
+- [ ] **Ассеты CDN** — перед запуском выполнить `npm run upload:assets` (изображения и шрифты уже находятся в CDN; команда обновляет сторонние CSS и `webflow.js`)
+- [ ] **Облачная функция** — развернуть и проверить `LEAD_API_URL` в CI-сборке
+- [ ] **DNS и CDN** — направить `estetika.zvenfit.ru` на бакет сайта и настроить обработку 404
+- [x] **Первый коммит и отправка в Git** — репозиторий опубликован в `origin/main`, CI может запускаться
+- [ ] **Отозвать старый токен Telegram**, если он когда-либо попадал в экспорт Webflow или HTML
 
 ---
 
-## Infra / DX
+## Высокий приоритет после запуска
 
-- [x] `AGENTS.md` + `.cursor/rules/`
-- [x] `upload/` for raw Webflow (was `export/`)
-- [x] `scripts/structured-data.config.json` (SEO single source)
-- [x] `npm run lint:public` + CI lint step
-- [x] Cloud Function validation/security unit tests + CI unit-test step
-- [x] Deterministic build artifact check (`npm run test:build` / `scripts/check-build.cjs`)
-- [x] Local Playwright screenshot suite for desktop, tablet and mobile (baselines are gitignored)
-- [x] UTM attribution (client + Cloud Function + marketing doc)
-- [ ] **Security response headers** — configure on site bucket/CDN (HTML meta cannot set HTTP security headers)
-- [x] Build injects Metrika, UTM, OG, JSON-LD
-- [x] Static `public/robots.txt` + `public/sitemap.xml` (manual, like main)
-- [x] Semantic image paths (`logo/`, `hero/`, `why-us/`, `services/`, `apparatus/`, `partners/`, …)
-- [x] CSS `url(../images|fonts)` → CDN rewrite at build
-- [ ] **Lean `public/`** — move CDN-only assets to `upload/` as sole source (images remain locally as upload source)
-- [ ] **Lead logging** — Cloud Logging or table (optional)
-- [ ] **Form smoke test in CI** — optional
+- [x] **Доступность формы заявки** — клавиатура и ARIA для пользовательского select; устранение дублирующихся ID
+- [ ] **Размер интерактивных элементов** — мобильное меню и кнопки формы не меньше 44 px при ширине 375 px
+- [ ] **`:focus-visible`** для ссылок, кнопок и пользовательского select
+- [ ] **Контраст футера и приглушённого текста** — соответствие WCAG AA на тёмном фоне
+- [ ] **`prefers-reduced-motion`** — отключать необязательные анимации, если они появятся
 
 ---
 
-## Optional parity with `zvenfit-frontend` (not needed for v1)
+## Средний приоритет: полировка и SEO
 
-- [ ] **Top.Mail.Ru / GTM** — main site uses extra tags; estetika uses Yandex Metrika only
-- [ ] **VK pixel** — not in scope unless marketing asks
-- [ ] **Schedule / Fitbase** — N/A for estetika
-- [ ] **App download badges** — N/A
-- [ ] **Yandex Maps org photos fetch at build** — N/A (no embedded map block)
-- [ ] **26-page snippet marker system** — overkill for 3 pages; build injects at `</head>` instead
-- [ ] **Prettier + heavy eslint stack** — main has TS/React rules; estetika uses minimal `eslint:recommended`
+- [ ] **Сетка логотипов партнёров** — заменить `partners/brand-01..12.webp` на реальные названия после идентификации
+- [ ] **Изображение Open Graph** — отдельная картинка 1200×630 для публикаций (сейчас используется webclip-180)
+- [x] **Юридические страницы в sitemap** — отдаются из бакета сайта
+- [ ] **Текст согласия в форме рассылки** — синхронизировать с политикой конфиденциальности
+- [ ] **Усиленная защита от спама** — базовые honeypot и ограничение запросов по IP уже есть; при появлении злоупотреблений добавить Turnstile/reCAPTCHA
 
 ---
 
-## Done
+## Инфраструктура и удобство разработки
 
-- [x] CDN URLs hardcoded in `public/` (`zvenfit-estetika/`)
-- [x] CI deploys full `dist/` to site bucket (HTML no-cache)
-- [x] Legal docs renamed (`privacy-policy.html`, `personal-data-processing.html`)
-- [x] Telegram handler: lead + newsletter + UTM block in message
-- [x] `404.html` with noindex
+- [x] `AGENTS.md` и `.cursor/rules/`
+- [x] `upload/` для сырого экспорта Webflow (раньше `export/`)
+- [x] `scripts/structured-data.config.json` как единый источник SEO-данных
+- [x] `npm run lint:public` и шаг линтера в CI
+- [x] Модульные тесты валидации и безопасности облачной функции + шаг тестов в CI
+- [x] Детерминированная проверка артефакта сборки (`npm run test:build` / `scripts/check-build.cjs`)
+- [x] Локальные скриншотные тесты Playwright для десктопа, планшета и телефона (эталоны исключены из Git)
+- [x] UTM-атрибуция на клиенте и в функции + инструкция для маркетинга
+- [ ] **HTTP-заголовки безопасности** — настроить на бакете сайта или CDN; HTML meta не может задавать HTTP-заголовки
+- [x] Сборка добавляет Метрику, UTM, Open Graph и JSON-LD
+- [x] Статические `public/robots.txt` и `public/sitemap.xml`, обновляемые вручную
+- [x] Семантические пути изображений (`logo/`, `hero/`, `why-us/`, `services/`, `apparatus/`, `partners/` и другие)
+- [x] Переписывание CSS-ссылок `url(../images|fonts)` на CDN при сборке
+- [ ] **Компактный `public/`** — перенести CDN-ассеты в `upload/` как единственный локальный источник
+- [ ] **Логирование заявок** — Cloud Logging или таблица, необязательно
+- [ ] **Smoke-тест формы в CI** — необязательно
 
 ---
 
-## Pre-release checklist
+## Необязательный паритет с `zvenfit-frontend`
 
-- [ ] `npm test` passes (lint + unit tests + checked production build)
-- [ ] Optional: `npm run test:visual` passes against local baselines
-- [ ] Test lead + newsletter with `?utm_source=test`
-- [ ] Metrika fires on production build (`YANDEX_METRIKA_ID` set)
-- [ ] CDN assets load from `storage.yandexcloud.net/zvenfit-estetika`
+Для первой версии не требуется.
+
+- [ ] **Top.Mail.Ru / GTM** — основной сайт использует дополнительные теги; в estetika сейчас только Яндекс Метрика
+- [ ] **Пиксель VK** — вне объёма работ, пока не появится запрос маркетинга
+- [ ] **Расписание / Fitbase** — неприменимо для estetika
+- [ ] **Кнопки загрузки приложения** — неприменимо
+- [ ] **Загрузка фотографий организации из Яндекс Карт при сборке** — неприменимо, блока карты нет
+- [ ] **Система маркеров сниппетов для 26 страниц** — избыточна для трёх страниц; текущая сборка вставляет данные перед `</head>`
+- [ ] **Prettier и тяжёлый набор ESLint** — в основном сайте есть правила TS/React, здесь используется минимальный `eslint:recommended`
+
+---
+
+## Выполнено
+
+- [x] Ссылки на CDN `zvenfit-estetika/` зафиксированы в `public/`
+- [x] CI загружает полный `dist/` в бакет сайта, HTML — с `no-cache`
+- [x] Юридические документы переименованы в `privacy-policy.html` и `personal-data-processing.html`
+- [x] Telegram-обработчик поддерживает заявки, рассылку и блок UTM в сообщении
+- [x] Страница `404.html` закрыта от индексации
+
+---
+
+## Чек-лист перед релизом
+
+- [ ] `npm test` проходит: линтер, модульные тесты и проверенная продакшен-сборка
+- [ ] Необязательно: `npm run test:visual` проходит на локальных эталонах
+- [ ] Заявка и рассылка проверены с `?utm_source=test`
+- [ ] Метрика загружается в продакшен-сборке с заданным `YANDEX_METRIKA_ID`
+- [ ] Ассеты CDN загружаются с `storage.yandexcloud.net/zvenfit-estetika`

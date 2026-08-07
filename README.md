@@ -1,49 +1,50 @@
 # ZvenFit Estetika Frontend
 
-Static Webflow landing, a small vanilla-JS runtime, and one Yandex Cloud Function that sends lead and newsletter forms to Telegram.
+Статический лендинг из Webflow, небольшой клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud, которая отправляет заявки и подписки на рассылку в Telegram.
 
-Production: `https://estetika.zvenfit.ru`.
+Продакшен: `https://estetika.zvenfit.ru`.
 
-## Architecture
+## Архитектура
 
 ```text
-Browser (estetika.zvenfit.ru)
-  ├─ site CDN → zvenfit-estetika-frontend bucket
-  │    HTML, legal pages, app JS, minified site CSS, robots.txt, sitemap.xml
+Браузер (estetika.zvenfit.ru)
+  ├─ CDN сайта → бакет zvenfit-estetika-frontend
+  │    HTML, юридические страницы, JS приложения, минифицированный CSS сайта,
+  │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
-  │    images, fonts, vendor CSS, webflow.js
-  └─ POST lead/newsletter → Yandex Cloud Function → Telegram
+  │    изображения, шрифты, сторонние CSS и webflow.js
+  └─ POST lead/newsletter → облачная функция Yandex Cloud → Telegram
 ```
 
-Asset-CDN URLs are committed in `public/` HTML and CSS. The build creates a lean `dist/`: images, fonts, vendor CSS, and `webflow.js` are removed because they are served from the assets bucket.
+Ссылки на ассеты из CDN зафиксированы в HTML и CSS внутри `public/`. Сборка создаёт компактный `dist/`: изображения, шрифты, сторонние CSS и `webflow.js` удаляются, потому что отдаются из отдельного бакета с ассетами.
 
-## Source of truth and project layout
+## Исходники и структура проекта
 
-Edit `public/`, `scripts/`, and `functions/`; never edit generated `dist/`.
+Редактируйте `public/`, `scripts/` и `functions/`. Сгенерированный `dist/` вручную не изменяется.
 
-| Path | Purpose |
-|------|---------|
-| `public/` | Tracked HTML, site CSS, app JS, robots and sitemap |
-| `public/form/` | Lead form page |
-| `public/documents/` | Legal HTML, deployed without landing-page injections |
-| `functions/telegram-lead/` | Lead/newsletter validation and Telegram delivery |
-| `scripts/build-static.cjs` | Builds `public/` into `dist/` |
-| `scripts/structured-data.config.json` | Site URL, assets CDN, page metadata and JSON-LD data |
-| `tests/unit/` | Cloud Function unit tests |
-| `tests/visual/` | Playwright screenshots for desktop, tablet and mobile |
-| `upload/` | Raw Webflow export staging (gitignored, local only) |
-| `dist/` | Generated deployment artifact (gitignored) |
+| Путь | Назначение |
+|------|------------|
+| `public/` | Версионируемые HTML, CSS сайта, JS приложения, robots и sitemap |
+| `public/form/` | Страница формы заявки |
+| `public/documents/` | Юридические HTML-страницы без инъекций лендинга |
+| `functions/telegram-lead/` | Валидация заявок/подписок и отправка в Telegram |
+| `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
+| `scripts/structured-data.config.json` | URL сайта и CDN, метаданные страниц и данные JSON-LD |
+| `tests/unit/` | Модульные тесты облачной функции |
+| `tests/visual/` | Скриншотные тесты Playwright для десктопа, планшета и телефона |
+| `upload/` | Локальная папка для сырого экспорта Webflow, исключена из Git |
+| `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
 
-Primary routes are `/`, `/form/`, `/404.html`, and the two files under `/documents/`.
+Основные маршруты: `/`, `/form/`, `/404.html` и две страницы в `/documents/`.
 
-## Requirements
+## Требования
 
-- Node.js 22 and npm (`npm ci` is preferred when `package-lock.json` is unchanged)
-- CDN access for images and Webflow assets during local rendering
-- Optional for deployment: Yandex Cloud CLI (`yc`) and AWS CLI
-- Optional for visual tests: Playwright Chromium (`npx playwright install chromium`)
+- Node.js 22 и npm; если `package-lock.json` не менялся, предпочтительно использовать `npm ci`
+- доступ к CDN для загрузки изображений и ассетов Webflow при локальном просмотре
+- для деплоя: Yandex Cloud CLI (`yc`) и AWS CLI
+- для визуальных тестов: Chromium для Playwright (`npx playwright install chromium`)
 
-## Local development
+## Локальная разработка
 
 ```bash
 cp .env.example .env.development
@@ -51,13 +52,13 @@ npm ci
 npm run dev:watch
 ```
 
-Open `http://localhost:4173`; the local form endpoint listens on `http://localhost:3000`.
+Сайт откроется на `http://localhost:4173`, локальный обработчик форм — на `http://localhost:3000`.
 
-`dev:watch` rebuilds when `public/`, build snippets, or structured-data config changes. Without `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, the mock API only logs the request and returns `{ "ok": true }`. If both are exported, it runs the real handler and sends to Telegram.
+`dev:watch` пересобирает проект при изменениях в `public/`, сниппетах сборки и конфигурации структурированных данных. Если `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` не заданы, мок-сервер только выводит заявку в консоль и отвечает `{ "ok": true }`. Если заданы обе переменные, он запускает настоящий обработчик и отправляет сообщение в Telegram.
 
-Use `npm run dev` for a one-time build without file watching.
+Команда `npm run dev` выполняет разовую сборку и запускает серверы без отслеживания файлов.
 
-## Build
+## Сборка
 
 ```bash
 LEAD_API_URL=https://example.invalid/lead \
@@ -66,40 +67,40 @@ ASSET_VERSION=local \
 npm run build
 ```
 
-Build inputs:
+Переменные сборки:
 
-| Variable | Behavior |
-|----------|----------|
-| `LEAD_API_URL` | Injected into `dist/js/lead-config.js`; production forms cannot submit when empty |
-| `YANDEX_METRIKA_ID` | Injects Yandex Metrika when set |
-| `ASSET_VERSION` | Cache-busting value for app JS, site CSS and CDN `webflow.js`; defaults to `1` |
-| `SITE_URL` | Canonical/OG base URL; defaults to `siteUrl` in structured-data config |
-| `NODE_ENV=development` | Loads `.env.development` and defaults the form API to `http://localhost:3000` |
+| Переменная | Поведение |
+|------------|-----------|
+| `LEAD_API_URL` | Подставляется в `dist/js/lead-config.js`; без неё продакшен-формы не смогут отправлять заявки |
+| `YANDEX_METRIKA_ID` | При наличии добавляет Яндекс Метрику |
+| `ASSET_VERSION` | Версия для сброса кеша JS приложения, CSS сайта и CDN-файла `webflow.js`; значение по умолчанию — `1` |
+| `SITE_URL` | Базовый URL для canonical и Open Graph; по умолчанию берётся `siteUrl` из конфигурации структурированных данных |
+| `NODE_ENV=development` | Загружает `.env.development` и использует `http://localhost:3000` как адрес API форм по умолчанию |
 
-The build also minifies the site CSS, injects UTM attribution, Open Graph, canonical tags and JSON-LD, normalizes Webflow links, and prunes CDN-only assets. Legal pages receive none of the landing-page injections; `/404.html` remains `noindex` and receives no analytics or JSON-LD.
+Сборка также минифицирует CSS сайта, добавляет UTM-атрибуцию, Open Graph, canonical и JSON-LD, нормализует ссылки Webflow и удаляет ассеты, которые должны отдаваться из CDN. В юридические страницы инъекции лендинга не добавляются. Страница `/404.html` остаётся с `noindex` и не получает ни аналитику, ни JSON-LD.
 
-## Verification
+## Проверка
 
 ```bash
-npm test                 # lint + Function unit tests + production build checks
-npm run test:visual      # compare Playwright screenshots
+npm test                 # линтер + модульные тесты функции + проверка продакшен-сборки
+npm run test:visual      # сравнение скриншотов Playwright
 ```
 
-Visual baselines are platform-specific and currently local/gitignored. Create or intentionally refresh them with `npm run test:visual:update`, then rerun `npm run test:visual`.
+Эталонные скриншоты зависят от платформы, хранятся только локально и исключены из Git. Создать или намеренно обновить их можно командой `npm run test:visual:update`, после чего нужно повторно запустить `npm run test:visual`.
 
-For a manual smoke test, open `/?utm_source=test`, submit the newsletter, then submit `/form/` and verify the logged request or Telegram message includes the attribution.
+Для ручной проверки откройте `/?utm_source=test`, отправьте подписку на рассылку, затем заявку на `/form/` и убедитесь, что в логе или сообщении Telegram есть маркировка.
 
-## Deployment
+## Деплой
 
-A push to `main` or a manual workflow dispatch runs `.github/workflows/main.yml`:
+При пуше в `main` или ручном запуске workflow выполняется `.github/workflows/main.yml`:
 
-1. deploy the Cloud Function and read its public invoke URL;
-2. install dependencies, lint, and run Function unit tests;
-3. build with the Function URL, Metrika ID and cache version;
-4. validate `dist/` with `scripts/check-build.cjs`;
-5. sync non-HTML files, then HTML with `no-cache`, to the site bucket.
+1. разворачивает облачную функцию и получает её публичный URL;
+2. устанавливает зависимости, запускает линтер и модульные тесты функции;
+3. собирает сайт с URL функции, идентификатором Метрики и версией кеша;
+4. проверяет `dist/` через `scripts/check-build.cjs`;
+5. синхронизирует с бакетом сайта сначала не-HTML-файлы, затем HTML с `no-cache`.
 
-Manual deployment:
+Ручной деплой:
 
 ```bash
 export YC_FOLDER_ID=...
@@ -107,29 +108,29 @@ export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 npm run deploy:lead-fn
 
-export LEAD_API_URL=...       # value printed by deploy:lead-fn
+export LEAD_API_URL=...       # значение из вывода deploy:lead-fn
 export YANDEX_METRIKA_ID=...
 npm run build
 
-export AWS_ACCESS_KEY_ID=...  # Yandex Object Storage static access key ID
+export AWS_ACCESS_KEY_ID=...  # ID статического ключа Yandex Object Storage
 export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-`npm run upload:assets` uses `YC_ACCESS_KEY_ID` and `YC_SECRET_ACCESS_KEY` instead. It updates only minified vendor CSS and `webflow.js`; it never touches images or fonts.
+Команда `npm run upload:assets` использует переменные `YC_ACCESS_KEY_ID` и `YC_SECRET_ACCESS_KEY`. Она обновляет только минифицированные сторонние CSS и `webflow.js`, не затрагивая изображения и шрифты.
 
-Complete infrastructure and secret setup: [`docs/setup.md`](docs/setup.md). Marketing attribution rules: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
+Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
 
-## Webflow re-export workflow
+## Повторный экспорт из Webflow
 
-1. Export Webflow into `upload/zvenfit-kosmetologiya.webflow/`.
-2. Port markup and site-CSS changes into `public/`, preserving CDN asset URLs.
-3. Keep custom runtime code in `public/js/`.
-4. Run `npm test`.
-5. If `normalize.css`, `webflow.css`, or `webflow.js` changed, run `npm run upload:assets` with Object Storage credentials.
+1. Экспортируйте проект Webflow в `upload/zvenfit-kosmetologiya.webflow/`.
+2. Перенесите изменения разметки и CSS сайта в `public/`, сохранив ссылки на CDN.
+3. Пользовательский клиентский код храните в `public/js/`.
+4. Запустите `npm test`.
+5. Если изменились `normalize.css`, `webflow.css` или `webflow.js`, запустите `npm run upload:assets` с реквизитами Object Storage.
 
-Images and fonts are managed directly in the assets bucket and are intentionally excluded from `upload:assets`.
+Изображения и шрифты управляются непосредственно в бакете ассетов и намеренно исключены из `upload:assets`.
 
-## Security
+## Безопасность
 
-Never commit bot tokens, service-account keys, static access keys, or real `.env*` files. If a Telegram bot token was exposed in a Webflow export or HTML, revoke it in BotFather before deployment.
+Не коммитьте токены бота, ключи сервисного аккаунта, статические ключи доступа и реальные `.env*`-файлы. Если токен Telegram-бота попал в экспорт Webflow или HTML, отзовите его через BotFather до деплоя.
