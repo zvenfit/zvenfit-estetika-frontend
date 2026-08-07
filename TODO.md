@@ -10,7 +10,7 @@
 - [ ] **CDN runtime assets** — run `npm run upload:assets` before go-live (images/fonts already live in CDN; command updates vendor CSS/webflow.js)
 - [ ] **Cloud Function** — deploy + verify `LEAD_API_URL` in CI build
 - [ ] **DNS + CDN** — `estetika.zvenfit.ru` → site bucket, 404 routing
-- [ ] **Initial commit + push** — enable CI
+- [x] **Initial commit + push** — repository is on `origin/main`; CI can run
 - [ ] **Revoke old Telegram token** if ever exposed in Webflow export / HTML
 
 ---
@@ -31,7 +31,7 @@
 - [ ] **OG image** — dedicated 1200×630 share image (currently webclip-180)
 - [x] **Legal pages in sitemap** — served from the site bucket
 - [ ] **Newsletter consent copy** — align with privacy policy wording
-- [ ] **Spam protection** — Turnstile/reCAPTCHA on forms (like main backlog)
+- [ ] **Stronger spam protection** — basic honeypot + per-instance IP throttling exist; add Turnstile/reCAPTCHA if abuse appears
 
 ---
 
@@ -41,6 +41,9 @@
 - [x] `upload/` for raw Webflow (was `export/`)
 - [x] `scripts/structured-data.config.json` (SEO single source)
 - [x] `npm run lint:public` + CI lint step
+- [x] Cloud Function validation/security unit tests + CI unit-test step
+- [x] Deterministic build artifact check (`npm run test:build` / `scripts/check-build.cjs`)
+- [x] Local Playwright screenshot suite for desktop, tablet and mobile (baselines are gitignored)
 - [x] UTM attribution (client + Cloud Function + marketing doc)
 - [ ] **Security response headers** — configure on site bucket/CDN (HTML meta cannot set HTTP security headers)
 - [x] Build injects Metrika, UTM, OG, JSON-LD
@@ -77,8 +80,8 @@
 
 ## Pre-release checklist
 
-- [ ] `npm run lint:public` passes
-- [ ] `npm run build` — dist has pages, legal HTML, min css, app js, robots, sitemap; no images/fonts
+- [ ] `npm test` passes (lint + unit tests + checked production build)
+- [ ] Optional: `npm run test:visual` passes against local baselines
 - [ ] Test lead + newsletter with `?utm_source=test`
 - [ ] Metrika fires on production build (`YANDEX_METRIKA_ID` set)
 - [ ] CDN assets load from `storage.yandexcloud.net/zvenfit-estetika`

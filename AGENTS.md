@@ -14,7 +14,7 @@
 - **Build:** `scripts/build-static.cjs` → `dist/` (gitignored)
 - **Runtime JS:** vanilla JS in `public/js/`
 - **Backend:** 1 Yandex Cloud Function in `functions/telegram-lead/` (lead + newsletter)
-- **CI:** `.github/workflows/main.yml` — deploy function → lint → build → S3
+- **CI:** `.github/workflows/main.yml` — deploy function → lint/unit tests → build check → S3
 
 No React/Vite/Next. Almost no TypeScript.
 
@@ -72,6 +72,8 @@ Also at build time:
 | UTM in leads | `public/js/utm-attribution.js`, `docs/utm-attribution-marketing.md` |
 | SEO / JSON-LD | `scripts/structured-data.config.json`, page `<title>` |
 | Site CSS | `public/css/zvenfit-kosmetologiya.webflow.css` |
+| Function tests | `tests/unit/telegram-lead.test.cjs` |
+| Visual tests | `tests/visual/`, `playwright.config.js` |
 | Mutable CDN assets upload (vendor CSS/webflow.js) | `scripts/prepare-cdn-assets.cjs`, `scripts/upload-assets.sh` |
 | Deploy | `.github/workflows/main.yml`, `npm run deploy:yc` |
 
@@ -88,10 +90,11 @@ Lead form posts to `http://localhost:3000` in dev (via injected `LEAD_API_URL`).
 ## Verification
 
 ```bash
-npm run lint:public
-npm run build
-npm run test:build
+npm test
+npm run test:visual    # optional local screenshot comparison
 ```
+
+Visual baselines are platform-specific and gitignored; create/update local baselines with `npm run test:visual:update`.
 
 Manual smoke:
 - `/` — newsletter form in footer
