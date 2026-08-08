@@ -37,7 +37,7 @@
 - [x] **Юридические страницы в sitemap** — отдаются из бакета сайта
 - [ ] **Текст согласия в форме рассылки** — синхронизировать с политикой конфиденциальности
 - [ ] **Усиленная защита от спама** — базовые honeypot и ограничение запросов по IP уже есть; при появлении злоупотреблений добавить Turnstile/reCAPTCHA
-- [x] **IMask** — согласовано оставить на `unpkg`, как в основном `zvenfit-frontend`; GSAP + ScrollTrigger переносим в собственный CDN в рамках блокеров запуска
+- [x] **IMask** — `imask@7.6.1` зафиксирован в зависимостях и опубликован в собственном CDN с длительным кешированием; HTML использует SRI и сохраняет функциональный fallback без маски
 
 ---
 
@@ -62,7 +62,13 @@
 - [x] Детерминированная проверка артефакта сборки (`npm run test:build` / `scripts/check-build.cjs`)
 - [x] Локальные скриншотные тесты Playwright для десктопа, планшета и телефона (эталоны исключены из Git)
 - [x] UTM-атрибуция на клиенте и в функции + инструкция для маркетинга
-- [ ] **HTTP-заголовки безопасности** — настроить на бакете сайта или CDN; HTML meta не может задавать HTTP-заголовки
+- [ ] **HTTP-заголовки безопасности на Cloud CDN** — добавить как статические заголовки ответов клиентам на CDN, а не через HTML `<meta>` ([документация Yandex Cloud CDN](https://yandex.cloud/ru/docs/cdn/operations/resources/configure-headers))
+  - [ ] `Strict-Transport-Security: max-age=31536000` — включать после восстановления production и проверки HTTPS; пока без `includeSubDomains` и `preload`
+  - [ ] `X-Content-Type-Options: nosniff`
+  - [ ] `X-Frame-Options: DENY`
+  - [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
+  - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
+  - [ ] Проверить заголовки для `/`, `/form/`, `/404.html` и юридических страниц командой `curl -I` после распространения настроек CDN
 - [x] Сборка добавляет Метрику, UTM, Open Graph и JSON-LD
 - [x] Статические `public/robots.txt` и `public/sitemap.xml`, обновляемые вручную
 - [x] Семантические пути изображений (`logo/`, `hero/`, `why-us/`, `services/`, `apparatus/`, `partners/` и другие)

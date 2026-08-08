@@ -65,6 +65,15 @@ test.describe('home', () => {
 });
 
 test.describe('form page', () => {
+  test('phone mask loads from CDN and formats input', async ({ page }) => {
+    await page.goto('/form/');
+
+    const phone = page.locator('input[name="phone"]');
+    await phone.fill('9991234567');
+
+    await expect(phone).toHaveValue('+7 (999) 123-45-67');
+  });
+
   test('hero + form layout', async ({ page }) => {
     await page.goto('/form/');
     await waitForVisualStable(page);

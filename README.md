@@ -12,7 +12,7 @@
   │    HTML, юридические страницы, JS приложения, минифицированный CSS сайта,
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
-  │    изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger и webflow.js
+  │    изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger, IMask и webflow.js
   └─ POST lead/newsletter → облачная функция Yandex Cloud → Telegram
 ```
 
@@ -118,7 +118,7 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery и GSAP зафиксированы в `package.json`; шрифты, jQuery, GSAP, ScrollTrigger и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI с `Cache-Control: public, max-age=31536000, immutable`. Массовый `sync --delete` для бакета ассетов не используется.
+В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery, GSAP и IMask зафиксированы в `package.json`; шрифты, jQuery, GSAP, ScrollTrigger, IMask и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI с `Cache-Control: public, max-age=31536000, immutable`. Массовый `sync --delete` для бакета ассетов не используется.
 
 ```bash
 yc storage s3api put-object \

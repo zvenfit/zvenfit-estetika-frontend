@@ -24,6 +24,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^8.57.1",
     "gsap": "3.15.0",
+    "imask": "7.6.1",
     "jquery": "3.5.1",
     "serve": "^14.2.4"
   }

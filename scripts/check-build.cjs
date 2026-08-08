@@ -59,6 +59,19 @@ for (const rel of ['index.html', 'form/index.html']) {
   if (html.includes('__LEAD_API_URL__') || html.includes('__ASSET_VERSION__')) {
     throw new Error(`check-build: unresolved placeholders in ${rel}`);
   }
+
+  if (html.includes('unpkg.com/imask')) {
+    throw new Error(`check-build: ${rel} loads IMask from unpkg`);
+  }
+
+  if (
+    !html.includes(
+      'https://storage.yandexcloud.net/zvenfit-estetika/js/imask-7.6.1.min.js?v=',
+    ) ||
+    !html.includes('integrity="sha384-UO8YwPv//GjwHj93ZlwXcDNjv3BSxdBFUB2jtiOuL3d/a0kS9E8sYvHjTBkQI8u8"')
+  ) {
+    throw new Error(`check-build: ${rel} does not load the pinned IMask CDN asset with SRI`);
+  }
 }
 
 for (const rel of ['index.html', 'form/index.html', '404.html']) {
