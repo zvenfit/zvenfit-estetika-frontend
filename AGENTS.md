@@ -35,7 +35,7 @@ React, Vite и Next не используются. TypeScript почти отс�
 Браузер (estetika.zvenfit.ru)
   ├─ бакет сайта — HTML, юридические страницы, JS приложения, минифицированный CSS,
   │                robots и sitemap
-  ├─ CDN zvenfit-estetika/ — изображения, сторонние CSS, шрифты и webflow.js
+  ├─ CDN zvenfit-estetika/ — изображения, шрифты, сторонние CSS и JS-библиотеки
   └─ POST lead/newsletter → functions/telegram-lead → Telegram
 
 Локальная разработка (npm run dev):
@@ -76,7 +76,7 @@ React, Vite и Next не используются. TypeScript почти отс�
 | CSS сайта | `public/css/zvenfit-kosmetologiya.webflow.css` |
 | Тесты функции | `tests/unit/telegram-lead.test.cjs` |
 | Визуальные тесты | `tests/visual/`, `playwright.config.js` |
-| Загрузка изменяемых CDN-ассетов | `scripts/prepare-cdn-assets.cjs`, `scripts/upload-assets.sh` |
+| Версии CDN-библиотек | `package.json`, `scripts/build-static.cjs`; файлы публикуются напрямую в Object Storage |
 | Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |
 
 ## Локальная разработка
@@ -116,10 +116,9 @@ npm run test:visual    # необязательное локальное сра�
 ## Частые ошибки
 
 1. Редактирование `dist/` вручную: изменения исчезнут при следующей сборке.
-2. Пропуск `npm run upload:assets` после изменения сторонних CSS или Webflow JS.
+2. Добавление локального staging или upload-скрипта для CDN: библиотеки публикуются напрямую в Object Storage без `.cdn-upload` и `sync --delete`.
 3. Запуск `lint` вместо `lint:public`: каталога `src/` в проекте нет.
 4. Возврат изображений, шрифтов или сторонних ассетов в бакет сайта: `dist/` должен оставаться компактным, кроме юридических HTML.
-5. Ожидание, что `upload:assets` загрузит изображения или шрифты: они намеренно исключены и управляются непосредственно в CDN.
 
 ## Страницы
 

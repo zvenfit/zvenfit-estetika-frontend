@@ -12,7 +12,7 @@ CDN estetika.zvenfit.ru
 
 Ссылки на ассеты в HTML/CSS из public/
   └─ storage.yandexcloud.net/zvenfit-estetika → изображения, шрифты,
-     сторонние CSS и webflow.js
+     сторонние CSS, jQuery, GSAP, ScrollTrigger и webflow.js
 ```
 
 Продакшен-workflow сначала разворачивает функцию, использует её URL при сборке сайта, проверяет `dist/` и только после этого загружает сайт.
@@ -83,7 +83,7 @@ yc iam key create --service-account-name "$SA_NAME" --output sa-key.json
 | Бакет | Содержимое | Как обновляется |
 |-------|------------|-----------------|
 | `zvenfit-estetika-frontend` | HTML, юридические страницы, robots, sitemap, JS приложения, минифицированный CSS сайта | CI при пуше в `main` или `npm run deploy:yc` |
-| `zvenfit-estetika` | Изображения, шрифты, сторонние CSS, `webflow.js` | Изображения и шрифты управляются отдельно; остальные файлы — через `npm run upload:assets` |
+| `zvenfit-estetika` | Изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger, `webflow.js` | Объекты публикуются напрямую через авторизованный Yandex Cloud CLI; массовый `sync --delete` не используется |
 
 Создайте оба бакета с публичным чтением и настройками статического сайта для первого бакета:
 
@@ -103,22 +103,23 @@ documents/personal-data-processing.html
 robots.txt
 sitemap.xml
 css/zvenfit-kosmetologiya.webflow.min.css
-js/*.js (скрипты приложения без webflow.js)
+js/*.js (скрипты приложения без CDN-библиотек)
 ```
 
-В нём не должно быть `images/`, `fonts/`, сторонних CSS, исходного CSS сайта и `js/webflow.js`.
+В нём не должно быть `images/`, `fonts/`, сторонних CSS, исходного CSS сайта и CDN-библиотек.
 
 ### Загрузка изменяемых ассетов
 
-`upload:assets` берёт сторонние `normalize.css` и `webflow.css` из `upload/zvenfit-kosmetologiya.webflow/`, минифицирует их, а `webflow.js` копирует из `public/js/`:
+В репозитории нет staging или upload-скрипта для бакета ассетов. Изменяемые объекты публикуются напрямую через авторизованный профиль Yandex Cloud:
 
-```bash
-YC_ACCESS_KEY_ID=... \
-YC_SECRET_ACCESS_KEY=... \
-npm run upload:assets
-```
+| Объект в бакете | Версионируемый источник |
+|------------------|-------------------------|
+| `js/jquery-3.5.1.min.js` | `jquery@3.5.1` из `package.json` |
+| `js/gsap-3.15.0.min.js` | `gsap@3.15.0` из `package.json` |
+| `js/ScrollTrigger-3.15.0.min.js` | `gsap@3.15.0` из `package.json` |
+| `js/webflow.js` | `public/js/webflow.js` |
 
-Скрипт синхронизирует только префиксы `css/` и `js/`, поэтому не может удалить изображения или шрифты.
+После прямой загрузки проверьте HTTP 200, `Content-Type`, `Cache-Control` и совпадение SHA-256. Не используйте `sync --delete` для всего префикса `js/`.
 
 ### Ручная загрузка сайта
 
@@ -172,7 +173,7 @@ npm run deploy:yc
 ## 6. Первый деплой
 
 1. Убедитесь, что изображения и шрифты уже находятся в бакете ассетов.
-2. Загрузите актуальные сторонние CSS и `webflow.js` через `npm run upload:assets`.
+2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
 5. Убедитесь, что успешно завершились деплой функции, сборка сайта, проверка артефакта и обе синхронизации с S3.

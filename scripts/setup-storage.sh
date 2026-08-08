@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create site bucket (CI deploy) + assets bucket (manual upload).
+# Create site bucket (CI deploy) + assets bucket (direct object publishing).
 set -euo pipefail
 
 SITE_BUCKET="${YC_S3_BUCKET:-zvenfit-estetika-frontend}"
@@ -52,7 +52,7 @@ echo "--- Site bucket (CI: HTML + app JS) ---"
 create_bucket "${SITE_BUCKET}" "yes"
 
 echo ""
-echo "--- Assets bucket (images/fonts direct; uploader manages vendor CSS/webflow.js) ---"
+echo "--- Assets bucket (objects are published directly; no staging sync) ---"
 create_bucket "${ASSETS_BUCKET}" "no"
 
 if yc iam service-account get --name "${SA_NAME}" >/dev/null 2>&1; then
@@ -74,5 +74,5 @@ echo "Assets (manual):    s3://${ASSETS_BUCKET}/"
 echo "Assets CDN base:    https://storage.yandexcloud.net/${ASSETS_BUCKET}"
 echo ""
 echo "Workflow:"
-echo "  1. npm run upload:assets   # vendor CSS/webflow.js only"
-echo "  2. git push                # CI deploys full dist/ → site bucket"
+echo "  1. Publish changed CDN objects directly and verify their public URLs"
+echo "  2. git push   # CI deploys full dist/ → site bucket"

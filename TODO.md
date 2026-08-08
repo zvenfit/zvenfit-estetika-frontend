@@ -7,11 +7,11 @@
 ## Блокеры запуска
 
 - [ ] **Секреты и переменные GitHub** — `YC_*`, `TELEGRAM_*`, `YANDEX_METRIKA_ID`, необязательный `ASSET_VERSION`
-- [ ] **JS-библиотеки в CDN** — завершить перенос обязательных Webflow-зависимостей в `storage.yandexcloud.net/zvenfit-estetika/js/`
-  - [ ] Добавить `jquery-3.5.1.min.js` в `scripts/prepare-cdn-assets.cjs`: сейчас загрузчик формирует только `webflow.js`, а `aws s3 sync --delete` удалит из `js/` любой файл, отсутствующий в staging
-  - [ ] Заменить Webflow CloudFront-ссылки на jQuery в `public/index.html` и `public/form/index.html` ссылкой на собственный CDN
-  - [ ] На `public/404.html` подключить jQuery перед `webflow.js` либо удалить неиспользуемый `webflow.js`
-  - [ ] Выполнить `npm run upload:assets` и проверить HTTP 200 для `js/jquery-3.5.1.min.js` и `js/webflow.js`
+- [x] **JS-библиотеки в CDN** — обязательные Webflow-зависимости перенесены в `storage.yandexcloud.net/zvenfit-estetika/js/`
+  - [x] Зафиксировать `jquery@3.5.1` и `gsap@3.15.0` в зависимостях; SHA-256 файлов совпадает с Webflow и `zvenfit-frontend`
+  - [x] Напрямую загрузить jQuery, GSAP, ScrollTrigger и `webflow.js` в Object Storage без staging и `sync --delete`; все URL отвечают HTTP 200, хеши совпадают (2026-08-07)
+  - [x] Заменить внешние ссылки на jQuery, GSAP и ScrollTrigger в `public/index.html` и `public/form/index.html` ссылками на собственный CDN
+  - [x] Удалить неиспользуемый `webflow.js` из `public/404.html`: статической странице не нужны Webflow JS и jQuery
 - [x] **Базовые ассеты CDN** — `css/normalize.min.css`, `css/webflow.min.css`, изображения и шрифты уже доступны из бакета; проверено 2026-08-07
 - [ ] **Облачная функция** — развернуть и проверить `LEAD_API_URL` в CI-сборке
 - [ ] **DNS и CDN** — направить `estetika.zvenfit.ru` на бакет сайта и настроить обработку 404
@@ -37,7 +37,7 @@
 - [x] **Юридические страницы в sitemap** — отдаются из бакета сайта
 - [ ] **Текст согласия в форме рассылки** — синхронизировать с политикой конфиденциальности
 - [ ] **Усиленная защита от спама** — базовые honeypot и ограничение запросов по IP уже есть; при появлении злоупотреблений добавить Turnstile/reCAPTCHA
-- [ ] **Внешние JS-зависимости** — решить, нужно ли переносить в собственный CDN GSAP + ScrollTrigger (главная страница) и IMask (главная и форма); для запуска не блокирует, все три внешних URL доступны, а основной `zvenfit-frontend` также оставляет IMask на `unpkg`
+- [x] **IMask** — согласовано оставить на `unpkg`, как в основном `zvenfit-frontend`; GSAP + ScrollTrigger переносим в собственный CDN в рамках блокеров запуска
 
 ---
 
@@ -56,7 +56,7 @@
 - [x] Статические `public/robots.txt` и `public/sitemap.xml`, обновляемые вручную
 - [x] Семантические пути изображений (`logo/`, `hero/`, `why-us/`, `services/`, `apparatus/`, `partners/` и другие)
 - [x] Переписывание CSS-ссылок `url(../images|fonts)` на CDN при сборке
-- [ ] **Компактный `public/`** — перенести CDN-ассеты в `upload/` как единственный локальный источник
+- [x] **Компактный `public/`** — изображения, шрифты и сторонние CSS не попадают в `dist/`; `public/js/webflow.js` остаётся версионируемым источником CDN-файла без локального staging
 - [ ] **Проверка CDN-зависимостей** — добавить smoke-проверку обязательных публичных URL; текущий `npm test` проверяет структуру `dist/`, но не обнаруживает HTTP 404 внешних ассетов
 - [ ] **Логирование заявок** — Cloud Logging или таблица, необязательно
 - [ ] **Smoke-тест формы в CI** — необязательно
@@ -91,8 +91,8 @@
 
 ## Чек-лист перед релизом
 
-- [ ] Повторно запустить `npm test`: линтер, модульные тесты и проверенная продакшен-сборка (локально проходит на 2026-08-07)
+- [x] `npm test` проходит: линтер, 6 модульных тестов и проверенная продакшен-сборка (проверено 2026-08-08)
 - [ ] Необязательно: `npm run test:visual` проходит на локальных эталонах
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
 - [ ] Метрика загружается в продакшен-сборке с заданным `YANDEX_METRIKA_ID`
-- [ ] Обязательные CDN-ассеты отвечают HTTP 200: `css/normalize.min.css`, `css/webflow.min.css`, `js/jquery-3.5.1.min.js`, `js/webflow.js`, используемые изображения и шрифты
+- [x] Обязательные CDN-ассеты отвечают HTTP 200: `css/normalize.min.css`, `css/webflow.min.css`, `js/jquery-3.5.1.min.js`, `js/gsap-3.15.0.min.js`, `js/ScrollTrigger-3.15.0.min.js`, `js/webflow.js`, используемые изображения и шрифты (проверено 2026-08-07)

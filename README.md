@@ -12,11 +12,11 @@
   │    HTML, юридические страницы, JS приложения, минифицированный CSS сайта,
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
-  │    изображения, шрифты, сторонние CSS и webflow.js
+  │    изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger и webflow.js
   └─ POST lead/newsletter → облачная функция Yandex Cloud → Telegram
 ```
 
-Ссылки на ассеты из CDN зафиксированы в HTML и CSS внутри `public/`. Сборка создаёт компактный `dist/`: изображения, шрифты, сторонние CSS и `webflow.js` удаляются, потому что отдаются из отдельного бакета с ассетами.
+Ссылки на ассеты из CDN зафиксированы в HTML и CSS внутри `public/`. Сборка создаёт компактный `dist/`: изображения, шрифты, сторонние CSS и CDN-библиотеки удаляются, потому что отдаются из отдельного бакета с ассетами.
 
 ## Исходники и структура проекта
 
@@ -73,7 +73,7 @@ npm run build
 |------------|-----------|
 | `LEAD_API_URL` | Подставляется в `dist/js/lead-config.js`; без неё продакшен-формы не смогут отправлять заявки |
 | `YANDEX_METRIKA_ID` | При наличии добавляет Яндекс Метрику |
-| `ASSET_VERSION` | Версия для сброса кеша JS приложения, CSS сайта и CDN-файла `webflow.js`; значение по умолчанию — `1` |
+| `ASSET_VERSION` | Версия для сброса кеша JS приложения, CSS сайта и CDN-библиотек; значение по умолчанию — `1` |
 | `SITE_URL` | Базовый URL для canonical и Open Graph; по умолчанию берётся `siteUrl` из конфигурации структурированных данных |
 | `NODE_ENV=development` | Загружает `.env.development` и использует `http://localhost:3000` как адрес API форм по умолчанию |
 
@@ -117,7 +117,7 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-Команда `npm run upload:assets` использует переменные `YC_ACCESS_KEY_ID` и `YC_SECRET_ACCESS_KEY`. Она обновляет только минифицированные сторонние CSS и `webflow.js`, не затрагивая изображения и шрифты.
+В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery и GSAP зафиксированы в `package.json`; jQuery, GSAP, ScrollTrigger и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI. Массовый `sync --delete` для бакета ассетов не используется.
 
 Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
 
@@ -127,9 +127,9 @@ npm run deploy:yc
 2. Перенесите изменения разметки и CSS сайта в `public/`, сохранив ссылки на CDN.
 3. Пользовательский клиентский код храните в `public/js/`.
 4. Запустите `npm test`.
-5. Если изменились `normalize.css`, `webflow.css` или `webflow.js`, запустите `npm run upload:assets` с реквизитами Object Storage.
+5. Если изменились CDN-ассеты, перед публикацией сайта обновите соответствующие объекты напрямую в бакете и проверьте их HTTP-статус и хеш.
 
-Изображения и шрифты управляются непосредственно в бакете ассетов и намеренно исключены из `upload:assets`.
+Изображения, шрифты и сторонние библиотеки управляются непосредственно в бакете ассетов.
 
 ## Безопасность
 
