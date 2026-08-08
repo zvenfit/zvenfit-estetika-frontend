@@ -43,8 +43,6 @@ create_bucket() {
       --website-settings '{"index":"index.html","error":"404.html"}'
   fi
 
-  # CORS optional — yc CLI flag format varies; not required for CDN origin
-  echo "    (CORS: configure in console if needed for direct bucket access)"
 }
 
 echo ""
@@ -54,6 +52,10 @@ create_bucket "${SITE_BUCKET}" "yes"
 echo ""
 echo "--- Assets bucket (objects are published directly; no staging sync) ---"
 create_bucket "${ASSETS_BUCKET}" "no"
+yc storage bucket update \
+  --name "${ASSETS_BUCKET}" \
+  --cors allowed-methods='[method-get,method-head]',allowed-origins='[*]',allowed-headers='[*]',max-age-seconds=86400
+echo "    CORS enabled for public fonts and assets"
 
 if yc iam service-account get --name "${SA_NAME}" >/dev/null 2>&1; then
   SA_ID="$(yc iam service-account get --name "${SA_NAME}" --format json | jq -r '.id')"
@@ -74,5 +76,7 @@ echo "Assets (manual):    s3://${ASSETS_BUCKET}/"
 echo "Assets CDN base:    https://storage.yandexcloud.net/${ASSETS_BUCKET}"
 echo ""
 echo "Workflow:"
-echo "  1. Publish changed CDN objects directly and verify their public URLs"
-echo "  2. git push   # CI deploys full dist/ → site bucket"
+echo "  1. Publish changed CDN objects directly with Cache-Control: public, max-age=31536000, immutable"
+echo "     yc storage s3api put-object --bucket ${ASSETS_BUCKET} --key <key> --body <file> --cache-control 'public, max-age=31536000, immutable'"
+echo "  2. Verify the public URL, Content-Type, Cache-Control and Access-Control-Allow-Origin"
+echo "  3. git push   # CI deploys full dist/ → site bucket"

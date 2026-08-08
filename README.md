@@ -82,7 +82,8 @@ npm run build
 ## Проверка
 
 ```bash
-npm test                 # линтер + модульные тесты функции + проверка продакшен-сборки
+npm test                 # линтер + модульные тесты + сборка + performance-budget
+npm run test:performance # проверка бюджета уже собранного dist/
 npm run test:visual      # сравнение скриншотов Playwright
 ```
 
@@ -97,8 +98,8 @@ npm run test:visual      # сравнение скриншотов Playwright
 1. разворачивает облачную функцию и получает её публичный URL;
 2. устанавливает зависимости, запускает линтер и модульные тесты функции;
 3. собирает сайт с URL функции, идентификатором Метрики и версией кеша;
-4. проверяет `dist/` через `scripts/check-build.cjs`;
-5. синхронизирует с бакетом сайта сначала не-HTML-файлы, затем HTML с `no-cache`.
+4. проверяет `dist/` и performance-budget;
+5. синхронизирует с бакетом сайта версионируемые ассеты с кешем на год, а HTML, `robots.txt` и `sitemap.xml` — с `no-cache`.
 
 Ручной деплой:
 
@@ -117,7 +118,18 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery и GSAP зафиксированы в `package.json`; jQuery, GSAP, ScrollTrigger и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI. Массовый `sync --delete` для бакета ассетов не используется.
+В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery и GSAP зафиксированы в `package.json`; шрифты, jQuery, GSAP, ScrollTrigger и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI с `Cache-Control: public, max-age=31536000, immutable`. Массовый `sync --delete` для бакета ассетов не используется.
+
+```bash
+yc storage s3api put-object \
+  --bucket zvenfit-estetika \
+  --key fonts/asset.woff2 \
+  --body ./asset.woff2 \
+  --content-type font/woff2 \
+  --cache-control 'public, max-age=31536000, immutable'
+```
+
+После публикации проверьте публичный URL, `Content-Type`, `Cache-Control` и CORS-заголовок. `npm run setup:storage` задаёт CORS для публичной загрузки шрифтов.
 
 Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
 

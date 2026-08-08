@@ -12,12 +12,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let currentIndex = -1;
 
-  function setOpen(open) {
+  function setActiveOption(index) {
+    currentIndex = index;
+    optionList.forEach((option, optionIndex) => {
+      option.classList.toggle('active', optionIndex === currentIndex);
+    });
+
+    const activeOption = optionList[currentIndex];
+    if (activeOption) {
+      selected.setAttribute('aria-activedescendant', activeOption.id);
+    } else {
+      selected.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  function getSelectedIndex() {
+    return optionList.findIndex(option => option.getAttribute('aria-selected') === 'true');
+  }
+
+  function setOpen(open, activateOption = false) {
     options.style.display = open ? 'block' : 'none';
     selected.setAttribute('aria-expanded', String(open));
-    if (!open) {
-      currentIndex = -1;
-      optionList.forEach(option => option.classList.remove('active'));
+
+    if (open && activateOption) {
+      const selectedIndex = getSelectedIndex();
+      setActiveOption(selectedIndex >= 0 ? selectedIndex : 0);
+    } else if (!open) {
+      setActiveOption(-1);
     }
   }
 
@@ -27,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
     hidden.value = value;
     optionList.forEach(item => item.setAttribute('aria-selected', String(item === option)));
     setOpen(false);
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
 
     if (value === 'Telegram') {
       if (telegramField) {
@@ -47,7 +69,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   selected.addEventListener('click', function () {
-    setOpen(options.style.display !== 'block');
+    const shouldOpen = options.style.display !== 'block';
+    setOpen(shouldOpen, shouldOpen);
   });
 
   document.addEventListener('click', function (event) {
@@ -59,6 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
   optionList.forEach(function (option) {
     option.addEventListener('click', function () {
       selectOption(option);
+      selected.focus();
     });
   });
 
@@ -70,28 +94,34 @@ document.addEventListener('DOMContentLoaded', function () {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (options.style.display !== 'block') {
-        setOpen(true);
+        setOpen(true, true);
       } else if (optionList[currentIndex]) {
         selectOption(optionList[currentIndex]);
       }
+      return;
+    }
+    if (event.key === 'Tab') {
+      setOpen(false);
       return;
     }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
       return;
     }
     event.preventDefault();
-    setOpen(true);
+    const wasOpen = options.style.display === 'block';
+    setOpen(true, !wasOpen);
     const direction = event.key === 'ArrowDown' ? 1 : -1;
-    currentIndex = (currentIndex + direction + optionList.length) % optionList.length;
-    optionList.forEach(option => option.classList.remove('active'));
-    optionList[currentIndex].classList.add('active');
+    if (wasOpen) {
+      setActiveOption((currentIndex + direction + optionList.length) % optionList.length);
+    }
   });
 
-  const label = document.getElementById('label-select');
+  const label = document.getElementById('contact-method-label');
   if (label) {
     label.addEventListener('click', function (event) {
       event.stopPropagation();
-      setOpen(options.style.display !== 'block');
+      const shouldOpen = options.style.display !== 'block';
+      setOpen(shouldOpen, shouldOpen);
       selected.focus();
     });
   }

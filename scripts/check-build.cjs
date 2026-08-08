@@ -61,6 +61,43 @@ for (const rel of ['index.html', 'form/index.html']) {
   }
 }
 
+for (const rel of ['index.html', 'form/index.html', '404.html']) {
+  const html = read(rel);
+  if (!html.includes('<main')) {
+    throw new Error(`check-build: missing main landmark in ${rel}`);
+  }
+
+  const phoneInputs = html.match(/<input[^>]*type=["']tel["'][^>]*>/gi) || [];
+  if (phoneInputs.some(input => !/autocomplete=["']tel["']/i.test(input))) {
+    throw new Error(`check-build: tel input without autocomplete=tel in ${rel}`);
+  }
+
+  if (/<img[^>]*\/logo-(?:full|mark)\.svg[^>]*alt=["']["'][^>]*>/i.test(html)) {
+    throw new Error(`check-build: linked logo has an empty alt in ${rel}`);
+  }
+}
+
+for (const rel of ['index.html', 'form/index.html']) {
+  if (!read(rel).includes('<footer')) {
+    throw new Error(`check-build: missing footer landmark in ${rel}`);
+  }
+}
+
+const formPage = read('form/index.html');
+for (const attribute of [
+  'aria-labelledby="contact-method-label"',
+  'aria-describedby="contact-method-error"',
+  'aria-required="true"',
+  'aria-invalid="false"',
+]) {
+  if (!formPage.includes(attribute)) {
+    throw new Error(`check-build: contact method combobox is missing ${attribute}`);
+  }
+}
+if (!formPage.includes('id="contact-method-error"')) {
+  throw new Error('check-build: contact method field error is missing');
+}
+
 const legal = read('documents/privacy-policy.html');
 if (legal.includes('ZvenFit Estetika: analytics') || legal.includes('application/ld+json')) {
   throw new Error('check-build: legal document received landing-page injections');

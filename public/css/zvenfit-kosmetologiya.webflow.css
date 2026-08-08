@@ -1,6 +1,6 @@
 @font-face {
   font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Regular.ttf') format("truetype");
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Regular.woff2') format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBold.ttf') format("truetype");
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBold.woff2') format("woff2");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Medium.ttf') format("truetype");
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Medium.woff2') format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -24,47 +24,7 @@
 
 @font-face {
   font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBoldOblique.ttf') format("truetype");
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Oblique.ttf') format("truetype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: Involve;
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-MediumOblique.ttf') format("truetype");
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Sourceserif 4 48 Pt";
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-LightItalic.ttf') format("truetype");
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Sourceserif 4 48 Pt";
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Light.ttf') format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Sourceserif 4 48 Pt";
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Italic.ttf') format("truetype");
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Oblique.woff2') format("woff2");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -72,7 +32,15 @@
 
 @font-face {
   font-family: "Sourceserif 4 48 Pt";
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Regular.ttf') format("truetype");
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Italic.woff2') format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sourceserif 4 48 Pt";
+  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Regular.woff2') format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -300,20 +268,22 @@
 
 .image {
   border-radius: var(--block);
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-photo.webp');
-  background-position: 50%;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-attachment: scroll;
   width: 695px;
   height: 695px;
+  overflow: hidden;
+  display: block;
 }
 
 .image.form {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/hero/form-photo.webp');
-  background-position: 50%;
-  background-size: cover;
   height: 800px;
+}
+
+.image > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50%;
+  display: block;
 }
 
 .main-txt-wrap {
@@ -533,107 +503,13 @@
 }
 
 .services-photo {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/vacuum-roller-massage.webp');
-  background-position: 0 0;
-  background-repeat: no-repeat;
-  background-size: cover;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
   width: 100%;
   height: 300px;
-}
-
-.services-photo._1.other {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/skin-cleansing.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._1 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/vacuum-roller-massage.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._2 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/rf-lifting.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._3 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/hydropiling.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._4 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/gas-liquid-peeling.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._5 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/ultrasound-phoresis.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._6 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/microcurrent-guasha.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._7 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/darsonval.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._8 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/microneedling.webp');
-  background-position: 50%;
-}
-
-.services-photo.face._9 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/face/revixan-photodynamic.webp');
-  background-position: 50%;
-  background-size: cover;
-}
-
-.services-photo.body._1 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/vacuum-roller-massage.webp');
-  background-position: 50%;
-}
-
-.services-photo.body._2 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/cavitation.webp');
-}
-
-.services-photo.body._3 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/rotational-massage.webp');
-}
-
-.services-photo.body._4 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/laser-epilation.webp');
-}
-
-.services-photo.body._5 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/pressotherapy.webp');
-}
-
-.services-photo.body._6 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/body/revixan-regeneration.webp');
-  background-position: 50%;
-  background-size: cover;
-}
-
-.services-photo._2.other {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/peels-and-care.webp');
-  background-position: 50%;
-}
-
-.services-photo._3.other {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/home-care-consultation.webp');
-  background-position: 50%;
-}
-
-.services-photo._4.other {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/services/aesthetic/pro-cosmetics.webp');
-  background-position: 50%;
+  object-fit: cover;
+  object-position: 50%;
+  display: block;
 }
 
 .services-card-txt-wrap {
@@ -694,11 +570,11 @@
 
 .image-2 {
   border-radius: var(--block);
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/about/team-photo.webp');
-  background-position: 40%;
-  background-size: cover;
   width: 695px;
   height: 695px;
+  object-fit: cover;
+  object-position: 40%;
+  display: block;
 }
 
 .about-block {
@@ -879,12 +755,11 @@
 
 .image-3 {
   border-radius: var(--block);
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/cross-promo/fitness-gym.webp');
-  background-position: 50%;
-  background-repeat: no-repeat;
-  background-size: cover;
   width: 695px;
   height: 500px;
+  object-fit: cover;
+  object-position: 50%;
+  display: block;
 }
 
 .activity {
@@ -1299,36 +1174,11 @@
 }
 
 .photo-eqiup {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/pressotop.webp');
-  background-position: 50%;
-  background-repeat: no-repeat;
-  background-size: cover;
   width: 400px;
   height: 400px;
-}
-
-.photo-eqiup._1 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/cosmo-face-10in1.webp');
-}
-
-.photo-eqiup._2 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/slimboss-5in1.webp');
-}
-
-.photo-eqiup._3 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/laser-one-touch-8.webp');
-}
-
-.photo-eqiup._4 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/revixan.webp');
-  background-position: 50%;
-  background-size: cover;
-}
-
-.photo-eqiup._5 {
-  background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/apparatus/inbody-720.webp');
-  background-position: 50%;
-  background-size: cover;
+  object-fit: cover;
+  object-position: 50%;
+  display: block;
 }
 
 .services-flex {
@@ -1982,7 +1832,6 @@
   }
 
   .services-photo {
-    background-position: 50%;
     width: 100%;
     height: 200px;
   }
@@ -2488,76 +2337,4 @@
   #w-node-_765e98da-ab8d-6a29-ed7f-12316278f9a2-f1f86170 {
     order: 1;
   }
-}
-
-
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Medium.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-SemiBoldOblique.ttf') format('truetype');
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-Oblique.ttf') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Involve';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/Involve-MediumOblique.ttf') format('truetype');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Sourceserif 4 48 Pt';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-LightItalic.ttf') format('truetype');
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Sourceserif 4 48 Pt';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Light.ttf') format('truetype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Sourceserif 4 48 Pt';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Italic.ttf') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Sourceserif 4 48 Pt';
-  src: url('https://storage.yandexcloud.net/zvenfit-estetika/fonts/SourceSerif4_48pt-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
 }

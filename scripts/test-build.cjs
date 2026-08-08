@@ -7,3 +7,4 @@ process.env.SITE_URL ||= 'https://estetika.zvenfit.ru';
 
 require('./build-static.cjs').runBuild();
 require('./check-build.cjs');
+require('./check-performance-budget.cjs');

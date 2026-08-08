@@ -28,6 +28,7 @@ const CACHE_BUST_SCRIPTS = [
   'lead-form.js',
   'newsletter-form.js',
   'phone-mask.js',
+  'lazy-tab-images.js',
   'name-input.js',
   'custom-select.js',
   'back-button.js',

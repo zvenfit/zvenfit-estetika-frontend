@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const successBlock = formRoot.querySelector('.success-message');
   const errorBlock = formRoot.querySelector('.error-message');
   const submitButton = form.querySelector('[type="submit"]');
+  const serviceInput = form.querySelector('[name="service"]');
+  const serviceCombobox = form.querySelector('[role="combobox"]');
+  const serviceError = form.querySelector('#contact-method-error');
   const defaultSubmitLabel = submitButton ? submitButton.value : 'Отправить';
   const defaultServiceLabel = 'Выберите удобный для вас вариант...';
   const successMessageMs = 5000;
@@ -19,6 +22,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     clearTimeout(successTimer);
     successTimer = null;
+  }
+
+  function setServiceValidity(isValid) {
+    if (serviceCombobox) {
+      serviceCombobox.setAttribute('aria-invalid', String(!isValid));
+    }
+    if (serviceError) {
+      serviceError.hidden = isValid;
+    }
   }
 
   function resetCustomFields() {
@@ -33,6 +45,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (hidden) {
       hidden.value = '';
     }
+    document.querySelectorAll('.select-options [role="option"]').forEach(option => {
+      option.setAttribute('aria-selected', 'false');
+      option.classList.remove('active');
+    });
+    if (selected) {
+      selected.setAttribute('aria-expanded', 'false');
+      selected.removeAttribute('aria-activedescendant');
+    }
+    setServiceValidity(true);
     if (telegramField) {
       telegramField.style.display = 'none';
     }
@@ -85,17 +106,18 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   setFormState(null);
+  setServiceValidity(true);
+
+  if (serviceInput) {
+    serviceInput.addEventListener('change', function () {
+      setServiceValidity(Boolean(serviceInput.value));
+    });
+  }
 
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
+    event.stopImmediatePropagation();
     setFormState(null);
-
-    const apiUrl = (window.ZVENFIT_LEAD_API || '').trim();
-    if (!apiUrl || apiUrl === '__LEAD_API_URL__') {
-      setFormState('error');
-
-      return;
-    }
 
     if (window.__ZVENFIT_ATTRIBUTION && typeof window.__ZVENFIT_ATTRIBUTION.sync === 'function') {
       window.__ZVENFIT_ATTRIBUTION.sync();
@@ -120,6 +142,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (!payload.service) {
+      setServiceValidity(false);
+      if (serviceCombobox) {
+        serviceCombobox.focus();
+      }
+
+      return;
+    }
+
+    setServiceValidity(true);
+
+    const apiUrl = (window.ZVENFIT_LEAD_API || '').trim();
+    if (!apiUrl || apiUrl === '__LEAD_API_URL__') {
       setFormState('error');
 
       return;
@@ -158,5 +192,5 @@ document.addEventListener('DOMContentLoaded', function () {
     } finally {
       setSubmitting(false);
     }
-  });
+  }, true);
 });
