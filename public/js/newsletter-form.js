@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const defaultSubmitLabel = submitButton ? submitButton.value : 'Подписаться';
   const successMessageMs = 5000;
   let successTimer;
+  let submissionId = '';
 
   function clearSuccessTimer() {
     if (!successTimer) {
@@ -85,6 +86,12 @@ document.addEventListener('DOMContentLoaded', function () {
         : {};
 
     const payload = {
+      submission_id:
+        submissionId ||
+        (submissionId =
+          typeof window.__ZVENFIT_CREATE_SUBMISSION_ID === 'function'
+            ? window.__ZVENFIT_CREATE_SUBMISSION_ID()
+            : ''),
       form_type: 'newsletter',
       phone: form.querySelector('[name="phone"]')?.value || '',
       website: form.querySelector('[name="website"]')?.value || '',
@@ -117,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       form.reset();
+      submissionId = '';
       setFormState('success');
       successTimer = setTimeout(function () {
         setFormState(null);

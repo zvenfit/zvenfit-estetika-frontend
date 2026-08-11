@@ -1,11 +1,13 @@
-# Настройка Telegram-бота и Yandex Cloud
+# Настройка Telegram, YDB и Yandex Cloud
 
 Инструкция по настройке облачной функции для заявок, бакета сайта, бакета ассетов и деплоя через GitHub Actions.
 
 ## Продакшен-топология
 
 ```text
-Форма → облачная функция Yandex Cloud (секреты в окружении) → группа Telegram
+Форма → Cloud Function → YDB (источник истины) → группа Telegram
+                      ↑                         ↗
+                      └──── retry timer ───────┘
 
 CDN estetika.zvenfit.ru
   └─ zvenfit-estetika-frontend → полный артефакт dist/
@@ -51,12 +53,22 @@ SA_ID="$(yc iam service-account get --name "$SA_NAME" --format json | jq -r '.id
 
 yc resource-manager folder add-access-binding \
   --id "$YC_FOLDER_ID" \
-  --role serverless.functions.admin \
+  --role functions.admin \
   --service-account-id "$SA_ID"
 
 yc resource-manager folder add-access-binding \
   --id "$YC_FOLDER_ID" \
   --role iam.serviceAccounts.user \
+  --service-account-id "$SA_ID"
+
+yc resource-manager folder add-access-binding \
+  --id "$YC_FOLDER_ID" \
+  --role functions.functionInvoker \
+  --service-account-id "$SA_ID"
+
+yc resource-manager folder add-access-binding \
+  --id "$YC_FOLDER_ID" \
+  --role ydb.editor \
   --service-account-id "$SA_ID"
 
 yc resource-manager folder add-access-binding \
@@ -145,7 +157,12 @@ npm run deploy:yc
 2. Добавьте пользовательский домен `estetika.zvenfit.ru`.
 3. Направьте DNS-запись CNAME на домен CDN.
 4. Подключите управляемый TLS-сертификат.
-5. Проверьте, что неизвестные пути отдают `/404.html`, а HTML не кешируется бессрочно.
+5. Настройте edge-кеш «как у источника» с fallback `86400` секунд.
+6. Отключите принудительный browser TTL: браузер должен получать `Cache-Control` объектов из бакета.
+7. Добавьте query-параметр `v` в whitelist ключа кеша, чтобы `app.js?v=1` и `app.js?v=2` считались разными объектами.
+8. Проверьте, что неизвестные пути отдают `/404.html` с HTTP 404 и `Cache-Control: no-cache, must-revalidate`.
+
+CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-revalidate`, а версионированные CSS/JS — с `public, max-age=31536000, immutable`. После изменения CDN-настроек или первого деплоя очистите кеш ресурса. Значение `ASSET_VERSION`, переданное через окружение или GitHub Variables, должно меняться при каждом релизе с изменениями CSS/JS.
 
 Бакет ассетов используется напрямую по адресу `https://storage.yandexcloud.net/zvenfit-estetika`. То же значение записано в `assetsCdnBase` файла `scripts/structured-data.config.json`.
 
@@ -168,6 +185,11 @@ npm run deploy:yc
 |-----|----------|
 | `YANDEX_METRIKA_ID` | Идентификатор продакшен-счётчика Метрики |
 | `ASSET_VERSION` | Необязательная версия для сброса кеша; по умолчанию используется номер запуска workflow |
+| `YC_LEAD_SERVICE_ACCOUNT_ID` | Runtime SA функции и таймера; по умолчанию SA из `YC_SA_JSON_KEY` |
+| `YDB_DATABASE_NAME` | Имя Serverless БД; по умолчанию `zvenfit-estetika-leads` |
+| `YDB_SUBMISSIONS_TABLE` | Таблица заявок и подписок; по умолчанию `submissions` |
+| `SUBMISSION_RETENTION_DAYS` | TTL записей; по умолчанию `1096`, значение нужно синхронизировать с политикой |
+| `MAX_TELEGRAM_ATTEMPTS` | Максимум попыток Telegram; по умолчанию `12` |
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. При добавлении или удалении домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
@@ -177,19 +199,20 @@ npm run deploy:yc
 2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
-5. Убедитесь, что успешно завершились деплой функции, сборка сайта, проверка артефакта и обе синхронизации с S3.
+5. Убедитесь, что успешно завершились создание YDB/retry timer, деплой функции, сборка сайта, проверка артефакта и три синхронизации с S3.
 
 Порядок шагов workflow:
 
 ```text
-деплой функции → получение URL → линтер → модульные тесты → сборка →
-проверка dist → загрузка не-HTML-файлов → загрузка HTML с no-cache
+создание YDB → деплой функции и retry timer → получение URL → тесты → сборка →
+проверка dist → immutable-ассеты → robots/sitemap no-cache → HTML no-cache
 ```
 
 Для полного ручного деплоя сначала разверните функцию, затем используйте напечатанный скриптом URL при сборке сайта:
 
 ```bash
 export YC_FOLDER_ID=...
+export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 export ALLOWED_ORIGINS=https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru
@@ -205,6 +228,10 @@ export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
+
+После первого вызова функция создаёт таблицу `submissions` с TTL. Статусы Telegram: `pending`, `sending`, `sent`, `failed`. Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"` означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и должен быть ограничен ответственными сотрудниками.
+
+Для запуска настоящего handler локально передайте endpoint существующей БД и короткоживущий IAM-токен через `YDB_CONNECTION_STRING` и `YDB_ACCESS_TOKEN_CREDENTIALS`. Без них mock-сервер не пишет персональные данные в YDB и возвращает безопасный mock-ответ.
 
 ## Локальная разработка и проверка форм
 
@@ -255,4 +282,4 @@ curl -X POST "$URL" \
   -d '{"form_type":"newsletter","phone":"+79991234567"}'
 ```
 
-Функция проверяет Origin, тип и размер JSON, валидирует поля, использует honeypot, ограничивает число запросов с одного IP в рамках экземпляра и обрабатывает ошибки Telegram. Модульные тесты находятся в `tests/unit/telegram-lead.test.cjs`.
+Функция проверяет Origin, тип и размер JSON, валидирует поля, использует honeypot, ограничивает число запросов с одного IP в рамках экземпляра и обрабатывает ошибки Telegram. `functions/telegram-lead/index.js` остаётся тонкой точкой входа, реализация находится в `handler.js`, а модульные тесты — в `functions/telegram-lead/__tests__/handler.test.js`. Пакет функции можно проверить отдельно командой `npm run test:lead-fn`.

@@ -1,0 +1,16 @@
+{
+  "name": "zvenfit-estetika-telegram-lead",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lead and newsletter handler for estetika.zvenfit.ru",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test __tests__/*.test.js"
+  },
+  "dependencies": {
+    "@ydbjs/auth": "6.3.1",
+    "@ydbjs/core": "6.3.1",
+    "@ydbjs/query": "6.3.0",
+    "@ydbjs/value": "6.0.8"
+  }
+}

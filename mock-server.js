@@ -70,21 +70,36 @@ http
         body += chunk;
       });
       req.on('end', async () => {
-        console.log('\n📩 Lead request:');
+        let payload = {};
         try {
-          console.log(JSON.parse(body));
+          payload = JSON.parse(body);
         } catch {
-          console.log(body);
+          payload = {};
         }
+        console.log('\n📩 Form request:');
+        console.log({
+          submission_id: payload.submission_id || 'missing',
+          form_type: payload.form_type || 'lead',
+          service: payload.service || 'missing',
+          has_name: Boolean(payload.name),
+          has_phone: Boolean(payload.phone),
+          has_utm: Boolean(payload.utm && Object.keys(payload.utm).length > 0),
+        });
         console.log('---');
 
-        if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+        if (
+          process.env.TELEGRAM_BOT_TOKEN &&
+          process.env.TELEGRAM_CHAT_ID &&
+          process.env.YDB_CONNECTION_STRING
+        ) {
           try {
             const result = await leadHandler.handler({
               httpMethod: 'POST',
               headers: {
                 origin: req.headers.origin || 'http://localhost:4173',
+                'content-type': req.headers['content-type'] || 'application/json',
               },
+              requestContext: { identity: { sourceIp: req.socket.remoteAddress || '' } },
               body,
             });
             sendHandlerResponse(res, result);
@@ -99,7 +114,13 @@ http
           'Content-Type': 'application/json; charset=utf-8',
           'Access-Control-Allow-Origin': '*',
         });
-        res.end(JSON.stringify({ ok: true }));
+        res.end(
+          JSON.stringify({
+            ok: true,
+            submission_id: payload.submission_id || null,
+            notification: 'mock',
+          }),
+        );
       });
 
       return;
@@ -110,10 +131,14 @@ http
   })
   .listen(PORT, () => {
     console.log(`🚀 Mock API: http://localhost:${PORT}`);
-    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      console.log('   POST / — live Telegram (TELEGRAM_* env set)');
+    if (
+      process.env.TELEGRAM_BOT_TOKEN &&
+      process.env.TELEGRAM_CHAT_ID &&
+      process.env.YDB_CONNECTION_STRING
+    ) {
+      console.log('   POST / — live YDB + Telegram');
     } else {
-      console.log('   POST / — stub ok:true (set TELEGRAM_* in .env.development for live)');
+      console.log('   POST / — stub ok:true (set TELEGRAM_* + YDB_CONNECTION_STRING for live)');
     }
     console.log('');
   });

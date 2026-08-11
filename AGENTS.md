@@ -36,7 +36,8 @@ React, Vite и Next не используются. TypeScript почти отс�
   ├─ бакет сайта — HTML, юридические страницы, JS приложения, минифицированный CSS,
   │                robots и sitemap
   ├─ CDN zvenfit-estetika/ — изображения, шрифты, сторонние CSS и JS-библиотеки
-  └─ POST lead/newsletter → functions/telegram-lead → Telegram
+  └─ POST lead/newsletter → functions/telegram-lead → YDB → Telegram
+                                                     ↑ retry timer
 
 Локальная разработка (npm run dev):
   мок-сервер :3000  ← POST заявок
@@ -70,11 +71,12 @@ React, Vite и Next не используются. TypeScript почти отс�
 | Разметка лендинга | `public/index.html` |
 | Интерфейс формы заявки | `public/form/index.html`, `public/js/lead-form.js` |
 | Форма рассылки | `public/index.html` (футер), `public/js/newsletter-form.js` |
-| API заявок и Telegram | `functions/telegram-lead/index.js` |
+| API заявок и Telegram | `functions/telegram-lead/handler.js`; `index.js` — только точка входа |
+| Хранение заявок и retry | `functions/telegram-lead/submission-store.js` |
 | UTM в заявках | `public/js/utm-attribution.js`, `docs/utm-attribution-marketing.md` |
 | SEO и JSON-LD | `scripts/structured-data.config.json`, `<title>` страницы |
 | CSS сайта | `public/css/zvenfit-kosmetologiya.webflow.css` |
-| Тесты функции | `tests/unit/telegram-lead.test.cjs` |
+| Тесты функции | `functions/telegram-lead/__tests__/handler.test.js` |
 | Визуальные тесты | `tests/visual/`, `playwright.config.js` |
 | Версии CDN-библиотек | `package.json`, `scripts/build-static.cjs`; файлы публикуются напрямую в Object Storage |
 | Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |
@@ -107,6 +109,7 @@ npm run test:visual    # необязательное локальное сра�
 
 - Не коммитьте токены, ключи сервисного аккаунта и реальные `.env*`.
 - Токен бота и ID чата хранятся только в окружении облачной функции и GitHub Secrets.
+- Заявка считается принятой после сохранения в YDB; Telegram используется как уведомление и может быть доставлен таймером позже.
 - CORS задаётся через `ALLOWED_ORIGINS` в workflow и окружении функции.
 
 ## Ограничения бренда

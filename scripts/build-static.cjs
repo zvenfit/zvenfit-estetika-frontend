@@ -26,6 +26,7 @@ const CDN_VENDOR_JS = [
 const CACHE_BUST_SCRIPTS = [
   'utm-attribution.js',
   'lead-config.js',
+  'submission-id.js',
   'lead-form.js',
   'newsletter-form.js',
   'phone-mask.js',

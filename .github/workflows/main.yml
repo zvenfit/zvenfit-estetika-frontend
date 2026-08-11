@@ -27,16 +27,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install and test lead function
+        run: |
+          npm ci --prefix functions/telegram-lead
+          npm run test:lead-fn
+
       - name: Install Yandex Cloud CLI
         run: |
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
 
       - name: Authenticate with service account
+        id: authenticate
         env:
           YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
         run: |
           echo "$YC_SA_KEY" > /tmp/sa-key.json
+          SERVICE_ACCOUNT_ID=$(jq -r '.service_account_id // empty' /tmp/sa-key.json)
+          if [ -z "$SERVICE_ACCOUNT_ID" ]; then
+            echo "ERROR: service_account_id is missing in YC_SA_JSON_KEY" >&2
+            exit 1
+          fi
+          echo "service_account_id=${SERVICE_ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
           yc config profile create ci-profile
           yc config set service-account-key /tmp/sa-key.json
           yc config set folder-id ${{ env.YC_FOLDER_ID }}
@@ -47,6 +64,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
+          YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID || steps.authenticate.outputs.service_account_id }}
+          YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
+          YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
+          SUBMISSION_RETENTION_DAYS: ${{ vars.SUBMISSION_RETENTION_DAYS || '1096' }}
+          MAX_TELEGRAM_ATTEMPTS: ${{ vars.MAX_TELEGRAM_ATTEMPTS || '12' }}
         run: bash scripts/deploy-telegram-lead.sh
 
       - name: Get function URL

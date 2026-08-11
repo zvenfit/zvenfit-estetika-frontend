@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const defaultServiceLabel = 'Выберите удобный для вас вариант...';
   const successMessageMs = 5000;
   let successTimer;
+  let submissionId = '';
 
   function clearSuccessTimer() {
     if (!successTimer) {
@@ -129,6 +130,12 @@ document.addEventListener('DOMContentLoaded', function () {
         : {};
 
     const payload = {
+      submission_id:
+        submissionId ||
+        (submissionId =
+          typeof window.__ZVENFIT_CREATE_SUBMISSION_ID === 'function'
+            ? window.__ZVENFIT_CREATE_SUBMISSION_ID()
+            : ''),
       form_type: 'lead',
       name: form.querySelector('[name="name"]')?.value || '',
       phone: form.querySelector('[name="phone"]')?.value || '',
@@ -182,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       form.reset();
+      submissionId = '';
       resetCustomFields();
       setFormState('success');
       successTimer = setTimeout(function () {

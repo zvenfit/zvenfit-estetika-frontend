@@ -1,6 +1,6 @@
 # ZvenFit Estetika Frontend
 
-Статический лендинг из Webflow, небольшой клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud, которая отправляет заявки и подписки на рассылку в Telegram.
+Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. Заявки и подписки сначала сохраняются в YDB, после чего функция отправляет уведомления в Telegram с повторными попытками по таймеру.
 
 Продакшен: `https://estetika.zvenfit.ru`.
 
@@ -13,7 +13,9 @@
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
   │    изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger, IMask и webflow.js
-  └─ POST lead/newsletter → облачная функция Yandex Cloud → Telegram
+  └─ POST lead/newsletter → Cloud Function → YDB (источник истины)
+                                      └→ Telegram
+                                          ↑ retry timer
 ```
 
 Ссылки на ассеты из CDN зафиксированы в HTML и CSS внутри `public/`. Сборка создаёт компактный `dist/`: изображения, шрифты, сторонние CSS и CDN-библиотеки удаляются, потому что отдаются из отдельного бакета с ассетами.
@@ -27,10 +29,12 @@
 | `public/` | Версионируемые HTML, CSS сайта, JS приложения, robots и sitemap |
 | `public/form/` | Страница формы заявки |
 | `public/documents/` | Юридические HTML-страницы без инъекций лендинга |
-| `functions/telegram-lead/` | Валидация заявок/подписок и отправка в Telegram |
+| `functions/telegram-lead/index.js` | Точка входа Cloud Function, реэкспорт обработчика |
+| `functions/telegram-lead/handler.js` | Валидация, идемпотентность, Telegram и retry timer |
+| `functions/telegram-lead/submission-store.js` | YDB: заявки и подписки, TTL, lease и статусы доставки |
+| `functions/telegram-lead/__tests__/` | Модульные тесты функции |
 | `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
 | `scripts/structured-data.config.json` | URL сайта и CDN, метаданные страниц и данные JSON-LD |
-| `tests/unit/` | Модульные тесты облачной функции |
 | `tests/visual/` | Скриншотные тесты Playwright для десктопа, планшета и телефона |
 | `upload/` | Локальная папка для сырого экспорта Webflow, исключена из Git |
 | `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
@@ -54,7 +58,7 @@ npm run dev:watch
 
 Сайт откроется на `http://localhost:4173`, локальный обработчик форм — на `http://localhost:3000`.
 
-`dev:watch` пересобирает проект при изменениях в `public/`, сниппетах сборки и конфигурации структурированных данных. Если `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` не заданы, мок-сервер только выводит заявку в консоль и отвечает `{ "ok": true }`. Если заданы обе переменные, он запускает настоящий обработчик и отправляет сообщение в Telegram.
+`dev:watch` пересобирает проект при изменениях в `public/`, сниппетах сборки и конфигурации структурированных данных. По умолчанию мок-сервер выводит только безопасную сводку формы и возвращает успешный mock-ответ. Для запуска настоящего обработчика локально нужны `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` и `YDB_CONNECTION_STRING`.
 
 Команда `npm run dev` выполняет разовую сборку и запускает серверы без отслеживания файлов.
 
@@ -83,6 +87,7 @@ npm run build
 
 ```bash
 npm test                 # линтер + модульные тесты + сборка + performance-budget
+npm run test:lead-fn     # только тесты пакета Cloud Function
 npm run test:performance # проверка бюджета уже собранного dist/
 npm run test:visual      # сравнение скриншотов Playwright
 ```
@@ -95,7 +100,7 @@ npm run test:visual      # сравнение скриншотов Playwright
 
 При пуше в `main` или ручном запуске workflow выполняется `.github/workflows/main.yml`:
 
-1. разворачивает облачную функцию и получает её публичный URL;
+1. создаёт YDB Serverless при необходимости, разворачивает функцию и минутный retry timer;
 2. устанавливает зависимости, запускает линтер и модульные тесты функции;
 3. собирает сайт с URL функции, идентификатором Метрики и версией кеша;
 4. проверяет `dist/` и performance-budget;
@@ -105,6 +110,7 @@ npm run test:visual      # сравнение скриншотов Playwright
 
 ```bash
 export YC_FOLDER_ID=...
+export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 npm run deploy:lead-fn
