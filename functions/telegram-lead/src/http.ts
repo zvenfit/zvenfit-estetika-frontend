@@ -4,7 +4,7 @@ export const MAX_REQUEST_BODY_BYTES = 16 * 1024;
 
 export function allowedOrigins(): string[] {
   const raw =
-    process.env.ALLOWED_ORIGINS || 'https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru';
+    process.env.ALLOWED_ORIGINS || 'https://estetika.zvenfit.ru';
 
   return raw
     .split(',')

@@ -11,7 +11,7 @@ env:
   S3_BUCKET: 'zvenfit-estetika-frontend'
   FUNCTION_NAME: 'zvenfit-estetika-telegram-lead'
   YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
-  ALLOWED_ORIGINS: 'https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru'
+  ALLOWED_ORIGINS: 'https://estetika.zvenfit.ru'
   LOG_LEVEL: 'info'
 
 concurrency:
@@ -134,7 +134,7 @@ jobs:
           TELEGRAM_RETRY_BATCH_SIZE: ${{ vars.TELEGRAM_RETRY_BATCH_SIZE || '5' }}
           TELEGRAM_TIMEOUT_MS: ${{ vars.TELEGRAM_TIMEOUT_MS || '15000' }}
           YC_LEAD_TIMEOUT: ${{ vars.YC_LEAD_TIMEOUT || '120s' }}
-          YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '5000' }}
+          YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
           YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '1000' }}
           YDB_SESSION_POOL_SIZE: ${{ vars.YDB_SESSION_POOL_SIZE || '5' }}
           LOG_LEVEL: ${{ env.LOG_LEVEL }}

@@ -61,12 +61,15 @@ test(
       await bootstrapSchema();
       await bootstrapSchema();
 
+      // Keep the fixture inside the active TTL window. A historical timestamp
+      // makes YDB eligible to delete occupied slots while this test is running.
+      const rateLimitNow = new Date();
       for (let round = 0; round < 5; round += 1) {
         const rateLimitResults = await Promise.all(
           Array.from({ length: 10 }, () =>
             consumeSubmissionRateLimit({
               sourceIp: `203.0.113.${10 + round}`,
-              now: new Date('2026-08-10T10:01:00.000Z'),
+              now: rateLimitNow,
             }),
           ),
         );

@@ -274,7 +274,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `TELEGRAM_RETRY_BATCH_SIZE` | Число записей, обрабатываемых timer за вызов; по умолчанию `5`, максимум `25` |
 | `TELEGRAM_TIMEOUT_MS` | Таймаут одного запроса Telegram; по умолчанию `15000`, максимум `25000` |
 | `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
-| `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; по умолчанию `5000` |
+| `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; production default `10000`, как в обкатанной конфигурации `zvenfit-frontend` |
 | `YDB_SLOW_OPERATION_MS` | Порог события медленной операции; по умолчанию `1000` |
 | `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
 | `MONIUM_METRICS_ENABLED` | Прямой экспорт метрик; production default `true` |
@@ -286,6 +286,9 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 Для еженедельной проверки паритета приватного `zvenfit/zvenfit-frontend` добавьте необязательный
 repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents. Для публичного upstream
 workflow использует стандартный `GITHUB_TOKEN`.
+
+GitHub Environment `production` использует custom deployment branch policy только для `main`.
+Не снимайте это ограничение: иначе ручной `workflow_dispatch` сможет развернуть feature-ветку.
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. При добавлении или удалении домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
@@ -313,7 +316,7 @@ export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
 export MONIUM_API_KEY=...
-export ALLOWED_ORIGINS=https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru
+export ALLOWED_ORIGINS=https://estetika.zvenfit.ru
 npm run deploy:lead-fn
 
 export LEAD_API_URL=...  # значение из вывода deploy:lead-fn

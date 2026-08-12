@@ -39,6 +39,7 @@ test('alerts reference declared metrics and both notification channels are expli
     'zvenfit_estetika_telegram_alerts',
     'zvenfit_estetika_email_alerts',
   ]);
+  assert.equal(config.alerts.length, 12);
 });
 
 test('lead-pipeline alerts use direct OTLP metrics with short evaluation delay', () => {
@@ -62,6 +63,7 @@ test('lead-pipeline alerts use direct OTLP metrics with short evaluation delay',
 test('retry health covers missing heartbeat and queue age', () => {
   const heartbeat = config.alerts.find(item => item.id === 'zvenfit_estetika_retry_worker_heartbeat');
   const backlog = config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog');
+  const triggerErrors = config.alerts.find(item => item.id === 'zvenfit_estetika_retry_trigger_errors');
 
   assert.equal(heartbeat.noData, 'ALARM');
   assert.equal(heartbeat.operator, '<');
@@ -73,6 +75,13 @@ test('retry health covers missing heartbeat and queue age', () => {
   assert.deepEqual(
     { warning: backlog.warning, alarm: backlog.alarm, aggregation: backlog.aggregation },
     { warning: 600, alarm: 1800, aggregation: 'last' },
+  );
+  assert.equal(config.resources.retryTriggerId, 'a1sc2t1ro4alukatrf99');
+  assert.match(triggerErrors.metricSelector, /serverless\.triggers\.access_error_per_second/);
+  assert.match(triggerErrors.metricSelector, /trigger="a1sc2t1ro4alukatrf99"/);
+  assert.deepEqual(
+    { warning: triggerErrors.warning, alarm: triggerErrors.alarm, delay: triggerErrors.delay },
+    { warning: 0, alarm: 0.5, delay: '30s' },
   );
 });
 

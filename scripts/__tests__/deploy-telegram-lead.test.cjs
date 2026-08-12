@@ -57,6 +57,13 @@ test('Telegram retry settings fit inside the Cloud Function timeout', () => {
   assert.match(workflow, /YC_LEAD_TIMEOUT:.*'120s'/);
 });
 
+test('production runtime defaults match the proven upstream settings', () => {
+  assert.match(deployScript, /YDB_QUERY_TIMEOUT_MS="\$\{YDB_QUERY_TIMEOUT_MS:-10000\}"/);
+  assert.match(workflow, /YDB_QUERY_TIMEOUT_MS:.*'10000'/);
+  assert.match(workflow, /ALLOWED_ORIGINS: 'https:\/\/estetika\.zvenfit\.ru'/);
+  assert.doesNotMatch(workflow, /www\.estetika\.zvenfit\.ru/);
+});
+
 test('CI deploy requires pre-provisioned infrastructure and does not grant access', () => {
   assert.doesNotMatch(deployScript, /yc ydb database create/);
   assert.doesNotMatch(deployScript, /yc serverless function create/);

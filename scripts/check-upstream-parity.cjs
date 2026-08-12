@@ -12,28 +12,35 @@ function normalizeSha(value) {
   return /^[0-9a-f]{40}$/.test(sha) ? sha : '';
 }
 
-function localHead(directory) {
-  try {
-    return normalizeSha(
-      childProcess.execFileSync('git', ['-C', directory, 'rev-parse', 'HEAD'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }),
-    );
-  } catch {
-    return '';
+function localBranchHead(directory, branch) {
+  for (const ref of [`origin/${branch}^{commit}`, `${branch}^{commit}`]) {
+    try {
+      const sha = normalizeSha(
+        childProcess.execFileSync('git', ['-C', directory, 'rev-parse', '--verify', ref], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }),
+      );
+      if (sha) return { sha, ref: ref.replace(/\^\{commit\}$/, '') };
+    } catch {
+      // Try the local branch after the remote-tracking branch.
+    }
   }
+
+  return { sha: '', ref: '' };
 }
 
-function resolveHead(environment = process.env) {
+function resolveHead(environment = process.env, branch = 'main') {
   const explicit = normalizeSha(environment.UPSTREAM_HEAD_SHA);
   if (explicit) {
     return { sha: explicit, source: 'UPSTREAM_HEAD_SHA' };
   }
 
   const directory = environment.ZVENFIT_FRONTEND_DIR || path.resolve(ROOT, '../zvenfit-frontend');
-  const sha = localHead(directory);
-  return sha ? { sha, source: directory } : { sha: '', source: directory };
+  const resolved = localBranchHead(directory, branch);
+  return resolved.sha
+    ? { sha: resolved.sha, source: `${directory}#${resolved.ref}` }
+    : { sha: '', source: `${directory}#origin/${branch}` };
 }
 
 function compare(baselineSha, currentSha) {
@@ -50,7 +57,7 @@ function compare(baselineSha, currentSha) {
 
 function run(environment = process.env) {
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-  const resolved = resolveHead(environment);
+  const resolved = resolveHead(environment, config.branch);
   if (!resolved.sha) {
     console.error(
       `upstream-parity: cannot resolve ${config.repository}@${config.branch}; set UPSTREAM_HEAD_SHA or ZVENFIT_FRONTEND_DIR`,
@@ -79,4 +86,4 @@ if (require.main === module) {
   process.exitCode = run();
 }
 
-module.exports = { compare, normalizeSha, resolveHead, run };
+module.exports = { compare, localBranchHead, normalizeSha, resolveHead, run };

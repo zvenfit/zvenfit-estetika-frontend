@@ -11,7 +11,8 @@
 - direct metrics: `cluster="default"`, `service="zvenfit-estetika-frontend"`;
 - Cloud Logging: группа `default`, retention 3 дня;
 - application/environment: `zvenfit-estetika-frontend` / `production`;
-- function/database: `zvenfit-estetika-telegram-lead` / `zvenfit-estetika-leads`.
+- function/database/retry trigger: `zvenfit-estetika-telegram-lead` /
+  `zvenfit-estetika-leads` / `a1sc2t1ro4alukatrf99`.
 
 Прямой экспорт включается переменной `MONIUM_METRICS_ENABLED=true`. Секрет `MONIUM_API_KEY`
 должен иметь право записи метрик; `MONIUM_PROJECT` по умолчанию равен `folder__<YC_FOLDER_ID>`.
@@ -58,6 +59,7 @@ Timer после retry pass экспортирует:
 | `zvenfit_estetika_telegram_backlog` | oldest pending, seconds | `>600` / `>1800` | OK |
 | `zvenfit_estetika_rate_limit_health` | fail-open errors | `>0` / `>2` | OK |
 | `zvenfit_estetika_function_runtime_errors` | Cloud Functions errors | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_retry_trigger_errors` | Cloud Functions trigger access/runtime errors | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_ydb_storage_usage` | `(used / limit) * 100` | `>=70` / `>=85` | WARNING |
 
 Heartbeat пишется только после успешного retry pass и чтения здоровья очереди. Он имеет корректно

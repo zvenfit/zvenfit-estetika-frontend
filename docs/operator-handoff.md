@@ -43,7 +43,7 @@ CI не выдаёт себе административные роли и на�
 
 - подтвердить реквизиты и владельца персональных данных в юридических документах;
 - согласовать отдельные согласия на обработку ПД и рекламную рассылку;
-- решить судьбу `www.estetika.zvenfit.ru`: настроить DNS/TLS/redirect либо убрать из CORS;
+- при необходимости вернуть `www.estetika.zvenfit.ru` только после одновременной настройки DNS и TLS;
 - отозвать Telegram token, если он когда-либо попадал в экспорт или HTML.
 
 ## 4. Первый deploy
@@ -58,7 +58,7 @@ CI не выдаёт себе административные роли и на�
 2. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 3. включать HSTS только после стабильной проверки HTTPS;
-4. создать в Monium оба notification channel и 11 alerts строго по
+4. создать в Monium оба notification channel и 12 alerts строго по
    `scripts/monitoring.config.json` / `docs/monitoring.md`;
 5. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
    в `OK`.

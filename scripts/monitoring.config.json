@@ -14,7 +14,8 @@
   },
   "resources": {
     "function": "zvenfit-estetika-telegram-lead",
-    "database": "zvenfit-estetika-leads"
+    "database": "zvenfit-estetika-leads",
+    "retryTriggerId": "a1sc2t1ro4alukatrf99"
   },
   "provisioning": {
     "notificationChannels": "manual-console",
@@ -169,6 +170,17 @@
       "id": "zvenfit_estetika_function_runtime_errors",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
+      "operator": ">",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "5m",
+      "delay": "30s",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_retry_trigger_errors",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"serverless.triggers.access_error_per_second|serverless.triggers.error_per_second\", trigger=\"a1sc2t1ro4alukatrf99\", type=\"request\"}",
+      "aggregation": "max",
       "operator": ">",
       "warning": 0,
       "alarm": 0.5,
