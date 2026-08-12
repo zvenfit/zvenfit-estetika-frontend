@@ -58,7 +58,7 @@ test(
     process.env.LEAD_RATE_LIMIT_SECRET = 'integration-test-secret-not-production-32';
 
     try {
-      assert.deepEqual(await runMigrations({ log: { info() {} } }), [1]);
+      assert.deepEqual(await runMigrations({ log: { info() {} } }), [1, 2]);
       assert.deepEqual(await runMigrations({ log: { info() {} } }), []);
 
       for (let round = 0; round < 5; round += 1) {
@@ -81,6 +81,11 @@ test(
         submissionStore.saveSubmission(submission(submissionId, now)),
       ]);
       assert.deepEqual(saved.map(result => result.created).sort(), [false, true]);
+      const queueHealth = await submissionStore.getTelegramQueueHealth({
+        now: new Date(now.getTime() + 5000),
+      });
+      assert.equal(queueHealth.pendingCount, 1);
+      assert.equal(queueHealth.oldestPendingAgeSeconds, 5);
       assert.deepEqual(await submissionStore.listTelegramCandidates({ now, limit: 10 }), [submissionId]);
 
       const leaseUntil = new Date(now.getTime() + 60_000);
@@ -127,6 +132,10 @@ test(
         }),
         [],
       );
+      assert.deepEqual(await submissionStore.getTelegramQueueHealth({ now: afterLease }), {
+        pendingCount: 0,
+        oldestPendingAgeSeconds: 0,
+      });
     } finally {
       await submissionStore.close();
       const client = await createYdbClient();

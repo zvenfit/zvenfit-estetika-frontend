@@ -1,34 +1,12 @@
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.querySelector('#wf-form-tg-send');
-  const formRoot = document.querySelector('#tg-send');
-  if (!form || !formRoot) {
-    return;
-  }
-
-  const successBlock = formRoot.querySelector('.success-message');
-  const errorBlock = formRoot.querySelector('.error-message');
-  const submitButton = form.querySelector('[type="submit"]');
-  const serviceInput = form.querySelector('[name="service"]');
-  const serviceCombobox = form.querySelector('[role="combobox"]');
-  const serviceError = form.querySelector('#contact-method-error');
-  const defaultSubmitLabel = submitButton ? submitButton.value : 'Отправить';
+  const serviceInput = form?.querySelector('[name="service"]');
+  const serviceCombobox = form?.querySelector('[role="combobox"]');
+  const serviceError = form?.querySelector('#contact-method-error');
   const defaultServiceLabel = 'Выберите удобный для вас вариант...';
-  const successMessageMs = 5000;
-  let successTimer;
-  let submissionId = '';
-
-  function clearSuccessTimer() {
-    if (!successTimer) {
-      return;
-    }
-    clearTimeout(successTimer);
-    successTimer = null;
-  }
 
   function setServiceValidity(isValid) {
-    if (serviceCombobox) {
-      serviceCombobox.setAttribute('aria-invalid', String(!isValid));
-    }
+    serviceCombobox?.setAttribute('aria-invalid', String(!isValid));
     if (serviceError) {
       serviceError.hidden = isValid;
     }
@@ -36,24 +14,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function resetCustomFields() {
     const selected = document.querySelector('.select-selected');
-    const hidden = document.querySelector('input[name="service"]');
     const telegramField = document.querySelector('.telegram-wrapper');
     const telegramInput = document.querySelector('[name="telegram_username"]');
 
     if (selected) {
-      selected.innerText = defaultServiceLabel;
-    }
-    if (hidden) {
-      hidden.value = '';
+      selected.textContent = defaultServiceLabel;
+      selected.setAttribute('aria-expanded', 'false');
+      selected.removeAttribute('aria-activedescendant');
     }
     document.querySelectorAll('.select-options [role="option"]').forEach(option => {
       option.setAttribute('aria-selected', 'false');
       option.classList.remove('active');
     });
-    if (selected) {
-      selected.setAttribute('aria-expanded', 'false');
-      selected.removeAttribute('aria-activedescendant');
-    }
     setServiceValidity(true);
     if (telegramField) {
       telegramField.style.display = 'none';
@@ -64,141 +36,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  function setFormState(state) {
-    clearSuccessTimer();
-
-    if (!state) {
-      form.style.display = '';
-      if (successBlock) {
-        successBlock.style.display = 'none';
-      }
-      if (errorBlock) {
-        errorBlock.style.display = 'none';
-      }
-
-      return;
-    }
-
-    if (state === 'success') {
-      form.style.display = 'none';
-      if (successBlock) {
-        successBlock.style.display = 'block';
-      }
-      if (errorBlock) {
-        errorBlock.style.display = 'none';
-      }
-    } else if (state === 'error') {
-      form.style.display = '';
-      if (successBlock) {
-        successBlock.style.display = 'none';
-      }
-      if (errorBlock) {
-        errorBlock.style.display = 'block';
-      }
-    }
-  }
-
-  function setSubmitting(isSubmitting) {
-    if (!submitButton) {
-      return;
-    }
-    submitButton.disabled = isSubmitting;
-    submitButton.value = isSubmitting ? 'Отправляем...' : defaultSubmitLabel;
-  }
-
-  setFormState(null);
-  setServiceValidity(true);
-
   if (serviceInput) {
     serviceInput.addEventListener('change', function () {
       setServiceValidity(Boolean(serviceInput.value));
     });
   }
 
-  form.addEventListener('submit', async function (event) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    setFormState(null);
-
-    if (window.__ZVENFIT_ATTRIBUTION && typeof window.__ZVENFIT_ATTRIBUTION.sync === 'function') {
-      window.__ZVENFIT_ATTRIBUTION.sync();
-    }
-
-    const utm =
-      window.__ZVENFIT_ATTRIBUTION && typeof window.__ZVENFIT_ATTRIBUTION.get === 'function'
-        ? window.__ZVENFIT_ATTRIBUTION.get()
-        : {};
-
-    const payload = {
-      submission_id:
-        submissionId ||
-        (submissionId =
-          typeof window.__ZVENFIT_CREATE_SUBMISSION_ID === 'function'
-            ? window.__ZVENFIT_CREATE_SUBMISSION_ID()
-            : ''),
-      form_type: 'lead',
-      name: form.querySelector('[name="name"]')?.value || '',
-      phone: form.querySelector('[name="phone"]')?.value || '',
-      service: form.querySelector('[name="service"]')?.value || '',
-      telegram_username: form.querySelector('[name="telegram_username"]')?.value || '',
-      website: form.querySelector('[name="website"]')?.value || '',
-    };
-
-    if (utm && Object.keys(utm).length > 0) {
-      payload.utm = utm;
-    }
-
-    if (!payload.service) {
-      setServiceValidity(false);
-      if (serviceCombobox) {
-        serviceCombobox.focus();
+  window.__ZVENFIT_FORM_CLIENT?.mount({
+    form: '#wf-form-tg-send',
+    root: '#tg-send',
+    kind: 'lead',
+    ready() {
+      setServiceValidity(true);
+    },
+    payload(activeForm, submissionId) {
+      return {
+        submission_id: submissionId,
+        form_type: 'lead',
+        name: activeForm.querySelector('[name="name"]')?.value || '',
+        phone: activeForm.querySelector('[name="phone"]')?.value || '',
+        service: activeForm.querySelector('[name="service"]')?.value || '',
+        telegram_username: activeForm.querySelector('[name="telegram_username"]')?.value || '',
+        website: activeForm.querySelector('[name="website"]')?.value || '',
+      };
+    },
+    validate(payload) {
+      const valid = Boolean(payload.service);
+      setServiceValidity(valid);
+      if (!valid) {
+        serviceCombobox?.focus();
       }
-
-      return;
-    }
-
-    setServiceValidity(true);
-
-    const apiUrl = (window.ZVENFIT_LEAD_API || '').trim();
-    if (!apiUrl || apiUrl === '__LEAD_API_URL__') {
-      setFormState('error');
-
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        setFormState('error');
-
-        return;
-      }
-
-      const data = await response.json();
-      if (!data.ok) {
-        setFormState('error');
-
-        return;
-      }
-
-      form.reset();
-      submissionId = '';
-      resetCustomFields();
-      setFormState('success');
-      successTimer = setTimeout(function () {
-        setFormState(null);
-      }, successMessageMs);
-    } catch {
-      setFormState('error');
-    } finally {
-      setSubmitting(false);
-    }
-  }, true);
+      return valid;
+    },
+    afterReset: resetCustomFields,
+  });
 });

@@ -10,6 +10,8 @@ import {
   requestBodyBytes,
 } from './http';
 import { createInvocationLogger } from './observability/logger';
+import { withEventMetrics } from './observability/event-metrics';
+import { createInvocationMetrics } from './observability/metrics';
 import { createSubmission, hasHoneypotValue, validateSubmission } from './submission-payload';
 import {
   errorCode,
@@ -51,6 +53,7 @@ function createDependencies(overrides: Partial<HandlerDependencies>): HandlerDep
   return {
     loggerFactory: createInvocationLogger,
     maxAttempts: maxTelegramAttempts,
+    metricsFactory: createInvocationMetrics,
     now: () => new Date(),
     rateLimiter: consumeSubmissionRateLimit,
     store: submissionStore,
@@ -135,51 +138,73 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
   const dependencies = createDependencies(overrides);
 
   return async (event, context) => {
-    const logger = dependencies.loggerFactory(context);
-    if (isTimerEvent(event)) {
-      return retryPendingSubmissions(dependencies, logger);
-    }
+    const baseLogger = dependencies.loggerFactory(context);
+    const metrics = dependencies.metricsFactory(context, baseLogger);
+    const logger = withEventMetrics(baseLogger, metrics);
 
-    const origins = allowedOrigins();
-    const origin = event.headers?.Origin || event.headers?.origin || '';
-    if (!isAllowedOrigin(origin, origins)) {
-      logBlockedSubmission(logger, 'origin');
-
-      return jsonResponse(403, { ok: false, error: 'origin_not_allowed' }, { Vary: 'Origin' });
-    }
-
-    const headers = corsHeaders(origin);
-    const method = (event.httpMethod || event.requestContext?.http?.method || 'GET').toUpperCase();
-    if (method === 'OPTIONS') {
-      return { statusCode: 204, headers, body: '' };
-    }
-    if (method !== 'POST') {
-      return jsonResponse(405, { ok: false, error: 'method_not_allowed' }, headers);
-    }
-
-    const contentType = event.headers?.['Content-Type'] || event.headers?.['content-type'] || '';
-    if (contentType && !contentType.toLowerCase().startsWith('application/json')) {
-      return jsonResponse(415, { ok: false, error: 'unsupported_media_type' }, headers);
-    }
-    if (requestBodyBytes(event) > MAX_REQUEST_BODY_BYTES) {
-      logBlockedSubmission(logger, 'payload_too_large');
-
-      return jsonResponse(413, { ok: false, error: 'payload_too_large' }, headers);
-    }
-
-    let body: JsonObject;
     try {
-      body = readBody(event);
-    } catch {
-      return jsonResponse(400, { ok: false, error: 'invalid_json' }, headers);
-    }
-    if (hasHoneypotValue(body)) {
-      logBlockedSubmission(logger, 'honeypot');
+      if (isTimerEvent(event)) {
+        const retrySummary = await retryPendingSubmissions(dependencies, logger);
+        const queueHealth = await dependencies.store.getTelegramQueueHealth({
+          now: dependencies.now(),
+          logger,
+        });
+        metrics.recordGauge(
+          'zvenfit_estetika_telegram_pending_submissions',
+          queueHealth.pendingCount,
+        );
+        metrics.recordGauge(
+          'zvenfit_estetika_telegram_oldest_pending_age_seconds',
+          queueHealth.oldestPendingAgeSeconds,
+        );
+        metrics.recordGauge('zvenfit_estetika_retry_worker_heartbeat', 1);
 
-      return jsonResponse(200, { ok: true }, headers);
-    }
+        return retrySummary;
+      }
 
-    return persistSubmission(body, dependencies, logger, headers, requestIp(event));
+      const origins = allowedOrigins();
+      const origin = event.headers?.Origin || event.headers?.origin || '';
+      if (!isAllowedOrigin(origin, origins)) {
+        logBlockedSubmission(logger, 'origin');
+
+        return jsonResponse(403, { ok: false, error: 'origin_not_allowed' }, { Vary: 'Origin' });
+      }
+
+      const headers = corsHeaders(origin);
+      const method = (event.httpMethod || event.requestContext?.http?.method || 'GET').toUpperCase();
+      if (method === 'OPTIONS') {
+        return { statusCode: 204, headers, body: '' };
+      }
+      if (method !== 'POST') {
+        return jsonResponse(405, { ok: false, error: 'method_not_allowed' }, headers);
+      }
+
+      const contentType = event.headers?.['Content-Type'] || event.headers?.['content-type'] || '';
+      if (contentType && !contentType.toLowerCase().startsWith('application/json')) {
+        return jsonResponse(415, { ok: false, error: 'unsupported_media_type' }, headers);
+      }
+      if (requestBodyBytes(event) > MAX_REQUEST_BODY_BYTES) {
+        logBlockedSubmission(logger, 'payload_too_large');
+
+        return jsonResponse(413, { ok: false, error: 'payload_too_large' }, headers);
+      }
+
+      let body: JsonObject;
+      try {
+        body = readBody(event);
+      } catch {
+        return jsonResponse(400, { ok: false, error: 'invalid_json' }, headers);
+      }
+      if (hasHoneypotValue(body)) {
+        logBlockedSubmission(logger, 'honeypot');
+
+        return jsonResponse(200, { ok: true }, headers);
+      }
+
+      return persistSubmission(body, dependencies, logger, headers, requestIp(event));
+    } finally {
+      await metrics.flush();
+    }
   };
 }
 

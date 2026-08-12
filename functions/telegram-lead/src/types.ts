@@ -29,6 +29,20 @@ export interface LoggerLike {
   warn?(fields: JsonObject, message?: string): void;
 }
 
+export interface ApplicationMetrics {
+  addCounter(
+    name: string,
+    value?: number,
+    attributes?: Record<string, string | number | boolean>,
+  ): void;
+  recordGauge(
+    name: string,
+    value: number,
+    attributes?: Record<string, string | number | boolean>,
+  ): void;
+  flush(): Promise<void>;
+}
+
 export type FormType = 'lead' | 'newsletter';
 export type UtmKey =
   | 'utm_source'
@@ -59,6 +73,11 @@ export interface ClaimedSubmission extends Submission {
 
 export interface StoreOptions {
   logger?: LoggerLike;
+}
+
+export interface TelegramQueueHealth {
+  pendingCount: number;
+  oldestPendingAgeSeconds: number;
 }
 
 export interface SubmissionStore {
@@ -92,11 +111,13 @@ export interface SubmissionStore {
     limit: number;
     logger?: LoggerLike;
   }): Promise<string[]>;
+  getTelegramQueueHealth(args: { now: Date; logger?: LoggerLike }): Promise<TelegramQueueHealth>;
 }
 
 export interface HandlerDependencies {
   loggerFactory(context?: FunctionContext): LoggerLike;
   maxAttempts(): number;
+  metricsFactory(context: FunctionContext | undefined, logger: LoggerLike): ApplicationMetrics;
   now(): Date;
   rateLimiter(args: { sourceIp: string; now: Date; logger?: LoggerLike }): Promise<boolean>;
   store: SubmissionStore;

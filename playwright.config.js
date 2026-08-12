@@ -49,7 +49,8 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run build && npx serve dist -l 4173 --no-clipboard',
+    command:
+      'LEAD_API_URL=https://example.invalid/lead YANDEX_METRIKA_ID=123456 ASSET_VERSION=playwright NODE_ENV=production npm run build && npx serve dist -l 4173 --no-clipboard',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

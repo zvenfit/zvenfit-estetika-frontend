@@ -54,8 +54,31 @@ jobs:
           SITE_URL: https://estetika.zvenfit.ru
         run: npm run test:build
 
-  deploy-function:
+  deploy-preflight:
     needs: quality-checks
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate deploy configuration
+        env:
+          YC_SA_JSON_KEY: ${{ secrets.YC_SA_JSON_KEY }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LEAD_RATE_LIMIT_SECRET: ${{ secrets.LEAD_RATE_LIMIT_SECRET }}
+          MONIUM_API_KEY: ${{ secrets.MONIUM_API_KEY }}
+          YC_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          YC_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
+          YANDEX_METRIKA_ID: ${{ vars.YANDEX_METRIKA_ID }}
+        run: node scripts/check-deploy-config.cjs
+
+  deploy-function:
+    needs: [quality-checks, deploy-preflight]
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -94,6 +117,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LEAD_RATE_LIMIT_SECRET: ${{ secrets.LEAD_RATE_LIMIT_SECRET }}
+          MONIUM_API_KEY: ${{ secrets.MONIUM_API_KEY }}
+          MONIUM_METRICS_ENABLED: ${{ vars.MONIUM_METRICS_ENABLED || 'true' }}
+          MONIUM_PROJECT: ${{ vars.MONIUM_PROJECT || format('folder__{0}', secrets.YC_FOLDER_ID) }}
+          MONIUM_CLUSTER: ${{ vars.MONIUM_CLUSTER || 'default' }}
+          MONIUM_SERVICE: ${{ vars.MONIUM_SERVICE || 'zvenfit-estetika-frontend' }}
+          MONIUM_METRICS_TIMEOUT_MS: ${{ vars.MONIUM_METRICS_TIMEOUT_MS || '1000' }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
@@ -204,3 +233,9 @@ jobs:
             --include "*.html"
             --cache-control "no-cache, must-revalidate"
             --metadata-directive REPLACE
+
+      - name: Smoke production deployment
+        env:
+          SITE_URL: https://estetika.zvenfit.ru
+          LEAD_API_URL: ${{ needs.deploy-function.outputs.function_url }}
+        run: node scripts/smoke-production.cjs

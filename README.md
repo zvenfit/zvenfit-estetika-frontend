@@ -32,11 +32,12 @@
 | `functions/telegram-lead/src/index.ts` | Точка входа Cloud Function, реэкспорт обработчика |
 | `functions/telegram-lead/src/handler.ts` | HTTP, валидация, идемпотентность и retry timer |
 | `functions/telegram-lead/src/ydb/` | Миграции, бессрочные заявки/подписки, индексированная очередь и rate limit |
-| `functions/telegram-lead/src/observability/` | Structured logs, redaction и наблюдаемость YDB |
+| `functions/telegram-lead/src/observability/` | Structured logs, redaction, YDB telemetry и прямые OTLP-метрики Monium |
 | `functions/telegram-lead/src/**/__tests__/` | Unit, artifact и YDB integration-тесты функции |
 | `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
 | `scripts/structured-data.config.json` | URL сайта и CDN, метаданные страниц и данные JSON-LD |
 | `tests/visual/` | Скриншотные тесты Playwright для десктопа, планшета и телефона |
+| `scripts/upstream-parity.json` | Последний проверенный commit `zvenfit-frontend` |
 | `upload/` | Локальная папка для сырого экспорта Webflow, исключена из Git |
 | `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
 
@@ -92,6 +93,7 @@ npm run test:lead-fn     # strict typecheck + unit + проверка runtime-а
 npm run test:monitoring  # контракт CI/deploy, событий, метрик и алертов
 npm run test:performance # проверка бюджета уже собранного dist/
 npm run test:visual      # сравнение скриншотов Playwright
+npm run check:upstream-parity # есть ли новые неразобранные изменения в соседнем zvenfit-frontend
 ```
 
 Эталонные скриншоты зависят от платформы, хранятся только локально и исключены из Git. Создать или намеренно обновить их можно командой `npm run test:visual:update`, после чего нужно повторно запустить `npm run test:visual`.
@@ -103,10 +105,11 @@ npm run test:visual      # сравнение скриншотов Playwright
 При пуше в `main` или ручном запуске workflow выполняется `.github/workflows/main.yml`:
 
 1. независимо от облака запускает линтер, strict typecheck, unit/artifact-тесты функции, мониторинговый контракт и проверку сайта;
-2. проверяет заранее созданную YDB Serverless, прогоняет integration-тесты на временных таблицах и применяет версионируемые миграции;
-3. упаковывает только скомпилированный CommonJS runtime, разворачивает функцию и минутный retry timer;
-4. собирает сайт с URL функции, проверяет `dist/` и performance-budget;
-5. синхронизирует с бакетом сайта версионируемые ассеты с кешем на год, а HTML, `robots.txt` и `sitemap.xml` — с `no-cache`.
+2. fail-fast проверяет наличие и формат обязательных production secrets/variables без вывода значений;
+3. проверяет заранее созданную YDB Serverless, прогоняет integration-тесты на временных таблицах и применяет версионируемые миграции;
+4. упаковывает только скомпилированный CommonJS runtime, разворачивает функцию и минутный retry timer;
+5. собирает сайт с URL функции, проверяет `dist/` и performance-budget;
+6. синхронизирует сайт и выполняет безопасный production smoke без создания реальной заявки.
 
 Ручной деплой:
 
@@ -116,6 +119,7 @@ export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
+export MONIUM_API_KEY=...
 npm run deploy:lead-fn
 
 export LEAD_API_URL=...       # значение из вывода deploy:lead-fn
@@ -140,7 +144,7 @@ yc storage s3api put-object \
 
 После публикации проверьте публичный URL, `Content-Type`, `Cache-Control` и CORS-заголовок. `npm run setup:storage` задаёт CORS для публичной загрузки шрифтов.
 
-Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Мониторинг после первого деплоя: [`docs/monitoring.md`](docs/monitoring.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
+Короткий список действий владельца: [`docs/operator-handoff.md`](docs/operator-handoff.md). Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Мониторинг после первого деплоя: [`docs/monitoring.md`](docs/monitoring.md). Правила регулярного сравнения с основным проектом: [`docs/upstream-parity.md`](docs/upstream-parity.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
 
 ## Повторный экспорт из Webflow
 

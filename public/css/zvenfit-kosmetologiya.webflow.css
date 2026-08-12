@@ -91,6 +91,71 @@
   }
 }
 
+/* Accessibility layer: keep the Webflow visual system while making keyboard and no-JS states explicit. */
+.visually-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  position: absolute;
+}
+
+:where(a, button, input, select, textarea, [role="button"], [role="combobox"]):focus-visible {
+  outline: 3px solid var(--black);
+  outline-offset: 3px;
+}
+
+.button {
+  min-height: 44px;
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.error-message:focus {
+  outline: none;
+}
+
+.form-noscript {
+  color: var(--black);
+  background: var(--dark-beige);
+  border: 1px solid var(--powder);
+  border-radius: 5px;
+  padding: 16px;
+  font-family: Involve, Arial, sans-serif;
+  line-height: 1.4;
+}
+
+.form-noscript.news {
+  color: var(--white);
+  background: #774553;
+}
+
+.form-noscript a {
+  color: inherit;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 @media screen and (max-width: 767px) {
   .w-layout-blockcontainer {
     max-width: none;

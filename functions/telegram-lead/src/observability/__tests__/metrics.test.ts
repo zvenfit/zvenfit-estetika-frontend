@@ -1,0 +1,230 @@
+import { ExportResultCode } from '@opentelemetry/core';
+import {
+  AggregationTemporality,
+  type PushMetricExporter,
+  type ResourceMetrics,
+} from '@opentelemetry/sdk-metrics';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { createInvocationMetrics } from '../metrics';
+import { createOtelTransport } from '../otel-transport';
+
+import type { JsonObject, LoggerLike } from '../../types';
+
+class TestLogger implements LoggerLike {
+  public readonly errors: JsonObject[] = [];
+  public readonly warnings: JsonObject[] = [];
+
+  public error(fields: JsonObject): void {
+    this.errors.push(fields);
+  }
+
+  public warn(fields: JsonObject): void {
+    this.warnings.push(fields);
+  }
+}
+
+function enabledEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return {
+    MONIUM_METRICS_ENABLED: 'true',
+    MONIUM_API_KEY: 'monium-api-key',
+    MONIUM_PROJECT: 'folder__test',
+    ...overrides,
+  };
+}
+
+test('stays inert when metrics are disabled and validates required credentials', async () => {
+  const logger = new TestLogger();
+  let factoryCalls = 0;
+  const disabled = createInvocationMetrics(undefined, logger, {
+    env: {},
+    transportFactory: () => {
+      factoryCalls += 1;
+      throw new Error('must not initialize');
+    },
+  });
+
+  disabled.addCounter('test_counter');
+  await disabled.flush();
+  assert.equal(factoryCalls, 0);
+
+  createInvocationMetrics(undefined, logger, { env: { MONIUM_METRICS_ENABLED: '1' } });
+  createInvocationMetrics(undefined, logger, { env: enabledEnv({ MONIUM_API_KEY: '' }) });
+  assert.deepEqual(logger.warnings, [
+    { event: 'monium_metrics_misconfigured', reason: 'missing_project' },
+    { event: 'monium_metrics_misconfigured', reason: 'missing_api_key' },
+  ]);
+});
+
+test('initializes lazily with bounded Monium settings and flushes once', async () => {
+  const logger = new TestLogger();
+  const calls: Array<{ kind: string; name: string; value: number }> = [];
+  const options: unknown[] = [];
+  let flushCalls = 0;
+  const metrics = createInvocationMetrics(undefined, logger, {
+    env: enabledEnv({
+      MONIUM_CLUSTER: 'production',
+      MONIUM_METRICS_TIMEOUT_MS: '750',
+    }),
+    transportFactory: transportOptions => {
+      options.push(transportOptions);
+
+      return {
+        addCounter: (name, value) => calls.push({ kind: 'counter', name, value }),
+        recordGauge: (name, value) => calls.push({ kind: 'gauge', name, value }),
+        async flush() {
+          flushCalls += 1;
+        },
+      };
+    },
+  });
+
+  assert.deepEqual(options, []);
+  metrics.addCounter('submission_saved', 2);
+  metrics.recordGauge('queue_depth', 3);
+  await metrics.flush();
+  await metrics.flush();
+
+  assert.deepEqual(calls, [
+    { kind: 'counter', name: 'submission_saved', value: 2 },
+    { kind: 'gauge', name: 'queue_depth', value: 3 },
+  ]);
+  assert.equal(flushCalls, 1);
+  assert.deepEqual(options, [
+    {
+      endpoint: 'https://ingest.monium.yandex.cloud/otlp/v1/metrics',
+      headers: {
+        Authorization: 'Api-Key monium-api-key',
+        'x-monium-project': 'folder__test',
+        'x-monium-cluster': 'production',
+        'x-monium-service': 'zvenfit-estetika-frontend',
+      },
+      timeoutMs: 750,
+    },
+  ]);
+});
+
+test('does not propagate initialization or export failures or expose credentials', async () => {
+  const initializationLogger = new TestLogger();
+  const initializationMetrics = createInvocationMetrics(undefined, initializationLogger, {
+    env: enabledEnv(),
+    transportFactory: () => {
+      throw Object.assign(new Error('unavailable'), { code: 'collector_unavailable' });
+    },
+  });
+  assert.doesNotThrow(() => initializationMetrics.addCounter('storage_errors'));
+  assert.deepEqual(initializationLogger.errors, [
+    { event: 'monium_metrics_init_error', error_code: 'collector_unavailable' },
+  ]);
+
+  const exportLogger = new TestLogger();
+  const exportMetrics = createInvocationMetrics(undefined, exportLogger, {
+    env: enabledEnv(),
+    transportFactory: () => ({
+      addCounter() {},
+      recordGauge() {},
+      async flush() {
+        throw Object.assign(new Error('timeout'), { code: 'export_timeout' });
+      },
+    }),
+  });
+  exportMetrics.addCounter('storage_errors');
+  await assert.doesNotReject(exportMetrics.flush());
+  assert.deepEqual(exportLogger.errors, [
+    { event: 'monium_metrics_export_error', error_code: 'export_timeout' },
+  ]);
+  assert.equal(JSON.stringify(exportLogger.errors).includes('monium-api-key'), false);
+});
+
+test('bounds exporter timeout', () => {
+  const timeouts: number[] = [];
+  for (const configured of ['10', '9000']) {
+    const metrics = createInvocationMetrics(undefined, new TestLogger(), {
+      env: enabledEnv({ MONIUM_METRICS_TIMEOUT_MS: configured }),
+      transportFactory: options => {
+        timeouts.push(options.timeoutMs);
+
+        return { addCounter() {}, recordGauge() {}, async flush() {} };
+      },
+    });
+    metrics.addCounter('test_counter');
+  }
+  assert.deepEqual(timeouts, [100, 5000]);
+});
+
+test('exports delta metrics and surfaces collector rejection', async () => {
+  let exportedMetrics: ResourceMetrics | undefined;
+  const exporter: PushMetricExporter = {
+    export(metrics, callback) {
+      exportedMetrics = metrics;
+      callback({ code: ExportResultCode.SUCCESS });
+    },
+    async forceFlush() {},
+    async shutdown() {},
+  };
+  const transport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 100 },
+    () => exporter,
+  );
+  transport.addCounter('zvenfit_test_events', 2, { outcome: 'stored' });
+  await transport.flush();
+
+  const metric = exportedMetrics?.scopeMetrics
+    .flatMap(scope => scope.metrics)
+    .find(item => item.descriptor.name === 'zvenfit_test_events');
+  assert.ok(metric);
+  assert.equal(metric.aggregationTemporality, AggregationTemporality.DELTA);
+  assert.equal(metric.dataPoints[0]?.value, 2);
+
+  const rejected: PushMetricExporter = {
+    export(_metrics, callback) {
+      callback({
+        code: ExportResultCode.FAILED,
+        error: Object.assign(new Error('rejected'), { code: 'collector_rejected' }),
+      });
+    },
+    async forceFlush() {},
+    async shutdown() {},
+  };
+  const rejectedTransport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 100 },
+    () => rejected,
+  );
+  rejectedTransport.addCounter('zvenfit_test_events', 1);
+  await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
+});
+
+test('exports zero-valued queue gauges as cumulative instant values', async () => {
+  let exportedMetrics: ResourceMetrics | undefined;
+  const exporter: PushMetricExporter = {
+    export(metrics, callback) {
+      exportedMetrics = metrics;
+      callback({ code: ExportResultCode.SUCCESS });
+    },
+    async forceFlush() {},
+    async shutdown() {},
+  };
+  const transport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 100 },
+    () => exporter,
+  );
+
+  transport.recordGauge('zvenfit_estetika_telegram_pending_submissions', 0);
+  transport.recordGauge('zvenfit_estetika_telegram_oldest_pending_age_seconds', 0);
+  transport.recordGauge('zvenfit_estetika_retry_worker_heartbeat', 1);
+  await transport.flush();
+
+  const metrics = exportedMetrics?.scopeMetrics.flatMap(scope => scope.metrics) ?? [];
+  const gauges = new Map(metrics.map(metric => [metric.descriptor.name, metric]));
+  for (const [name, expectedValue] of [
+    ['zvenfit_estetika_telegram_pending_submissions', 0],
+    ['zvenfit_estetika_telegram_oldest_pending_age_seconds', 0],
+    ['zvenfit_estetika_retry_worker_heartbeat', 1],
+  ] as const) {
+    const gauge = gauges.get(name);
+    assert.ok(gauge, `${name} was not exported`);
+    assert.equal(gauge.aggregationTemporality, AggregationTemporality.CUMULATIVE);
+    assert.equal(gauge.dataPoints[0]?.value, expectedValue);
+  }
+});

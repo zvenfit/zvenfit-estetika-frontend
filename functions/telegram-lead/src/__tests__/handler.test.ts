@@ -59,9 +59,15 @@ function dependencies(
   return {
     loggerFactory: () => logger,
     maxAttempts: () => 12,
+    metricsFactory: () => ({ addCounter() {}, recordGauge() {}, async flush() {} }),
     now: () => NOW,
     rateLimiter: async () => true,
-    store: store as SubmissionStore,
+    store: {
+      async getTelegramQueueHealth() {
+        return { pendingCount: 0, oldestPendingAgeSeconds: 0 };
+      },
+      ...store,
+    } as SubmissionStore,
     telegramSender: async () => {},
     uuid: () => DELIVERY_ID,
     ...overrides,

@@ -211,6 +211,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `TELEGRAM_BOT_TOKEN` | Токен Telegram-бота |
 | `TELEGRAM_CHAT_ID` | Идентификатор целевой группы |
 | `LEAD_RATE_LIMIT_SECRET` | Случайная строка длиной от 32 символов для HMAC IP (`openssl rand -hex 32`) |
+| `MONIUM_API_KEY` | API key с правом записи direct metrics в Monium; передаётся только функции |
 | `YC_ACCESS_KEY_ID` | ID статического ключа Object Storage |
 | `YC_SECRET_ACCESS_KEY` | Секретная часть статического ключа Object Storage |
 
@@ -233,6 +234,15 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; по умолчанию `5000` |
 | `YDB_SLOW_OPERATION_MS` | Порог события медленной операции; по умолчанию `1000` |
 | `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
+| `MONIUM_METRICS_ENABLED` | Прямой экспорт метрик; production default `true` |
+| `MONIUM_PROJECT` | Проект Monium; по умолчанию `folder__<YC_FOLDER_ID>` |
+| `MONIUM_CLUSTER` | Cluster direct metrics; по умолчанию `default` |
+| `MONIUM_SERVICE` | Service direct metrics; по умолчанию `zvenfit-estetika-frontend` |
+| `MONIUM_METRICS_TIMEOUT_MS` | Таймаут OTLP export; по умолчанию `1000`, диапазон `100–5000` |
+
+Для еженедельной проверки паритета приватного `zvenfit/zvenfit-frontend` добавьте необязательный
+repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents. Для публичного upstream
+workflow использует стандартный `GITHUB_TOKEN`.
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. При добавлении или удалении домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
@@ -247,8 +257,8 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 Порядок шагов workflow:
 
 ```text
-quality checks → проверка YDB → integration test → миграции → деплой функции и retry timer → получение URL → сборка →
-проверка dist → immutable-ассеты → robots/sitemap no-cache → HTML no-cache
+quality checks → deploy preflight → проверка YDB → integration test → миграции → функция и retry timer →
+получение URL → сборка → проверка dist → immutable-ассеты → robots/sitemap → HTML → production smoke
 ```
 
 Для полного ручного деплоя сначала разверните функцию, затем используйте напечатанный скриптом URL при сборке сайта:
@@ -259,6 +269,7 @@ export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
+export MONIUM_API_KEY=...
 export ALLOWED_ORIGINS=https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru
 npm run deploy:lead-fn
 

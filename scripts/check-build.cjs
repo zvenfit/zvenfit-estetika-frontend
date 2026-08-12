@@ -64,6 +64,13 @@ for (const rel of ['index.html', 'form/index.html']) {
     throw new Error(`check-build: ${rel} loads IMask from unpkg`);
   }
 
+  if (/<form[^>]*method=["']get["']/i.test(html)) {
+    throw new Error(`check-build: ${rel} contains a GET form that could expose personal data in URL`);
+  }
+  if (!html.includes('<noscript>') || !html.includes('tel:+79688440088')) {
+    throw new Error(`check-build: ${rel} has no safe no-JS fallback`);
+  }
+
   if (
     !html.includes(
       'https://storage.yandexcloud.net/zvenfit-estetika/js/imask-7.6.1.min.js?v=',
@@ -109,6 +116,11 @@ for (const attribute of [
 }
 if (!formPage.includes('id="contact-method-error"')) {
   throw new Error('check-build: contact method field error is missing');
+}
+
+const homePage = read('index.html');
+if (!homePage.includes('<label class="visually-hidden" for="phone">Номер телефона</label>')) {
+  throw new Error('check-build: newsletter phone input has no accessible label');
 }
 
 const legal = read('documents/privacy-policy.html');

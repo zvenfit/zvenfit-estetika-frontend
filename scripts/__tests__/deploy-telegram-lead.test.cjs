@@ -11,15 +11,22 @@ const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/main.yml'), 
 
 test('production deploy jobs wait for quality checks', () => {
   const quality = workflow.indexOf('  quality-checks:');
+  const preflight = workflow.indexOf('  deploy-preflight:');
   const functionDeploy = workflow.indexOf('  deploy-function:');
   const siteDeploy = workflow.indexOf('  deploy-site:');
 
   assert.equal(quality >= 0, true);
-  assert.equal(functionDeploy > quality, true);
+  assert.equal(preflight > quality, true);
+  assert.equal(functionDeploy > preflight, true);
   assert.equal(siteDeploy > functionDeploy, true);
   const functionJob = workflow.slice(functionDeploy, siteDeploy);
-  assert.match(functionJob, /needs: quality-checks/);
+  assert.match(functionJob, /needs: \[quality-checks, deploy-preflight\]/);
   assert.match(functionJob, /environment: production/);
+});
+
+test('deploy fails fast on missing configuration and smoke-checks production', () => {
+  assert.match(workflow, /deploy-preflight:[\s\S]*node scripts\/check-deploy-config\.cjs/);
+  assert.match(workflow, /Smoke production deployment[\s\S]*node scripts\/smoke-production\.cjs/);
 });
 
 test('function deploy verifies YDB, migrates and then creates a version', () => {

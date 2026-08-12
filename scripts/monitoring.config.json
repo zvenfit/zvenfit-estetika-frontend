@@ -2,6 +2,12 @@
   "application": "zvenfit-estetika-frontend",
   "environment": "production",
   "project": "folder__b1ge1e4iopttj79hfdfm",
+  "directMetrics": {
+    "cluster": "default",
+    "service": "zvenfit-estetika-frontend",
+    "transport": "OTLP delta",
+    "endpoint": "https://ingest.monium.yandex.cloud/otlp/v1/metrics"
+  },
   "logGroup": {
     "name": "default",
     "retentionDays": 3
@@ -9,6 +15,11 @@
   "resources": {
     "function": "zvenfit-estetika-telegram-lead",
     "database": "zvenfit-estetika-leads"
+  },
+  "provisioning": {
+    "notificationChannels": "manual-console",
+    "alerts": "manual-console",
+    "reason": "Yandex Monitoring does not expose these resources in the public YC CLI or Terraform provider"
   },
   "notificationChannels": [
     "zvenfit_estetika_telegram_alerts",
@@ -57,58 +68,134 @@
   "alerts": [
     {
       "id": "zvenfit_estetika_storage_errors",
-      "metricId": "zvenfit_estetika_storage_errors_1m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_storage_errors\"}",
+      "aggregation": "max",
+      "operator": ">",
       "warning": 0,
       "alarm": 0.5,
       "window": "5m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_permanent_telegram_failures",
-      "metricId": "zvenfit_estetika_telegram_failed_1m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_failed_1m\"}",
+      "aggregation": "max",
+      "operator": ">",
       "warning": 0,
       "alarm": 0.5,
       "window": "5m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_ydb_retries",
-      "metricId": "zvenfit_estetika_ydb_retries_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_ydb_retries_5m\"}",
+      "aggregation": "sum",
+      "operator": ">",
       "warning": 4.5,
       "alarm": 5.5,
       "window": "10m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_slow_ydb",
-      "metricId": "zvenfit_estetika_ydb_slow_5m",
-      "warning": 0,
-      "alarm": 0.5,
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_ydb_slow_5m\"}",
+      "aggregation": "sum",
+      "operator": ">",
+      "warning": 0.5,
+      "alarm": 2.5,
       "window": "10m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_rate_limited",
-      "metricId": "zvenfit_estetika_rate_limited_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_rate_limited_5m\"}",
+      "aggregation": "sum",
+      "operator": ">",
       "warning": 0,
       "alarm": 5,
       "window": "10m",
+      "delay": "30s",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_submission_volume",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_submissions_5m\"}",
+      "aggregation": "sum",
+      "operator": ">",
+      "warning": 10,
+      "alarm": 20,
+      "window": "10m",
+      "delay": "30s",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_retry_worker_heartbeat",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\"}",
+      "aggregation": "last",
+      "operator": "<",
+      "warning": 0.9,
+      "alarm": 0.5,
+      "window": "5m",
+      "delay": "30s",
+      "noData": "ALARM"
+    },
+    {
+      "id": "zvenfit_estetika_telegram_backlog",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\"}",
+      "aggregation": "last",
+      "operator": ">",
+      "warning": 600,
+      "alarm": 1800,
+      "window": "5m",
+      "delay": "30s",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_rate_limit_health",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_rate_limit_errors_5m\"}",
+      "aggregation": "sum",
+      "operator": ">",
+      "warning": 0,
+      "alarm": 2,
+      "window": "10m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_function_runtime_errors",
-      "metricSelector": "service=serverless-functions,name=functions_errors,resource_id=zvenfit-estetika-telegram-lead",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "aggregation": "sum",
+      "operator": ">",
       "warning": 0,
       "alarm": 0.5,
       "window": "5m",
+      "delay": "30s",
       "noData": "OK"
     },
     {
       "id": "zvenfit_estetika_ydb_storage_usage",
-      "metricSelector": "service=ydb,database.serverless=zvenfit-estetika-leads,used/limit*100",
+      "queries": [
+        {
+          "name": "A",
+          "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
+        },
+        {
+          "name": "B",
+          "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
+        },
+        { "name": "C", "query": "(A / B) * 100" }
+      ],
+      "signal": "C",
+      "aggregation": "last",
+      "operator": ">=",
       "warning": 70,
       "alarm": 85,
       "window": "15m",
+      "delay": "30s",
       "noData": "WARNING"
     }
   ]

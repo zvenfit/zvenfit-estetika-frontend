@@ -1,4 +1,4 @@
-import { dueIndexName, tableName } from './config';
+import { dueIndexName, queueHealthIndexName, tableName } from './config';
 import {
   firstResultSet,
   getSql,
@@ -12,7 +12,7 @@ import {
   ydbUint32,
 } from './context';
 
-import type { ClaimedSubmission, LoggerLike } from '../types';
+import type { ClaimedSubmission, LoggerLike, TelegramQueueHealth } from '../types';
 
 export async function claimForTelegram({
   submissionId,
@@ -179,5 +179,40 @@ export async function listTelegramCandidates({
     );
 
     return rows.map(row => stringValue(row.submission_id));
+  });
+}
+
+export async function getTelegramQueueHealth({
+  now,
+  logger,
+}: {
+  now: Date;
+  logger?: LoggerLike;
+}): Promise<TelegramQueueHealth> {
+  return observed('get_telegram_queue_health', logger, async () => {
+    const sql = await getSql();
+    const submissionsTable = sql.identifier(tableName());
+    const queueHealthIndex = sql.identifier(queueHealthIndexName());
+    const rows = firstResultSet(
+      await timed(
+        sql`
+          SELECT
+            COUNT(*) AS pending_count,
+            MIN(created_at) AS oldest_created_at
+          FROM ${submissionsTable} VIEW ${queueHealthIndex}
+          WHERE telegram_status = ${'pending'} OR telegram_status = ${'sending'};
+        `
+          .idempotent(true)
+          .isolation('snapshotReadOnly'),
+      ),
+    );
+    const row = rows[0];
+    const pendingCount = Math.max(0, Number(row?.pending_count || 0));
+    const oldestCreatedAt = row?.oldest_created_at;
+    const oldestPendingAgeSeconds = oldestCreatedAt
+      ? Math.max(0, Math.floor((now.getTime() - toEpoch(oldestCreatedAt)) / 1000))
+      : 0;
+
+    return { pendingCount, oldestPendingAgeSeconds };
   });
 }

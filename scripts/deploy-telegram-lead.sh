@@ -22,6 +22,11 @@ MEMORY="${YC_LEAD_MEMORY:-256m}"
 TIMEOUT="${YC_LEAD_TIMEOUT:-120s}"
 ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
+MONIUM_METRICS_ENABLED="${MONIUM_METRICS_ENABLED:-true}"
+MONIUM_PROJECT="${MONIUM_PROJECT:-folder__${YC_FOLDER_ID:-}}"
+MONIUM_CLUSTER="${MONIUM_CLUSTER:-default}"
+MONIUM_SERVICE="${MONIUM_SERVICE:-zvenfit-estetika-frontend}"
+MONIUM_METRICS_TIMEOUT_MS="${MONIUM_METRICS_TIMEOUT_MS:-1000}"
 
 if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" || -z "${LEAD_RATE_LIMIT_SECRET:-}" ]]; then
   echo "deploy-telegram-lead: set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID and LEAD_RATE_LIMIT_SECRET" >&2
@@ -41,6 +46,13 @@ fi
 if [[ -z "${YC_FOLDER_ID:-}" ]]; then
   echo "deploy-telegram-lead: set YC_FOLDER_ID" >&2
   exit 1
+fi
+
+if [[ "${MONIUM_METRICS_ENABLED}" == "true" || "${MONIUM_METRICS_ENABLED}" == "1" ]]; then
+  if [[ -z "${MONIUM_API_KEY:-}" || -z "${MONIUM_PROJECT}" ]]; then
+    echo "deploy-telegram-lead: enabled Monium metrics require MONIUM_API_KEY and MONIUM_PROJECT" >&2
+    exit 1
+  fi
 fi
 
 if [[ -z "${YC_LEAD_SERVICE_ACCOUNT_ID:-}" ]]; then
@@ -133,6 +145,12 @@ yc serverless function version create \
   --environment YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
   --environment YDB_SLOW_OPERATION_MS="${YDB_SLOW_OPERATION_MS}" \
   --environment YDB_SESSION_POOL_SIZE="${YDB_SESSION_POOL_SIZE}" \
+  --environment MONIUM_METRICS_ENABLED="${MONIUM_METRICS_ENABLED}" \
+  --environment MONIUM_API_KEY="${MONIUM_API_KEY:-}" \
+  --environment MONIUM_PROJECT="${MONIUM_PROJECT}" \
+  --environment MONIUM_CLUSTER="${MONIUM_CLUSTER}" \
+  --environment MONIUM_SERVICE="${MONIUM_SERVICE}" \
+  --environment MONIUM_METRICS_TIMEOUT_MS="${MONIUM_METRICS_TIMEOUT_MS}" \
   --environment LOG_LEVEL="${LOG_LEVEL}" \
   --environment NODE_ENV="${NODE_ENV:-production}"
 

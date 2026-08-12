@@ -27,6 +27,7 @@ const CACHE_BUST_SCRIPTS = [
   'utm-attribution.js',
   'lead-config.js',
   'submission-id.js',
+  'form-client.js',
   'lead-form.js',
   'newsletter-form.js',
   'phone-mask.js',

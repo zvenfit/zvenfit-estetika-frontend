@@ -1,5 +1,12 @@
 import { createYdbClient } from './client';
-import { dueIndexName, migrationTableName, queryTimeoutMs, rateLimitsTableName, tableName } from './config';
+import {
+  dueIndexName,
+  migrationTableName,
+  queryTimeoutMs,
+  queueHealthIndexName,
+  rateLimitsTableName,
+  tableName,
+} from './config';
 
 import type { YdbClient, YdbQuery } from '../types';
 
@@ -8,6 +15,7 @@ interface MigrationContext extends YdbClient {
   migrationsTable: unknown;
   rateLimitsTable: unknown;
   dueIndex: unknown;
+  queueHealthIndex: unknown;
 }
 
 interface Migration {
@@ -46,8 +54,24 @@ async function createSubmissionsTable({ sql, submissionsTable }: MigrationContex
         INDEX idx_telegram_due GLOBAL SYNC
           ON (telegram_due_at, created_at)
           COVER (telegram_status),
+        INDEX idx_telegram_status_created GLOBAL SYNC
+          ON (telegram_status, created_at),
         PRIMARY KEY (submission_id)
       );
+    `.idempotent(true),
+  );
+}
+
+async function createQueueHealthIndex({
+  sql,
+  submissionsTable,
+  queueHealthIndex,
+}: MigrationContext): Promise<void> {
+  await timed(
+    sql`
+      ALTER TABLE ${submissionsTable}
+      ADD INDEX ${queueHealthIndex} GLOBAL SYNC
+        ON (telegram_status, created_at);
     `.idempotent(true),
   );
 }
@@ -131,6 +155,24 @@ async function validateSubmissionSchema({
   );
 }
 
+async function verifyQueueHealthIndex({
+  sql,
+  submissionsTable,
+  queueHealthIndex,
+}: MigrationContext): Promise<void> {
+  await timed(
+    sql`
+      SELECT created_at
+      FROM ${submissionsTable} VIEW ${queueHealthIndex}
+      WHERE telegram_status = ${'pending'} OR telegram_status = ${'sending'}
+      ORDER BY telegram_status, created_at
+      LIMIT ${1};
+    `
+      .idempotent(true)
+      .isolation('snapshotReadOnly'),
+  );
+}
+
 async function verifySubmissionStorage(context: MigrationContext): Promise<void> {
   await verifySubmissionColumns(context);
   await validateSubmissionSchema(context);
@@ -143,6 +185,12 @@ export const MIGRATIONS: readonly Migration[] = [
     name: 'create_submission_storage',
     apply: createSubmissionStorage,
     verify: verifySubmissionStorage,
+  },
+  {
+    version: 2,
+    name: 'add_telegram_queue_health_index',
+    apply: createQueueHealthIndex,
+    verify: verifyQueueHealthIndex,
   },
 ];
 
@@ -217,6 +265,7 @@ function migrationContext(client: YdbClient): MigrationContext {
     migrationsTable: client.sql.identifier(migrationTableName()),
     rateLimitsTable: client.sql.identifier(rateLimitsTableName()),
     dueIndex: client.sql.identifier(dueIndexName()),
+    queueHealthIndex: client.sql.identifier(queueHealthIndexName()),
   };
 }
 
@@ -241,6 +290,7 @@ export async function runMigrations({ log = console }: { log?: MigrationLogger }
     }
 
     await verifySubmissionStorage(context);
+    await verifyQueueHealthIndex(context);
 
     return completed;
   } finally {
@@ -252,6 +302,7 @@ export const _private = {
   applyMigration,
   appliedVersions,
   createRateLimitsTable,
+  createQueueHealthIndex,
   createSubmissionStorage,
   createSubmissionsTable,
   ensureMigrationTable,
@@ -260,6 +311,7 @@ export const _private = {
   timed,
   validateSubmissionSchema,
   verifyRateLimitsSchema,
+  verifyQueueHealthIndex,
   verifySubmissionColumns,
   verifySubmissionStorage,
 };

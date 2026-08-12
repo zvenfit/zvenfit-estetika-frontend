@@ -40,6 +40,10 @@ export function dueIndexName(): string {
   return 'idx_telegram_due';
 }
 
+export function queueHealthIndexName(): string {
+  return 'idx_telegram_status_created';
+}
+
 export function normalizeConnectionString(value: string | undefined): string {
   const connectionString = (value || '').trim();
   if (!connectionString) {
