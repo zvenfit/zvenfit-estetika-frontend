@@ -5,12 +5,24 @@
   "description": "Lead and newsletter handler for estetika.zvenfit.ru",
   "main": "index.js",
   "scripts": {
-    "test": "node --test __tests__/*.test.js"
+    "build": "rm -rf build && tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "npm run typecheck && npm run test:unit && npm run test:artifact",
+    "test:unit": "node --import tsx --test src/__tests__/*.test.ts src/telegram/__tests__/*.test.ts src/ydb/__tests__/*.test.ts src/observability/__tests__/*.test.ts",
+    "test:artifact": "npm run build && node --test src/__tests__/deployment.test.cjs",
+    "test:integration": "npm run typecheck && node --import tsx --test src/ydb/__tests__/integration/*.test.ts",
+    "migrate": "npm run build && node build/cli/migrate.js"
   },
   "dependencies": {
     "@ydbjs/auth": "6.3.1",
     "@ydbjs/core": "6.3.1",
     "@ydbjs/query": "6.3.0",
-    "@ydbjs/value": "6.0.8"
+    "@ydbjs/value": "6.0.8",
+    "pino": "10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
   }
 }

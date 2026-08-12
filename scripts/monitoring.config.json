@@ -1,0 +1,115 @@
+{
+  "application": "zvenfit-estetika-frontend",
+  "environment": "production",
+  "project": "folder__b1ge1e4iopttj79hfdfm",
+  "logGroup": {
+    "name": "default",
+    "retentionDays": 3
+  },
+  "resources": {
+    "function": "zvenfit-estetika-telegram-lead",
+    "database": "zvenfit-estetika-leads"
+  },
+  "notificationChannels": [
+    "zvenfit_estetika_telegram_alerts",
+    "zvenfit_estetika_email_alerts"
+  ],
+  "logMetrics": [
+    {
+      "id": "zvenfit_estetika_storage_errors_1m",
+      "events": ["submission_storage_error", "telegram_delivery_retry_error"],
+      "aggregation": "count",
+      "window": "1m"
+    },
+    {
+      "id": "zvenfit_estetika_telegram_failed_1m",
+      "events": ["telegram_delivery_failed_permanently"],
+      "aggregation": "count",
+      "window": "1m"
+    },
+    {
+      "id": "zvenfit_estetika_ydb_retries_5m",
+      "events": ["ydb_retry"],
+      "aggregation": "count",
+      "window": "5m"
+    },
+    {
+      "id": "zvenfit_estetika_ydb_slow_5m",
+      "events": ["ydb_slow_operation"],
+      "aggregation": "count",
+      "window": "5m"
+    },
+    {
+      "id": "zvenfit_estetika_rate_limited_5m",
+      "events": ["submission_blocked"],
+      "filters": { "reason": "rate_limit" },
+      "aggregation": "count",
+      "window": "5m"
+    },
+    {
+      "id": "zvenfit_estetika_submissions_5m",
+      "events": ["submission_persisted"],
+      "groupBy": ["form_type"],
+      "aggregation": "count",
+      "window": "5m"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "zvenfit_estetika_storage_errors",
+      "metricId": "zvenfit_estetika_storage_errors_1m",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "5m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_permanent_telegram_failures",
+      "metricId": "zvenfit_estetika_telegram_failed_1m",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "5m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_ydb_retries",
+      "metricId": "zvenfit_estetika_ydb_retries_5m",
+      "warning": 4.5,
+      "alarm": 5.5,
+      "window": "10m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_slow_ydb",
+      "metricId": "zvenfit_estetika_ydb_slow_5m",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "10m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_rate_limited",
+      "metricId": "zvenfit_estetika_rate_limited_5m",
+      "warning": 0,
+      "alarm": 5,
+      "window": "10m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_function_runtime_errors",
+      "metricSelector": "service=serverless-functions,name=functions_errors,resource_id=zvenfit-estetika-telegram-lead",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "5m",
+      "noData": "OK"
+    },
+    {
+      "id": "zvenfit_estetika_ydb_storage_usage",
+      "metricSelector": "service=ydb,database.serverless=zvenfit-estetika-leads,used/limit*100",
+      "warning": 70,
+      "alarm": 85,
+      "window": "15m",
+      "noData": "WARNING"
+    }
+  ]
+}

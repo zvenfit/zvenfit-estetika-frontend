@@ -1,6 +1,6 @@
 # ZvenFit Estetika Frontend
 
-Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. Заявки и подписки сначала сохраняются в YDB, после чего функция отправляет уведомления в Telegram с повторными попытками по таймеру.
+Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. HTTP-запрос сохраняет заявку или подписку в YDB и сразу возвращает подтверждение; уведомления в Telegram асинхронно доставляет минутный timer с повторными попытками.
 
 Продакшен: `https://estetika.zvenfit.ru`.
 
@@ -29,10 +29,11 @@
 | `public/` | Версионируемые HTML, CSS сайта, JS приложения, robots и sitemap |
 | `public/form/` | Страница формы заявки |
 | `public/documents/` | Юридические HTML-страницы без инъекций лендинга |
-| `functions/telegram-lead/index.js` | Точка входа Cloud Function, реэкспорт обработчика |
-| `functions/telegram-lead/handler.js` | Валидация, идемпотентность, Telegram и retry timer |
-| `functions/telegram-lead/submission-store.js` | YDB: заявки и подписки, TTL, lease и статусы доставки |
-| `functions/telegram-lead/__tests__/` | Модульные тесты функции |
+| `functions/telegram-lead/src/index.ts` | Точка входа Cloud Function, реэкспорт обработчика |
+| `functions/telegram-lead/src/handler.ts` | HTTP, валидация, идемпотентность и retry timer |
+| `functions/telegram-lead/src/ydb/` | Миграции, бессрочные заявки/подписки, индексированная очередь и rate limit |
+| `functions/telegram-lead/src/observability/` | Structured logs, redaction и наблюдаемость YDB |
+| `functions/telegram-lead/src/**/__tests__/` | Unit, artifact и YDB integration-тесты функции |
 | `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
 | `scripts/structured-data.config.json` | URL сайта и CDN, метаданные страниц и данные JSON-LD |
 | `tests/visual/` | Скриншотные тесты Playwright для десктопа, планшета и телефона |
@@ -58,7 +59,7 @@ npm run dev:watch
 
 Сайт откроется на `http://localhost:4173`, локальный обработчик форм — на `http://localhost:3000`.
 
-`dev:watch` пересобирает проект при изменениях в `public/`, сниппетах сборки и конфигурации структурированных данных. По умолчанию мок-сервер выводит только безопасную сводку формы и возвращает успешный mock-ответ. Для запуска настоящего обработчика локально нужны `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` и `YDB_CONNECTION_STRING`.
+Перед запуском dev-команд TypeScript-функция компилируется в локальный `functions/telegram-lead/build/`. `dev:watch` пересобирает статический сайт при изменениях в `public/`, сниппетах сборки и конфигурации структурированных данных. По умолчанию мок-сервер выводит только безопасную сводку формы и возвращает успешный mock-ответ. Для запуска настоящего обработчика локально нужны `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `YDB_CONNECTION_STRING` и `LEAD_RATE_LIMIT_SECRET`.
 
 Команда `npm run dev` выполняет разовую сборку и запускает серверы без отслеживания файлов.
 
@@ -86,8 +87,9 @@ npm run build
 ## Проверка
 
 ```bash
-npm test                 # линтер + модульные тесты + сборка + performance-budget
-npm run test:lead-fn     # только тесты пакета Cloud Function
+npm test                 # линтер + функция + мониторинговый контракт + сборка + performance-budget
+npm run test:lead-fn     # strict typecheck + unit + проверка runtime-артефакта
+npm run test:monitoring  # контракт CI/deploy, событий, метрик и алертов
 npm run test:performance # проверка бюджета уже собранного dist/
 npm run test:visual      # сравнение скриншотов Playwright
 ```
@@ -100,10 +102,10 @@ npm run test:visual      # сравнение скриншотов Playwright
 
 При пуше в `main` или ручном запуске workflow выполняется `.github/workflows/main.yml`:
 
-1. создаёт YDB Serverless при необходимости, разворачивает функцию и минутный retry timer;
-2. устанавливает зависимости, запускает линтер и модульные тесты функции;
-3. собирает сайт с URL функции, идентификатором Метрики и версией кеша;
-4. проверяет `dist/` и performance-budget;
+1. независимо от облака запускает линтер, strict typecheck, unit/artifact-тесты функции, мониторинговый контракт и проверку сайта;
+2. проверяет заранее созданную YDB Serverless, прогоняет integration-тесты на временных таблицах и применяет версионируемые миграции;
+3. упаковывает только скомпилированный CommonJS runtime, разворачивает функцию и минутный retry timer;
+4. собирает сайт с URL функции, проверяет `dist/` и performance-budget;
 5. синхронизирует с бакетом сайта версионируемые ассеты с кешем на год, а HTML, `robots.txt` и `sitemap.xml` — с `no-cache`.
 
 Ручной деплой:
@@ -113,6 +115,7 @@ export YC_FOLDER_ID=...
 export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
+export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
 npm run deploy:lead-fn
 
 export LEAD_API_URL=...       # значение из вывода deploy:lead-fn
@@ -137,7 +140,7 @@ yc storage s3api put-object \
 
 После публикации проверьте публичный URL, `Content-Type`, `Cache-Control` и CORS-заголовок. `npm run setup:storage` задаёт CORS для публичной загрузки шрифтов.
 
-Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
+Полная настройка инфраструктуры и секретов: [`docs/setup.md`](docs/setup.md). Мониторинг после первого деплоя: [`docs/monitoring.md`](docs/monitoring.md). Правила маркетинговой атрибуции: [`docs/utm-attribution-marketing.md`](docs/utm-attribution-marketing.md).
 
 ## Повторный экспорт из Webflow
 

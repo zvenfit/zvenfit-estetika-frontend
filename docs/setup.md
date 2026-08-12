@@ -53,22 +53,7 @@ SA_ID="$(yc iam service-account get --name "$SA_NAME" --format json | jq -r '.id
 
 yc resource-manager folder add-access-binding \
   --id "$YC_FOLDER_ID" \
-  --role functions.admin \
-  --service-account-id "$SA_ID"
-
-yc resource-manager folder add-access-binding \
-  --id "$YC_FOLDER_ID" \
-  --role iam.serviceAccounts.user \
-  --service-account-id "$SA_ID"
-
-yc resource-manager folder add-access-binding \
-  --id "$YC_FOLDER_ID" \
-  --role functions.functionInvoker \
-  --service-account-id "$SA_ID"
-
-yc resource-manager folder add-access-binding \
-  --id "$YC_FOLDER_ID" \
-  --role ydb.editor \
+  --role functions.editor \
   --service-account-id "$SA_ID"
 
 yc resource-manager folder add-access-binding \
@@ -89,6 +74,55 @@ yc iam key create --service-account-name "$SA_NAME" --output sa-key.json
 ```
 
 Скопируйте JSON целиком в GitHub Secrets, затем безопасно удалите локальный файл. Статический ключ создайте в консоли Yandex Cloud или актуальной командой `yc iam access-key`: его секрет показывается только при создании.
+
+Для runtime функции создайте отдельный сервисный аккаунт без статических ключей. Его ID потребуется
+как GitHub Variable `YC_LEAD_SERVICE_ACCOUNT_ID`:
+
+```bash
+export RUNTIME_SA_NAME=zvenfit-estetika-lead-runtime
+yc iam service-account create --name "$RUNTIME_SA_NAME"
+RUNTIME_SA_ID="$(yc iam service-account get --name "$RUNTIME_SA_NAME" --format json | jq -r '.id')"
+
+echo "YC_LEAD_SERVICE_ACCOUNT_ID=$RUNTIME_SA_ID"
+```
+
+До первого CI deploy администратор один раз создаёт YDB и функцию и выдаёт доступы на
+конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру, применяет
+миграции и создаёт новую версию функции:
+
+```bash
+yc ydb database create \
+  --name zvenfit-estetika-leads \
+  --description="Durable ZvenFit Estetika form submissions" \
+  --serverless \
+  --sls-storage-size=1GB \
+  --deletion-protection
+
+yc ydb database add-access-binding \
+  --name zvenfit-estetika-leads \
+  --role ydb.editor \
+  --service-account-id "$SA_ID"
+
+yc ydb database add-access-binding \
+  --name zvenfit-estetika-leads \
+  --role ydb.editor \
+  --service-account-id "$RUNTIME_SA_ID"
+
+yc iam service-account add-access-binding \
+  --id "$RUNTIME_SA_ID" \
+  --role iam.serviceAccounts.user \
+  --service-account-id "$SA_ID"
+
+yc serverless function create --name zvenfit-estetika-telegram-lead
+yc serverless function allow-unauthenticated-invoke zvenfit-estetika-telegram-lead
+yc serverless function add-access-binding \
+  --name zvenfit-estetika-telegram-lead \
+  --role functions.functionInvoker \
+  --service-account-id "$RUNTIME_SA_ID"
+```
+
+Публичный `functionInvoker` назначается один раз администратором. CI проверяет binding и
+останавливает deploy с инструкцией, если он отсутствует; выдавать `functions.admin` CI не требуется.
 
 ## 3. Object Storage
 
@@ -176,6 +210,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `YC_FOLDER_ID` | Идентификатор каталога Yandex Cloud для `yc` |
 | `TELEGRAM_BOT_TOKEN` | Токен Telegram-бота |
 | `TELEGRAM_CHAT_ID` | Идентификатор целевой группы |
+| `LEAD_RATE_LIMIT_SECRET` | Случайная строка длиной от 32 символов для HMAC IP (`openssl rand -hex 32`) |
 | `YC_ACCESS_KEY_ID` | ID статического ключа Object Storage |
 | `YC_SECRET_ACCESS_KEY` | Секретная часть статического ключа Object Storage |
 
@@ -185,11 +220,19 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 |-----|----------|
 | `YANDEX_METRIKA_ID` | Идентификатор продакшен-счётчика Метрики |
 | `ASSET_VERSION` | Необязательная версия для сброса кеша; по умолчанию используется номер запуска workflow |
-| `YC_LEAD_SERVICE_ACCOUNT_ID` | Runtime SA функции и таймера; по умолчанию SA из `YC_SA_JSON_KEY` |
+| `YC_LEAD_SERVICE_ACCOUNT_ID` | Обязательный ID отдельного runtime SA функции и таймера |
 | `YDB_DATABASE_NAME` | Имя Serverless БД; по умолчанию `zvenfit-estetika-leads` |
 | `YDB_SUBMISSIONS_TABLE` | Таблица заявок и подписок; по умолчанию `submissions` |
-| `SUBMISSION_RETENTION_DAYS` | TTL записей; по умолчанию `1096`, значение нужно синхронизировать с политикой |
+| `YDB_RATE_LIMITS_TABLE` | TTL-таблица технических счётчиков; по умолчанию `submission_rate_limits` |
+| `LEAD_RATE_LIMIT_MAX` | Допустимых отправок с одного HMAC-IP за окно; по умолчанию `5` |
+| `LEAD_RATE_LIMIT_WINDOW_SECONDS` | Размер окна rate limit; по умолчанию `600` |
 | `MAX_TELEGRAM_ATTEMPTS` | Максимум попыток Telegram; по умолчанию `12` |
+| `TELEGRAM_RETRY_BATCH_SIZE` | Число записей, обрабатываемых timer за вызов; по умолчанию `5`, максимум `25` |
+| `TELEGRAM_TIMEOUT_MS` | Таймаут одного запроса Telegram; по умолчанию `15000`, максимум `25000` |
+| `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
+| `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; по умолчанию `5000` |
+| `YDB_SLOW_OPERATION_MS` | Порог события медленной операции; по умолчанию `1000` |
+| `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. При добавлении или удалении домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
@@ -199,12 +242,12 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
-5. Убедитесь, что успешно завершились создание YDB/retry timer, деплой функции, сборка сайта, проверка артефакта и три синхронизации с S3.
+5. Убедитесь, что успешно завершились проверка YDB, integration test, миграции, деплой функции/retry timer, сборка сайта, проверка артефакта и три синхронизации с S3.
 
 Порядок шагов workflow:
 
 ```text
-создание YDB → деплой функции и retry timer → получение URL → тесты → сборка →
+quality checks → проверка YDB → integration test → миграции → деплой функции и retry timer → получение URL → сборка →
 проверка dist → immutable-ассеты → robots/sitemap no-cache → HTML no-cache
 ```
 
@@ -215,6 +258,7 @@ export YC_FOLDER_ID=...
 export YC_LEAD_SERVICE_ACCOUNT_ID=...
 export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
+export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
 export ALLOWED_ORIGINS=https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru
 npm run deploy:lead-fn
 
@@ -229,7 +273,7 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-После первого вызова функция создаёт таблицу `submissions` с TTL. Статусы Telegram: `pending`, `sending`, `sent`, `failed`. Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"` означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и должен быть ограничен ответственными сотрудниками.
+До создания версии функции deploy-скрипт применяет версионируемые миграции. Таблица `submissions` хранит заявки и подписки бессрочно, без TTL; TTL используется только для технических счётчиков rate limit. Очередь Telegram использует синхронный индекс `idx_telegram_due`. Статусы: `pending`, `sending`, `sent`, `failed`. Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"` означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и должен быть ограничен ответственными сотрудниками.
 
 Для запуска настоящего handler локально передайте endpoint существующей БД и короткоживущий IAM-токен через `YDB_CONNECTION_STRING` и `YDB_ACCESS_TOKEN_CREDENTIALS`. Без них mock-сервер не пишет персональные данные в YDB и возвращает безопасный mock-ответ.
 
@@ -282,4 +326,8 @@ curl -X POST "$URL" \
   -d '{"form_type":"newsletter","phone":"+79991234567"}'
 ```
 
-Функция проверяет Origin, тип и размер JSON, валидирует поля, использует honeypot, ограничивает число запросов с одного IP в рамках экземпляра и обрабатывает ошибки Telegram. `functions/telegram-lead/index.js` остаётся тонкой точкой входа, реализация находится в `handler.js`, а модульные тесты — в `functions/telegram-lead/__tests__/handler.test.js`. Пакет функции можно проверить отдельно командой `npm run test:lead-fn`.
+Функция проверяет Origin, тип и размер JSON, валидирует поля, использует honeypot,
+транзакционно ограничивает один HMAC-IP пятью отправками за 10 минут и обрабатывает ошибки
+Telegram. `functions/telegram-lead/src/index.ts` остаётся тонкой точкой входа, реализация разделена
+на HTTP, payload, Telegram, YDB и observability-модули. Пакет функции можно проверить отдельно
+командой `npm run test:lead-fn`, а настоящую YDB — `npm --prefix functions/telegram-lead run test:integration`.

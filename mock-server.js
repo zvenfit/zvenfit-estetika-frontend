@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const leadHandler = require('./functions/telegram-lead/index.js');
+const leadHandler = require('./functions/telegram-lead/build/index.js');
 
 const PORT = 3000;
 const rootDir = __dirname;

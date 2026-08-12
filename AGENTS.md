@@ -13,10 +13,10 @@
 - **Фронтенд:** статический HTML из Webflow в `public/`
 - **Сборка:** `scripts/build-static.cjs` → `dist/`, который исключён из Git
 - **Клиентский JS:** чистый JavaScript в `public/js/`
-- **Бэкенд:** одна облачная функция Yandex Cloud в `functions/telegram-lead/` для заявок и рассылки
+- **Бэкенд:** одна TypeScript-функция Yandex Cloud в `functions/telegram-lead/` для заявок и рассылки; компилируется в CommonJS
 - **CI:** `.github/workflows/main.yml` — деплой функции → линтер и модульные тесты → проверка сборки → S3
 
-React, Vite и Next не используются. TypeScript почти отсутствует.
+React, Vite и Next не используются. TypeScript применяется только в Cloud Function; клиентский код остаётся на чистом JavaScript.
 
 ## Исходники
 
@@ -71,12 +71,12 @@ React, Vite и Next не используются. TypeScript почти отс�
 | Разметка лендинга | `public/index.html` |
 | Интерфейс формы заявки | `public/form/index.html`, `public/js/lead-form.js` |
 | Форма рассылки | `public/index.html` (футер), `public/js/newsletter-form.js` |
-| API заявок и Telegram | `functions/telegram-lead/handler.js`; `index.js` — только точка входа |
-| Хранение заявок и retry | `functions/telegram-lead/submission-store.js` |
+| API заявок и Telegram | `functions/telegram-lead/src/handler.ts`; `src/index.ts` — только точка входа |
+| Хранение заявок и retry | `functions/telegram-lead/src/ydb/` |
 | UTM в заявках | `public/js/utm-attribution.js`, `docs/utm-attribution-marketing.md` |
 | SEO и JSON-LD | `scripts/structured-data.config.json`, `<title>` страницы |
 | CSS сайта | `public/css/zvenfit-kosmetologiya.webflow.css` |
-| Тесты функции | `functions/telegram-lead/__tests__/handler.test.js` |
+| Тесты функции | `functions/telegram-lead/src/**/__tests__/` |
 | Визуальные тесты | `tests/visual/`, `playwright.config.js` |
 | Версии CDN-библиотек | `package.json`, `scripts/build-static.cjs`; файлы публикуются напрямую в Object Storage |
 | Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |

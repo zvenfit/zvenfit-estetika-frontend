@@ -12,14 +12,52 @@ env:
   FUNCTION_NAME: 'zvenfit-estetika-telegram-lead'
   YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
   ALLOWED_ORIGINS: 'https://estetika.zvenfit.ru,https://www.estetika.zvenfit.ru'
+  LOG_LEVEL: 'info'
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy-function:
+  quality-checks:
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/telegram-lead/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix functions/telegram-lead
+
+      - name: Run linters and Cloud Function tests
+        run: |
+          npm run lint:public
+          npm run test:lead-fn
+          npm run test:monitoring
+
+      - name: Verify static production build
+        env:
+          LEAD_API_URL: https://example.invalid/lead
+          YANDEX_METRIKA_ID: '123456'
+          ASSET_VERSION: ci-${{ github.run_number }}
+          SITE_URL: https://estetika.zvenfit.ru
+        run: npm run test:build
+
+  deploy-function:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    environment: production
     outputs:
       function_url: ${{ steps.get-url.outputs.url }}
 
@@ -32,10 +70,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install and test lead function
-        run: |
-          npm ci --prefix functions/telegram-lead
-          npm run test:lead-fn
+      - name: Install lead function dependencies
+        run: npm ci --prefix functions/telegram-lead
 
       - name: Install Yandex Cloud CLI
         run: |
@@ -43,17 +79,10 @@ jobs:
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
 
       - name: Authenticate with service account
-        id: authenticate
         env:
           YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
         run: |
           echo "$YC_SA_KEY" > /tmp/sa-key.json
-          SERVICE_ACCOUNT_ID=$(jq -r '.service_account_id // empty' /tmp/sa-key.json)
-          if [ -z "$SERVICE_ACCOUNT_ID" ]; then
-            echo "ERROR: service_account_id is missing in YC_SA_JSON_KEY" >&2
-            exit 1
-          fi
-          echo "service_account_id=${SERVICE_ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
           yc config profile create ci-profile
           yc config set service-account-key /tmp/sa-key.json
           yc config set folder-id ${{ env.YC_FOLDER_ID }}
@@ -61,14 +90,25 @@ jobs:
 
       - name: Deploy Cloud Function
         env:
+          NODE_ENV: production
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LEAD_RATE_LIMIT_SECRET: ${{ secrets.LEAD_RATE_LIMIT_SECRET }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
-          YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID || steps.authenticate.outputs.service_account_id }}
+          YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
           YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
-          SUBMISSION_RETENTION_DAYS: ${{ vars.SUBMISSION_RETENTION_DAYS || '1096' }}
+          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}
+          LEAD_RATE_LIMIT_MAX: ${{ vars.LEAD_RATE_LIMIT_MAX || '5' }}
+          LEAD_RATE_LIMIT_WINDOW_SECONDS: ${{ vars.LEAD_RATE_LIMIT_WINDOW_SECONDS || '600' }}
           MAX_TELEGRAM_ATTEMPTS: ${{ vars.MAX_TELEGRAM_ATTEMPTS || '12' }}
+          TELEGRAM_RETRY_BATCH_SIZE: ${{ vars.TELEGRAM_RETRY_BATCH_SIZE || '5' }}
+          TELEGRAM_TIMEOUT_MS: ${{ vars.TELEGRAM_TIMEOUT_MS || '15000' }}
+          YC_LEAD_TIMEOUT: ${{ vars.YC_LEAD_TIMEOUT || '120s' }}
+          YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '5000' }}
+          YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '1000' }}
+          YDB_SESSION_POOL_SIZE: ${{ vars.YDB_SESSION_POOL_SIZE || '5' }}
+          LOG_LEVEL: ${{ env.LOG_LEVEL }}
         run: bash scripts/deploy-telegram-lead.sh
 
       - name: Get function URL
@@ -99,12 +139,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run linter
-        run: npm run lint:public
-
-      - name: Run unit tests
-        run: npm run test:unit
 
       - name: Build site
         env:
