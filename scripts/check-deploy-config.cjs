@@ -31,6 +31,15 @@ function validate(environment) {
   if (!missing.includes('LEAD_RATE_LIMIT_SECRET') && environment.LEAD_RATE_LIMIT_SECRET.trim().length < 32) {
     invalid.push('LEAD_RATE_LIMIT_SECRET');
   }
+  if (
+    !missing.includes('TELEGRAM_BOT_TOKEN') &&
+    !/^\d{6,}:[A-Za-z0-9_-]{30,}$/.test(environment.TELEGRAM_BOT_TOKEN.trim())
+  ) {
+    invalid.push('TELEGRAM_BOT_TOKEN');
+  }
+  if (!missing.includes('TELEGRAM_CHAT_ID') && !/^-\d{6,}$/.test(environment.TELEGRAM_CHAT_ID.trim())) {
+    invalid.push('TELEGRAM_CHAT_ID');
+  }
   if (!missing.includes('YANDEX_METRIKA_ID') && !/^\d+$/.test(environment.YANDEX_METRIKA_ID.trim())) {
     invalid.push('YANDEX_METRIKA_ID');
   }
