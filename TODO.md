@@ -1,6 +1,6 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-12**: локальный quality/deploy-контур готов, но production остаётся заблокирован пустыми GitHub Secrets/Variables и не созданной облачной инфраструктурой. Последний проверенный workflow run `31637915286` прошёл quality checks и остановился на авторизации. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
+Состояние проверено **2026-08-13**: локальный quality/deploy-контур готов, но production остаётся заблокирован пустыми GitHub Secrets/Variables и не созданной облачной инфраструктурой. Workflow [run #31640472833](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31640472833) для `5878864` прошёл весь `quality-checks` и корректно остановился на новом deploy preflight, перечислив отсутствующие имена конфигурации без значений. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
 
