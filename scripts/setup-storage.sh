@@ -60,12 +60,12 @@ echo "    CORS enabled for public fonts and assets"
 if yc iam service-account get --name "${SA_NAME}" >/dev/null 2>&1; then
   SA_ID="$(yc iam service-account get --name "${SA_NAME}" --format json | jq -r '.id')"
   echo ""
-  echo "==> Grant storage.editor to ${SA_NAME}"
-  yc resource-manager folder add-access-binding \
-    --id "${FOLDER_ID}" \
-    --role storage.editor \
-    --service-account-id "${SA_ID}" \
-    2>/dev/null || echo "    (binding may already exist)"
+  echo "==> Grant bucket-scoped read/write ACL to ${SA_NAME}"
+  yc storage bucket update \
+    --name "${SITE_BUCKET}" \
+    --public-read \
+    --grants grant-type=grant-type-account,grantee-id="${SA_ID}",permission=permission-read \
+    --grants grant-type=grant-type-account,grantee-id="${SA_ID}",permission=permission-write
 fi
 
 echo ""

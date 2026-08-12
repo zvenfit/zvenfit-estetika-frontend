@@ -41,7 +41,11 @@ curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
 
 Скопируйте `chat.id` нужной группы. Идентификаторы групп обычно отрицательные.
 
-## 2. Каталог и сервисный аккаунт для CI
+## 2. Изолированные service accounts, YDB и функция
+
+Estetika использует отдельные service accounts и resource-level bindings. Не выдавайте CI
+folder-level роли `functions.editor`, `storage.editor` или `ydb.editor`: иначе его ключи смогут
+изменять ресурсы основного `zvenfit-frontend` в том же каталоге.
 
 ```bash
 yc init
@@ -50,16 +54,6 @@ export SA_NAME=github-ci-zvenfit-estetika
 
 yc iam service-account create --name "$SA_NAME"
 SA_ID="$(yc iam service-account get --name "$SA_NAME" --format json | jq -r '.id')"
-
-yc resource-manager folder add-access-binding \
-  --id "$YC_FOLDER_ID" \
-  --role functions.editor \
-  --service-account-id "$SA_ID"
-
-yc resource-manager folder add-access-binding \
-  --id "$YC_FOLDER_ID" \
-  --role storage.editor \
-  --service-account-id "$SA_ID"
 ```
 
 Для этого аккаунта нужны два набора реквизитов:
@@ -86,8 +80,8 @@ RUNTIME_SA_ID="$(yc iam service-account get --name "$RUNTIME_SA_NAME" --format j
 echo "YC_LEAD_SERVICE_ACCOUNT_ID=$RUNTIME_SA_ID"
 ```
 
-До первого CI deploy администратор один раз создаёт YDB и функцию и выдаёт доступы на
-конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру, применяет
+До первого CI deploy администратор один раз создаёт YDB, функцию и retry timer и выдаёт доступы
+на конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру, применяет
 миграции и создаёт новую версию функции:
 
 ```bash
@@ -114,15 +108,46 @@ yc iam service-account add-access-binding \
   --service-account-id "$SA_ID"
 
 yc serverless function create --name zvenfit-estetika-telegram-lead
+yc serverless function add-access-binding \
+  --name zvenfit-estetika-telegram-lead \
+  --role functions.editor \
+  --service-account-id "$SA_ID"
+
 yc serverless function allow-unauthenticated-invoke zvenfit-estetika-telegram-lead
 yc serverless function add-access-binding \
   --name zvenfit-estetika-telegram-lead \
   --role functions.functionInvoker \
   --service-account-id "$RUNTIME_SA_ID"
+
+yc serverless trigger create timer \
+  --name zvenfit-estetika-telegram-retry \
+  --description="Retry pending ZvenFit Estetika Telegram notifications" \
+  --cron-expression='* * * * ? *' \
+  --payload='retry-telegram' \
+  --invoke-function-name=zvenfit-estetika-telegram-lead \
+  --invoke-function-service-account-id="$RUNTIME_SA_ID" \
+  --retry-attempts=2 \
+  --retry-interval=30s
+
+yc resource-manager folder add-access-binding \
+  --id "$YC_FOLDER_ID" \
+  --role monium.metrics.writer \
+  --service-account-id "$RUNTIME_SA_ID"
+
+yc iam api-key create \
+  --service-account-id "$RUNTIME_SA_ID" \
+  --description="ZvenFit Estetika direct metrics" \
+  --scope yc.monium.metrics.write
 ```
 
-Публичный `functionInvoker` назначается один раз администратором. CI проверяет binding и
-останавливает deploy с инструкцией, если он отсутствует; выдавать `functions.admin` CI не требуется.
+Секрет API key из последней команды сохраните как `MONIUM_API_KEY`: после создания его нельзя
+прочитать повторно. Роль Monium действует в проекте текущего каталога, но метрики Estetika имеют
+отдельный `service=zvenfit-estetika-frontend`; она не даёт доступ к YDB, функции или бакетам
+основного проекта.
+
+Публичный `functionInvoker` и retry timer назначаются один раз администратором. CI проверяет
+binding, не изменяет timer и останавливает deploy с инструкцией, если функция или binding
+отсутствуют; выдавать `functions.admin` CI не требуется.
 
 ## 3. Object Storage
 
@@ -136,6 +161,17 @@ yc serverless function add-access-binding \
 ```bash
 export YC_FOLDER_ID="$(yc config get folder-id)"
 npm run setup:storage
+```
+
+Скрипт выдаёт `READ` + `WRITE` CI service account только через ACL бакета
+`zvenfit-estetika-frontend`. Доступ к бакету ассетов `zvenfit-estetika` и к бакетам основного
+проекта CI не получает. Команда ACL, если инфраструктура настраивается вручную:
+
+```bash
+yc storage bucket update zvenfit-estetika-frontend \
+  --public-read \
+  --grants grant-type=grant-type-account,grantee-id="$SA_ID",permission=permission-read \
+  --grants grant-type=grant-type-account,grantee-id="$SA_ID",permission=permission-write
 ```
 
 Сгенерированный артефакт сайта содержит:
@@ -252,12 +288,12 @@ workflow использует стандартный `GITHUB_TOKEN`.
 2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
-5. Убедитесь, что успешно завершились проверка YDB, integration test, миграции, деплой функции/retry timer, сборка сайта, проверка артефакта и три синхронизации с S3.
+5. Убедитесь, что успешно завершились проверка YDB, integration test, миграции, деплой версии функции, сборка сайта, проверка артефакта и три синхронизации с S3.
 
 Порядок шагов workflow:
 
 ```text
-quality checks → deploy preflight → проверка YDB → integration test → миграции → функция и retry timer →
+quality checks → deploy preflight → проверка YDB → integration test → миграции → версия функции →
 получение URL → сборка → проверка dist → immutable-ассеты → robots/sitemap → HTML → production smoke
 ```
 

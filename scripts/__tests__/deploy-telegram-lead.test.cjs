@@ -58,17 +58,15 @@ test('Telegram retry settings fit inside the Cloud Function timeout', () => {
 
 test('CI deploy requires pre-provisioned infrastructure and does not grant access', () => {
   assert.doesNotMatch(deployScript, /yc ydb database create/);
+  assert.doesNotMatch(deployScript, /yc serverless function create/);
   assert.doesNotMatch(deployScript, /\nyc serverless function allow-unauthenticated-invoke/);
   assert.match(deployScript, /function list-access-bindings/);
   assert.match(deployScript, /missing the one-time public functionInvoker binding/);
 });
 
-test('existing retry trigger is resolved and updated by id', () => {
-  const updateStart = deployScript.indexOf('yc serverless trigger update timer');
-  const createStart = deployScript.indexOf('yc serverless trigger create timer');
-  const updateBlock = deployScript.slice(updateStart, createStart);
-
-  assert.match(deployScript, /TRIGGER_ID=.*trigger get/);
-  assert.match(updateBlock, /--id="\$\{TRIGGER_ID\}"/);
-  assert.doesNotMatch(updateBlock, /--name="\$\{TRIGGER_NAME\}"/);
+test('CI deploy leaves the one-time retry trigger untouched', () => {
+  assert.doesNotMatch(deployScript, /yc serverless trigger create/);
+  assert.doesNotMatch(deployScript, /yc serverless trigger update/);
+  assert.doesNotMatch(deployScript, /yc serverless trigger delete/);
+  assert.match(deployScript, /LEAD_RETRY_TRIGGER=/);
 });

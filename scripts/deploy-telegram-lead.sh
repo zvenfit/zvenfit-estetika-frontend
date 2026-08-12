@@ -96,7 +96,8 @@ npm --prefix "${ROOT_DIR}/functions/telegram-lead" run migrate
 unset YDB_IAM_TOKEN
 
 if ! yc serverless function get --name="${FUNCTION_NAME}" >/dev/null 2>&1; then
-  yc serverless function create --name="${FUNCTION_NAME}"
+  echo "deploy-telegram-lead: function ${FUNCTION_NAME} must be provisioned before CI deploy" >&2
+  exit 1
 fi
 
 if ! yc serverless function list-access-bindings --name="${FUNCTION_NAME}" --format=json | node -e "
@@ -153,37 +154,6 @@ yc serverless function version create \
   --environment MONIUM_METRICS_TIMEOUT_MS="${MONIUM_METRICS_TIMEOUT_MS}" \
   --environment LOG_LEVEL="${LOG_LEVEL}" \
   --environment NODE_ENV="${NODE_ENV:-production}"
-
-if yc serverless trigger get --name="${TRIGGER_NAME}" >/dev/null 2>&1; then
-  TRIGGER_ID="$(yc serverless trigger get --name="${TRIGGER_NAME}" --format=json | node -e "
-const fs = require('fs');
-const data = JSON.parse(fs.readFileSync(0, 'utf8'));
-process.stdout.write(data.id || '');
-")"
-  if [[ -z "${TRIGGER_ID}" ]]; then
-    echo "deploy-telegram-lead: failed to resolve trigger id for ${TRIGGER_NAME}" >&2
-    exit 1
-  fi
-
-  yc serverless trigger update timer \
-    --id="${TRIGGER_ID}" \
-    --new-cron-expression='* * * * ? *' \
-    --new-payload='retry-telegram' \
-    --new-invoke-function-name="${FUNCTION_NAME}" \
-    --new-invoke-function-service-account-id="${YC_LEAD_SERVICE_ACCOUNT_ID}" \
-    --new-function-retry-attempts=2 \
-    --new-function-retry-interval=30s
-else
-  yc serverless trigger create timer \
-    --name="${TRIGGER_NAME}" \
-    --description="Retry pending ZvenFit Estetika Telegram notifications" \
-    --cron-expression='* * * * ? *' \
-    --payload='retry-telegram' \
-    --invoke-function-name="${FUNCTION_NAME}" \
-    --invoke-function-service-account-id="${YC_LEAD_SERVICE_ACCOUNT_ID}" \
-    --retry-attempts=2 \
-    --retry-interval=30s
-fi
 
 INVOKE_URL="$(yc serverless function get --name="${FUNCTION_NAME}" --format=json | node -e "
 const fs = require('fs');

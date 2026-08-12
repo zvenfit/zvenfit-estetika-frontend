@@ -6,37 +6,35 @@
 
 ## 1. Заполнить GitHub Environment `production`
 
-Обязательные Secrets:
+Уже настроены отдельными реквизитами Estetika:
 
 - `YC_SA_JSON_KEY`;
 - `YC_FOLDER_ID`;
-- `TELEGRAM_BOT_TOKEN`;
-- `TELEGRAM_CHAT_ID`;
 - `LEAD_RATE_LIMIT_SECRET` — минимум 32 символа;
 - `MONIUM_API_KEY`;
 - `YC_ACCESS_KEY_ID`;
 - `YC_SECRET_ACCESS_KEY`.
 
-Обязательные Variables:
+Уже настроены Variables:
 
 - `YC_LEAD_SERVICE_ACCOUNT_ID`;
-- `YANDEX_METRIKA_ID`.
+- параметры YDB, retry, таймаутов и Monium из `docs/setup.md`.
+
+Владелец должен добавить только:
+
+- Secrets `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` для отдельного бота/группы Estetika;
+- Variable `YANDEX_METRIKA_ID` для отдельного счётчика Estetika.
 
 Остальные variables имеют безопасные defaults и перечислены в `docs/setup.md`. Если
 `zvenfit/zvenfit-frontend` приватный, отдельно добавьте read-only secret `UPSTREAM_READ_TOKEN` для
 еженедельной проверки паритета.
 
-## 2. Один раз подготовить Yandex Cloud
+## 2. Yandex Cloud подготовлен
 
-По разделу 2 файла `docs/setup.md`:
-
-1. создать serverless YDB `zvenfit-estetika-leads` с deletion protection;
-2. создать runtime service account функции;
-3. выдать CI и runtime SA только описанные resource-level роли YDB/Function;
-4. создать функцию `zvenfit-estetika-telegram-lead`;
-5. один раз разрешить публичный invoke функции;
-6. создать API key Monium с правом записи метрик;
-7. проверить website-конфигурацию бакета `zvenfit-estetika-frontend`.
+Созданы отдельные serverless YDB `zvenfit-estetika-leads`, функция
+`zvenfit-estetika-telegram-lead`, runtime/CI service accounts и retry timer. Выданы только
+resource-level роли YDB/Function, а CI получил ACL только бакета `zvenfit-estetika-frontend`.
+Бакеты, YDB, функция и service accounts основного `zvenfit-frontend` не используются.
 
 CI не выдаёт себе административные роли и намеренно остановится с понятным сообщением, если
 одноразовая инфраструктура или binding отсутствуют.
@@ -51,7 +49,7 @@ CI не выдаёт себе административные роли и на�
 ## 4. Первый deploy
 
 После заполнения secrets/variables запустить `Deploy to Production` вручную либо отправить commit в
-`main`. Workflow сам выполнит preflight, integration-тест YDB, миграции, функцию, retry timer,
+`main`. Workflow сам выполнит preflight, integration-тест YDB, миграции, новую версию функции,
 сборку, загрузку сайта и безопасный smoke-test без реальной заявки.
 
 После успеха:
