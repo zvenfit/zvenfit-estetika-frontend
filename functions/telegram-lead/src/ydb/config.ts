@@ -25,10 +25,6 @@ export function tableName(): string {
   );
 }
 
-export function migrationTableName(): string {
-  return validateIdentifier(`${tableName()}_migrations`, 'invalid_ydb_migration_table_name');
-}
-
 export function rateLimitsTableName(): string {
   return validateIdentifier(
     (process.env.YDB_RATE_LIMITS_TABLE || DEFAULT_RATE_LIMITS_TABLE_NAME).trim(),

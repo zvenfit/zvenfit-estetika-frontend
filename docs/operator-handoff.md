@@ -49,7 +49,7 @@ CI не выдаёт себе административные роли и на�
 ## 4. Первый deploy
 
 После заполнения secrets/variables запустить `Deploy to Production` вручную либо отправить commit в
-`main`. Workflow сам выполнит preflight, integration-тест YDB, миграции, новую версию функции,
+`main`. Workflow сам выполнит preflight, integration-тест YDB, проверку готовой схемы, новую версию функции,
 сборку, загрузку сайта и безопасный smoke-test без реальной заявки.
 
 После успеха:

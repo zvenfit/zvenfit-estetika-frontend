@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { createYdbClient } from '../../client';
-import { migrationTableName, queryTimeoutMs, rateLimitsTableName } from '../../config';
+import { queryTimeoutMs, rateLimitsTableName } from '../../config';
 import { consumeSubmissionRateLimit } from '../../rate-limit';
+import { bootstrapSchema } from '../../schema';
 import * as submissionStore from '../../submission-store';
-import { runMigrations } from '../../migrations';
 
 import type { ClaimedSubmission, Submission, YdbSql } from '../../../types';
 
@@ -37,7 +37,7 @@ async function dropTable(sql: YdbSql, name: string): Promise<void> {
 }
 
 test(
-  'YDB migrations, rate limit, idempotency, indexed queue, lease and delivery token work together',
+  'bootstrapped YDB schema, rate limit, idempotency, indexed queue, lease and delivery token work together',
   { skip: !TEST_CONNECTION_STRING },
   async () => {
     if (!TEST_CONNECTION_STRING) {
@@ -58,8 +58,8 @@ test(
     process.env.LEAD_RATE_LIMIT_SECRET = 'integration-test-secret-not-production-32';
 
     try {
-      assert.deepEqual(await runMigrations({ log: { info() {} } }), [1, 2]);
-      assert.deepEqual(await runMigrations({ log: { info() {} } }), []);
+      await bootstrapSchema();
+      await bootstrapSchema();
 
       for (let round = 0; round < 5; round += 1) {
         const rateLimitResults = await Promise.all(
@@ -141,7 +141,6 @@ test(
       const client = await createYdbClient();
       await dropTable(client.sql, table);
       await dropTable(client.sql, rateLimitsTableName());
-      await dropTable(client.sql, migrationTableName());
       await client.close();
 
       for (const [name, value] of Object.entries({

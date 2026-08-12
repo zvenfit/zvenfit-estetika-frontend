@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  migrationTableName,
   normalizeConnectionString,
   queryTimeoutMs,
   rateLimitsTableName,
@@ -10,11 +9,10 @@ import {
   tableName,
 } from '../config';
 
-test('validates data, migration and rate-limit table identifiers', () => {
+test('validates data and rate-limit table identifiers', () => {
   process.env.YDB_SUBMISSIONS_TABLE = 'submissions_2026';
   process.env.YDB_RATE_LIMITS_TABLE = 'submission_limits';
   assert.equal(tableName(), 'submissions_2026');
-  assert.equal(migrationTableName(), 'submissions_2026_migrations');
   assert.equal(rateLimitsTableName(), 'submission_limits');
   process.env.YDB_SUBMISSIONS_TABLE = 'bad/table';
   assert.throws(() => tableName(), /invalid_ydb_table_name/);

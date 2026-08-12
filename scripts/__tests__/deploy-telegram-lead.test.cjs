@@ -29,14 +29,15 @@ test('deploy fails fast on missing configuration and smoke-checks production', (
   assert.match(workflow, /Smoke production deployment[\s\S]*node scripts\/smoke-production\.cjs/);
 });
 
-test('function deploy verifies YDB, migrates and then creates a version', () => {
+test('function deploy integration-tests and verifies the pre-provisioned schema before creating a version', () => {
   const integration = deployScript.indexOf('run test:integration');
-  const migration = deployScript.indexOf('run migrate');
+  const schemaVerification = deployScript.indexOf('run verify:schema');
   const deploy = deployScript.indexOf('yc serverless function version create');
 
   assert.equal(integration >= 0, true);
-  assert.equal(migration > integration, true);
-  assert.equal(deploy > migration, true);
+  assert.equal(schemaVerification > integration, true);
+  assert.equal(deploy > schemaVerification, true);
+  assert.doesNotMatch(deployScript, /run migrate/);
 });
 
 test('deployment package contains compiled runtime modules only', () => {

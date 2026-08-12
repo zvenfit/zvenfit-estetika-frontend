@@ -80,9 +80,9 @@ RUNTIME_SA_ID="$(yc iam service-account get --name "$RUNTIME_SA_NAME" --format j
 echo "YC_LEAD_SERVICE_ACCOUNT_ID=$RUNTIME_SA_ID"
 ```
 
-До первого CI deploy администратор один раз создаёт YDB, функцию и retry timer и выдаёт доступы
-на конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру, применяет
-миграции и создаёт новую версию функции:
+До первого CI deploy администратор один раз создаёт YDB, финальную схему, функцию и retry timer и
+выдаёт доступы на конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру
+и схему, затем создаёт новую версию функции:
 
 ```bash
 yc ydb database create \
@@ -101,6 +101,13 @@ yc ydb database add-access-binding \
   --name zvenfit-estetika-leads \
   --role ydb.editor \
   --service-account-id "$RUNTIME_SA_ID"
+
+export YDB_CONNECTION_STRING="$(yc ydb database get \
+  --name zvenfit-estetika-leads \
+  --format json | jq -r '.endpoint')"
+export YDB_ACCESS_TOKEN_CREDENTIALS="$(yc iam create-token)"
+npm --prefix functions/telegram-lead run bootstrap:schema
+unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
 
 yc iam service-account add-access-binding \
   --id "$RUNTIME_SA_ID" \
@@ -288,12 +295,12 @@ workflow использует стандартный `GITHUB_TOKEN`.
 2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
-5. Убедитесь, что успешно завершились проверка YDB, integration test, миграции, деплой версии функции, сборка сайта, проверка артефакта и три синхронизации с S3.
+5. Убедитесь, что успешно завершились проверка YDB, integration test, read-only проверка схемы, деплой версии функции, сборка сайта, проверка артефакта и три синхронизации с S3.
 
 Порядок шагов workflow:
 
 ```text
-quality checks → deploy preflight → проверка YDB → integration test → миграции → версия функции →
+quality checks → deploy preflight → проверка YDB → integration test → проверка схемы → версия функции →
 получение URL → сборка → проверка dist → immutable-ассеты → robots/sitemap → HTML → production smoke
 ```
 
@@ -320,7 +327,17 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-До создания версии функции deploy-скрипт применяет версионируемые миграции. Таблица `submissions` хранит заявки и подписки бессрочно, без TTL; TTL используется только для технических счётчиков rate limit. Очередь Telegram использует синхронный индекс `idx_telegram_due`. Статусы: `pending`, `sending`, `sent`, `failed`. Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"` означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и должен быть ограничен ответственными сотрудниками.
+Для пилотного запуска финальная схема создаётся один раз командой `bootstrap:schema`; production
+deploy только проверяет её командой `verify:schema` и ничего в структуре YDB не меняет. Пока в БД
+нет ценных данных, изменение схемы выполняется пересозданием пилотной БД или таблиц. До перехода к
+постоянному хранению и эволюции схемы без пересоздания нужно отдельно ввести стратегию миграций.
+
+Таблица `submissions` хранит заявки и подписки бессрочно, без TTL; TTL используется только для
+технических счётчиков rate limit. Очередь Telegram использует синхронные индексы
+`idx_telegram_due` и `idx_telegram_status_created`. Статусы: `pending`, `sending`, `sent`, `failed`.
+Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"`
+означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и
+должен быть ограничен ответственными сотрудниками.
 
 Для запуска настоящего handler локально передайте endpoint существующей БД и короткоживущий IAM-токен через `YDB_CONNECTION_STRING` и `YDB_ACCESS_TOKEN_CREDENTIALS`. Без них mock-сервер не пишет персональные данные в YDB и возвращает безопасный mock-ответ.
 

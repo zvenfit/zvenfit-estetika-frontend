@@ -11,7 +11,8 @@
     "test:unit": "node --import tsx --test src/__tests__/*.test.ts src/telegram/__tests__/*.test.ts src/ydb/__tests__/*.test.ts src/observability/__tests__/*.test.ts",
     "test:artifact": "npm run build && node --test src/__tests__/deployment.test.cjs",
     "test:integration": "npm run typecheck && node --import tsx --test src/ydb/__tests__/integration/*.test.ts",
-    "migrate": "npm run build && node build/cli/migrate.js"
+    "bootstrap:schema": "npm run build && node build/cli/bootstrap-schema.js",
+    "verify:schema": "npm run build && node build/cli/verify-schema.js"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

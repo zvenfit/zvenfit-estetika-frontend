@@ -91,7 +91,7 @@ YDB_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
 YDB_SUBMISSIONS_TABLE="${YDB_SUBMISSIONS_TABLE}" \
 YDB_RATE_LIMITS_TABLE="${YDB_RATE_LIMITS_TABLE}" \
 YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
-npm --prefix "${ROOT_DIR}/functions/telegram-lead" run migrate
+npm --prefix "${ROOT_DIR}/functions/telegram-lead" run verify:schema
 
 unset YDB_IAM_TOKEN
 
