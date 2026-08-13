@@ -4,7 +4,7 @@
 секретов, юридических решений или проверки реального сообщения. Значения секретов не присылайте в
 чат и не коммитьте.
 
-## 1. Заполнить GitHub Environment `production`
+## 1. GitHub Environment `production` настроен
 
 Уже настроены отдельными реквизитами Estetika:
 
@@ -15,19 +15,16 @@
 - `YC_ACCESS_KEY_ID`;
 - `YC_SECRET_ACCESS_KEY`.
 
-Уже настроены Variables:
+Настроены Variables:
 
 - `YC_LEAD_SERVICE_ACCOUNT_ID`;
 - параметры YDB, retry, таймаутов и Monium из `docs/setup.md`.
 
-Владелец должен добавить только:
-
-- Secrets `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` для отдельного бота/группы Estetika;
-- Variable `YANDEX_METRIKA_ID` для отдельного счётчика Estetika.
-
-Остальные variables имеют безопасные defaults и перечислены в `docs/setup.md`. Если
-`zvenfit/zvenfit-frontend` приватный, отдельно добавьте read-only secret `UPSTREAM_READ_TOKEN` для
-еженедельной проверки паритета.
+Также настроены отдельные `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `YANDEX_METRIKA_ID` и
+`YDB_DATABASE_ID`. Все обязательные значения прошли production preflight и полный deploy; значения
+секретов не выводились. Остальные variables имеют безопасные defaults и перечислены в
+`docs/setup.md`. `zvenfit/zvenfit-frontend` публичный, поэтому отдельный `UPSTREAM_READ_TOKEN` не
+требуется.
 
 ## 2. Yandex Cloud подготовлен
 
@@ -46,21 +43,20 @@ CI не выдаёт себе административные роли и на�
 - считать `estetika.zvenfit.ru` единственным production-доменом; `www.estetika.zvenfit.ru` не поддерживать;
 - отозвать Telegram token, если он когда-либо попадал в экспорт или HTML.
 
-## 4. Первый deploy
+## 4. Первый deploy выполнен
 
-После заполнения secrets/variables запустить `Deploy to Production` вручную либо отправить commit в
-`main`. Workflow сам выполнит preflight, integration-тест YDB, проверку готовой схемы, новую версию функции,
-сборку, загрузку сайта и безопасный smoke-test без реальной заявки.
+Workflow [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673)
+выполнил preflight, integration-тест YDB, проверку готовой схемы, создание версии функции, сборку,
+загрузку сайта и безопасный smoke-test без реальной заявки. Кеш CDN после первого deploy очищен.
 
 После успеха:
 
-1. очистить закешированные CDN-ответы 404;
-2. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
+1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
-3. включать HSTS только после стабильной проверки HTTPS;
-4. создать в Monium оба notification channel и 12 alerts строго по
+2. включать HSTS только после стабильной проверки HTTPS;
+3. создать или проверить в Monium оба notification channel и 12 alerts строго по
    `scripts/monitoring.config.json` / `docs/monitoring.md`;
-5. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
+4. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
    в `OK`.
 
 ## 5. Единственная проверка с реальными данными
@@ -72,5 +68,6 @@ CI не выдаёт себе административные роли и на�
 5. проверить `/`, `/form/`, неизвестный URL и обе юридические страницы;
 6. проверить security headers командой `curl -I` после распространения CDN-настроек.
 
-После этого production можно считать технически запущенным. API Gateway + Smart Web Security,
-CSP и budget alerts остаются обязательным следующим уровнем до рекламного трафика.
+После этого production можно считать полностью проверенным для пилотного приёма заявок. API Gateway
++ Smart Web Security, CSP и budget alerts остаются обязательным следующим уровнем до рекламного
+трафика.

@@ -1,38 +1,35 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-13**: локальный quality/deploy-контур готов, но production остаётся заблокирован пустыми GitHub Secrets/Variables и не созданной облачной инфраструктурой. Workflow [run #31640472833](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31640472833) для `5878864` прошёл весь `quality-checks` и корректно остановился на новом deploy preflight, перечислив отсутствующие имена конфигурации без значений. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
+Состояние проверено **2026-08-13**: отдельная инфраструктура Estetika создана, production secrets/variables настроены, а первый технический deploy полностью прошёл в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673). Функция активна, сайт и юридические страницы доступны через CDN, Метрика встроена, кеш первого 404 очищен. До приёма реальных заявок остаются юридические решения и проверка одного реального цикла форма → YDB → Telegram; мониторинговые уведомления и security hardening перечислены ниже. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
 
 ## Ближайший порядок работ
 
-1. **Вернуть независимую проверку кода в CI** — отделить lint/test/build от деплоя функции и добавить безопасную проверку обязательной конфигурации.
-2. **Восстановить доступ CI к Yandex Cloud** — проверить или перевыпустить ключ сервисного аккаунта и остальные secrets/variables.
-3. **Закрыть минимальную надёжность форм до приёма реальных заявок** — доверенный IP, таймауты Telegram и клиента, понятные ошибки, безопасное поведение без JavaScript.
-4. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
-5. **Развернуть функцию и сайт** — получить URL функции, собрать сайт с ним, загрузить `dist/` в бакет и очистить закешированные CDN-ответы 404.
-6. **Провести release smoke-test** — страницы, пользовательская 404, юридические документы, одна маркированная заявка, одна подписка и Метрика.
-7. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
-8. **До рекламного трафика** — API Gateway + Smart Web Security, CSP, логирование и уведомления расходов. Производительность, SEO и контент вести после восстановления production, если они не блокируют юридическую проверку.
+1. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
+2. **Провести release smoke-test с реальными данными** — одна маркированная заявка, одна подписка, Telegram, YDB и визит Метрики; read-only smoke страниц уже проходит в CI.
+3. **Довести мониторинг** — подключить Telegram/email notification channels ко всем 12 алертам и проверить синтетическое уведомление.
+4. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
+5. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
 
 ---
 
 ## Блокеры запуска
 
-- [ ] **Восстановить авторизацию Yandex Cloud в GitHub Actions** — последний запуск для `5335fff` упал на шаге `Authenticate with service account`, поэтому деплой функции завершился ошибкой, а деплой сайта был пропущен ([run #31266597979](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31266597979))
-  - [ ] Проверить/перевыпустить `YC_SA_JSON_KEY` и наличие `YC_FOLDER_ID`, не выводя значения секретов в лог
-  - [ ] Проверить secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `LEAD_RATE_LIMIT_SECRET`, `MONIUM_API_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` и variables `YC_LEAD_SERVICE_ACCOUNT_ID`, `YANDEX_METRIKA_ID`, `ASSET_VERSION`; `ASSET_VERSION` необязателен
+- [x] **Авторизация Yandex Cloud в GitHub Actions** — отдельный CI service account успешно прошёл авторизацию и полный deploy в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673)
+  - [x] `YC_SA_JSON_KEY` и `YC_FOLDER_ID` проверены реальным созданием версии функции
+  - [x] Обязательные production secrets/variables прошли preflight; `ASSET_VERSION` остаётся необязательным
 - [x] **JS-библиотеки в CDN** — обязательные Webflow-зависимости перенесены в `storage.yandexcloud.net/zvenfit-estetika/js/`
   - [x] Зафиксировать `jquery@3.5.1` и `gsap@3.15.0` в зависимостях; SHA-256 файлов совпадает с Webflow и `zvenfit-frontend`
   - [x] Напрямую загрузить jQuery, GSAP, ScrollTrigger и `webflow.js` в Object Storage без staging и `sync --delete`; все URL отвечают HTTP 200, хеши совпадают (2026-08-07)
   - [x] Заменить внешние ссылки на jQuery, GSAP и ScrollTrigger в `public/index.html` и `public/form/index.html` ссылками на собственный CDN
   - [x] Удалить неиспользуемый `webflow.js` из `public/404.html`: статической странице не нужны Webflow JS и jQuery
 - [x] **Базовые ассеты CDN** — `css/normalize.min.css`, `css/webflow.min.css`, изображения и шрифты уже доступны из бакета; проверено 2026-08-07
-- [ ] **Подготовить и наполнить бакет сайта** — проверить website-настройки `zvenfit-estetika-frontend`, при необходимости применить `npm run setup:storage`, затем загрузить `dist/`
-- [ ] **Восстановить production за CDN** — `https://estetika.zvenfit.ru/`, `/form/` и `/404.html` сейчас отвечают HTTP 404
+- [x] **Подготовить и наполнить бакет сайта** — `dist/` загружен отдельным S3-ключом Estetika; HTML и crawl metadata получили `no-cache`, неизменяемые файлы — длительный кеш
+- [x] **Восстановить production за CDN** — главная, форма, пользовательская 404, юридические страницы, robots и sitemap проверены после первого deploy
   - [x] CDN использует кеш источника с fallback `86400`, принудительный browser TTL отключён, а `v` входит в ключ кеша (настроено 2026-08-08)
-  - [ ] После первого успешного деплоя очистить кеш CDN, включая закешированные ответы 404
-  - [ ] Проверить `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы
+  - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
+  - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
 - [ ] **После первого деплоя создать мониторинг в Monium** — по `docs/monitoring.md` и `scripts/monitoring.config.json` создать log metrics, Telegram/email notification channels и alerts, затем выполнить безопасный smoke-тест алертов
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
@@ -144,7 +141,7 @@
 - [x] **Компактный `public/`** — изображения, шрифты и сторонние CSS не попадают в `dist/`; `public/js/webflow.js` остаётся версионируемым источником CDN-файла без локального staging
 - [x] **Разделить CI-проверки и деплой** — lint/typecheck/unit/artifact/monitoring/build выполняются в независимом `quality-checks`; деплой зависит от его успеха
 - [x] **Проверка конфигурации CI** — отдельный production preflight валидирует обязательные secrets/variables без печати значений
-- [x] **Production smoke-тест в CI** — после деплоя проверяются страницы, 404, robots, URL функции, OPTIONS/CORS и безопасный `400` на невалидном запросе; отсутствующие security headers пока выводятся предупреждением
+- [x] **Production smoke-тест в CI** — после деплоя read-only запросами проверяются страницы, 404, robots, URL функции и OPTIONS/CORS; отсутствующие security headers пока выводятся предупреждением
 - [x] **Регулярный паритет с `zvenfit-frontend`** — baseline commit, локальная проверка, еженедельный workflow и инструкция аудита без слепого копирования UI
 
 ---
@@ -181,5 +178,5 @@
 - [x] `npm test` проходит: линтер, strict TypeScript, 34 unit-теста Cloud Function, проверка CommonJS-артефакта, 22 contract-теста CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-13)
 - [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
-- [ ] Метрика загружается в продакшен-сборке с заданным `YANDEX_METRIKA_ID`
+- [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)
 - [x] Все 78 уникальных CDN-ассетов текущей production-сборки, включая IMask, изображения, WOFF2, CSS и JS, отвечают HTTP 200 (проверено 2026-08-08)
