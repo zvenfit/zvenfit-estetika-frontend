@@ -18,8 +18,6 @@ const SITE_CSS_SOURCE = 'zvenfit-kosmetologiya.webflow.css';
 const SITE_CSS_MIN = 'zvenfit-kosmetologiya.webflow.min.css';
 const CDN_VENDOR_JS = [
   'jquery-3.5.1.min.js',
-  'gsap-3.15.0.min.js',
-  'ScrollTrigger-3.15.0.min.js',
   'imask-7.6.1.min.js',
   'webflow.js',
 ];

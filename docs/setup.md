@@ -14,7 +14,7 @@ CDN estetika.zvenfit.ru
 
 Ссылки на ассеты в HTML/CSS из public/
   └─ storage.yandexcloud.net/zvenfit-estetika → изображения, шрифты,
-     сторонние CSS, jQuery, GSAP, ScrollTrigger, IMask и webflow.js
+     сторонние CSS, jQuery, IMask и webflow.js
 ```
 
 Продакшен-workflow сначала разворачивает функцию, использует её URL при сборке сайта, проверяет `dist/` и только после этого загружает сайт.
@@ -166,7 +166,7 @@ binding, не изменяет timer и останавливает deploy с и�
 | Бакет | Содержимое | Как обновляется |
 |-------|------------|-----------------|
 | `zvenfit-estetika-frontend` | HTML, юридические страницы, robots, sitemap, JS приложения, минифицированный CSS сайта | CI при пуше в `main` или `npm run deploy:yc` |
-| `zvenfit-estetika` | Изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger, IMask, `webflow.js` | Объекты публикуются напрямую через авторизованный Yandex Cloud CLI; массовый `sync --delete` не используется |
+| `zvenfit-estetika` | Изображения, шрифты, сторонние CSS, jQuery, IMask, `webflow.js` | Объекты публикуются напрямую через авторизованный Yandex Cloud CLI; массовый `sync --delete` не используется |
 
 Создайте оба бакета с публичным чтением и настройками статического сайта для первого бакета:
 
@@ -209,8 +209,6 @@ js/*.js (скрипты приложения без CDN-библиотек)
 | Объект в бакете | Версионируемый источник |
 |------------------|-------------------------|
 | `js/jquery-3.5.1.min.js` | `jquery@3.5.1` из `package.json` |
-| `js/gsap-3.15.0.min.js` | `gsap@3.15.0` из `package.json` |
-| `js/ScrollTrigger-3.15.0.min.js` | `gsap@3.15.0` из `package.json` |
 | `js/imask-7.6.1.min.js` | `imask@7.6.1` из `package.json` (`node_modules/imask/dist/imask.min.js`) |
 | `js/webflow.js` | `public/js/webflow.js` |
 

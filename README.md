@@ -12,7 +12,7 @@
   │    HTML, юридические страницы, JS приложения, минифицированный CSS сайта,
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
-  │    изображения, шрифты, сторонние CSS, jQuery, GSAP, ScrollTrigger, IMask и webflow.js
+  │    изображения, шрифты, сторонние CSS, jQuery, IMask и webflow.js
   └─ POST lead/newsletter → Cloud Function → YDB (источник истины)
                                       └→ Telegram
                                           ↑ retry timer
@@ -85,6 +85,12 @@ npm run build
 
 Сборка также минифицирует CSS сайта, добавляет UTM-атрибуцию, Open Graph, canonical и JSON-LD, нормализует ссылки Webflow и удаляет ассеты, которые должны отдаваться из CDN. В юридические страницы инъекции лендинга не добавляются. Страница `/404.html` остаётся с `noindex` и не получает ни аналитику, ни JSON-LD.
 
+## Движение интерфейса
+
+Первый экран, карточки «Почему выбирают нас» и секция «О нас» намеренно статичны: они не должны перемещаться между секциями, менять прозрачность от прогресса страницы или перекрывать CTA. Движение используется только как короткая обратная связь — 180 мс для кнопок и hover-состояния FAQ. Глобальный `prefers-reduced-motion` отключает и эти переходы.
+
+При переносе нового экспорта Webflow сохраняйте классы `home-hero`, `studio-about` и `card-personal`, не возвращайте удалённые `data-w-id` трёх первых карточек и `qa-hover`: старые Webflow timelines привязаны к этим служебным маркерам и создают невидимые hit-test слои.
+
 ## Проверка
 
 ```bash
@@ -132,7 +138,7 @@ export AWS_SECRET_ACCESS_KEY=...
 npm run deploy:yc
 ```
 
-В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery, GSAP и IMask зафиксированы в `package.json`; шрифты, jQuery, GSAP, ScrollTrigger, IMask и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI с `Cache-Control: public, max-age=31536000, immutable`. Массовый `sync --delete` для бакета ассетов не используется.
+В репозитории намеренно нет staging и upload-скрипта для CDN. Версии jQuery и IMask зафиксированы в `package.json`; шрифты, jQuery, IMask и `webflow.js` публикуются напрямую в бакет `zvenfit-estetika` через авторизованный Yandex Cloud CLI с `Cache-Control: public, max-age=31536000, immutable`. Массовый `sync --delete` для бакета ассетов не используется.
 
 ```bash
 yc storage s3api put-object \

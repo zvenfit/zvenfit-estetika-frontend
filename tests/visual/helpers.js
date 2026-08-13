@@ -35,28 +35,4 @@ async function waitForVisualStable(page) {
   await page.waitForTimeout(500);
 }
 
-/**
- * Webflow + GSAP ScrollTrigger keeps above-the-fold blocks at visibility:hidden
- * until scroll/interaction. For deterministic screenshots, reveal a subtree.
- */
-async function revealForScreenshot(page, rootSelector) {
-  await page.evaluate((selector) => {
-    const root = document.querySelector(selector);
-    if (!root) {
-      return;
-    }
-
-    const reveal = (el) => {
-      el.style.setProperty('visibility', 'visible', 'important');
-      el.style.setProperty('opacity', '1', 'important');
-      if (el.style.transform && el.style.transform !== 'none') {
-        el.style.setProperty('transform', 'none', 'important');
-      }
-    };
-
-    reveal(root);
-    root.querySelectorAll('*').forEach(reveal);
-  }, rootSelector);
-}
-
-module.exports = { blockNoisyRequests, waitForVisualStable, revealForScreenshot };
+module.exports = { blockNoisyRequests, waitForVisualStable };

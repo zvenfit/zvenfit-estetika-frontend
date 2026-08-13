@@ -44,6 +44,7 @@ for (const forbidden of [
   /^css\/(normalize|webflow)\.css$/,
   /^css\/zvenfit-kosmetologiya\.webflow\.css$/,
   /^js\/webflow\.js$/,
+  /^js\/(?:gsap-[^/]+|ScrollTrigger-[^/]+)\.js$/,
 ]) {
   const found = files.filter(file => forbidden.test(file));
   if (found.length) throw new Error(`check-build: forbidden files: ${found.join(', ')}`);
@@ -121,6 +122,23 @@ if (!formPage.includes('id="contact-method-error"')) {
 const homePage = read('index.html');
 if (!homePage.includes('<label class="visually-hidden" for="phone">Номер телефона</label>')) {
   throw new Error('check-build: newsletter phone input has no accessible label');
+}
+if (/gsap|ScrollTrigger/i.test(homePage)) {
+  throw new Error('check-build: home page still loads the removed motion libraries');
+}
+for (const motionHook of [
+  '61539419-ce88-ac6e-2be5-a18971d536e7',
+  '61539419-ce88-ac6e-2be5-a18971d536e2',
+]) {
+  if (homePage.includes(motionHook)) {
+    throw new Error(`check-build: legacy card motion hook remains: ${motionHook}`);
+  }
+}
+if (!homePage.includes('w-layout-blockcontainer home-hero w-container')) {
+  throw new Error('check-build: static home hero class is missing');
+}
+if (!homePage.includes('w-layout-blockcontainer studio-about w-container')) {
+  throw new Error('check-build: static about class is missing');
 }
 
 const legal = read('documents/privacy-policy.html');

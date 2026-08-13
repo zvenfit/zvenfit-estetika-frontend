@@ -20,9 +20,9 @@
   - [x] `YC_SA_JSON_KEY` и `YC_FOLDER_ID` проверены реальным созданием версии функции
   - [x] Обязательные production secrets/variables прошли preflight; `ASSET_VERSION` остаётся необязательным
 - [x] **JS-библиотеки в CDN** — обязательные Webflow-зависимости перенесены в `storage.yandexcloud.net/zvenfit-estetika/js/`
-  - [x] Зафиксировать `jquery@3.5.1` и `gsap@3.15.0` в зависимостях; SHA-256 файлов совпадает с Webflow и `zvenfit-frontend`
-  - [x] Напрямую загрузить jQuery, GSAP, ScrollTrigger и `webflow.js` в Object Storage без staging и `sync --delete`; все URL отвечают HTTP 200, хеши совпадают (2026-08-07)
-  - [x] Заменить внешние ссылки на jQuery, GSAP и ScrollTrigger в `public/index.html` и `public/form/index.html` ссылками на собственный CDN
+  - [x] Зафиксировать `jquery@3.5.1`; ранее загруженные GSAP и ScrollTrigger удалены из runtime и зависимостей после motion-cleanup 2026-08-13
+  - [x] Напрямую загрузить jQuery и `webflow.js` в Object Storage без staging и `sync --delete`; URL отвечают HTTP 200, хеши совпадают (2026-08-07)
+  - [x] Заменить внешнюю ссылку на jQuery ссылкой на собственный CDN; неиспользуемые GSAP и ScrollTrigger больше не загружаются
   - [x] Удалить неиспользуемый `webflow.js` из `public/404.html`: статической странице не нужны Webflow JS и jQuery
 - [x] **Базовые ассеты CDN** — `css/normalize.min.css`, `css/webflow.min.css`, изображения и шрифты уже доступны из бакета; проверено 2026-08-07
 - [x] **Подготовить и наполнить бакет сайта** — `dist/` загружен отдельным S3-ключом Estetika; HTML и crawl metadata получили `no-cache`, неизменяемые файлы — длительный кеш

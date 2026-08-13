@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { blockNoisyRequests, waitForVisualStable, revealForScreenshot } = require('./helpers');
+const { blockNoisyRequests, waitForVisualStable } = require('./helpers');
 
 function isDesktop(testInfo) {
   return testInfo.project.name === 'desktop-chrome';
@@ -15,12 +15,48 @@ test.describe('home', () => {
   test('hero block', async ({ page }, testInfo) => {
     await page.goto('/');
     await waitForVisualStable(page);
-    await revealForScreenshot(page, '.w-layout-blockcontainer.main');
 
     const hero = page.locator(
-      isDesktop(testInfo) ? '.w-layout-blockcontainer.main' : '.main-block',
+      isDesktop(testInfo) ? '.w-layout-blockcontainer.home-hero' : '.main-block',
     );
     await expect(hero).toHaveScreenshot('home-hero.png');
+  });
+
+  test('hero CTA is topmost and navigates', async ({ page }) => {
+    await page.goto('/');
+
+    const cta = page.locator('.home-hero .button');
+    await expect(cta).toBeVisible();
+    const receivesPointer = await cta.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const target = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+      return target === element || element.contains(target);
+    });
+    expect(receivesPointer).toBe(true);
+
+    await cta.click();
+    await expect(page).toHaveURL(/\/form\/$/);
+  });
+
+  test('why-us cards stay in document flow while scrolling', async ({ page }) => {
+    await page.goto('/');
+
+    await page.locator('.why').scrollIntoViewIfNeeded();
+    const motionState = await page.locator('.why .why-card').evaluateAll((cards) => (
+      cards.slice(0, 3).map((card) => {
+        const style = getComputedStyle(card);
+        return { opacity: style.opacity, transform: style.transform };
+      })
+    ));
+
+    expect(motionState).toEqual([
+      { opacity: '1', transform: 'none' },
+      { opacity: '1', transform: 'none' },
+      { opacity: '1', transform: 'none' },
+    ]);
   });
 
   test('services — face tab', async ({ page }) => {

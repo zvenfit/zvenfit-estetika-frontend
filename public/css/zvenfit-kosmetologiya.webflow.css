@@ -267,6 +267,7 @@
   font-weight: 500;
   line-height: 140%;
   text-decoration: none;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 .button:hover {
@@ -283,7 +284,7 @@
   color: var(--black);
 }
 
-.main {
+.main, .home-hero {
   width: 100%;
   max-width: 1400px;
   height: auto;
@@ -455,7 +456,7 @@
   background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-pink-03.webp');
 }
 
-.why-card._1 {
+.why-card.card-personal {
   background-image: url('https://storage.yandexcloud.net/zvenfit-estetika/images/why-us/card-01.webp');
   background-position: 0 0;
   background-size: auto;
@@ -616,7 +617,7 @@
   display: flex;
 }
 
-.about {
+.about, .studio-about {
   width: 100%;
   max-width: 1400px;
   height: auto;
@@ -1030,8 +1031,16 @@
   border-radius: 100px;
   width: 50px;
   height: 50px;
+  pointer-events: none;
   position: absolute;
   inset: 20px 20px 20px auto;
+  transition: opacity 180ms ease;
+}
+
+.qa-toggle:hover .qa-hover,
+.qa-toggle:focus-visible .qa-hover,
+.qa-toggle.w--open .qa-hover {
+  opacity: 1;
 }
 
 .text-block-2 {
@@ -1453,7 +1462,7 @@
     display: none;
   }
 
-  .main {
+  .main, .home-hero {
     max-width: 640px;
     margin-top: 80px;
     overflow: hidden;
@@ -1512,7 +1521,7 @@
     background-size: contain;
   }
 
-  .why-card._1, .why-card._2, .why-card._3 {
+  .why-card.card-personal, .why-card._2, .why-card._3 {
     background-position: 50% 100%;
     background-repeat: no-repeat;
     background-size: contain;
@@ -1558,7 +1567,7 @@
     grid-row-gap: 10px;
   }
 
-  .about {
+  .about, .studio-about {
     max-width: 640px;
     overflow: hidden;
   }
@@ -1804,7 +1813,7 @@
     font-size: 16px;
   }
 
-  .main {
+  .main, .home-hero {
     max-width: 480px;
   }
 
@@ -1861,7 +1870,7 @@
     background-size: auto;
   }
 
-  .why-card._1 {
+  .why-card.card-personal {
     background-image: none;
     background-position: 0 0;
     background-size: auto;
@@ -1917,7 +1926,7 @@
     font-size: 18px;
   }
 
-  .about, .equipment {
+  .about, .studio-about, .equipment {
     max-width: 480px;
   }
 
@@ -2104,7 +2113,7 @@
     font-size: 15px;
   }
 
-  .main {
+  .main, .home-hero {
     max-width: 350px;
   }
 
@@ -2145,7 +2154,7 @@
     margin-bottom: 20px;
   }
 
-  .why-card.pink._11, .why-card._1, .why-card._2, .why-card._3 {
+  .why-card.pink._11, .why-card.card-personal, .why-card._2, .why-card._3 {
     padding: 20px;
   }
 
@@ -2183,7 +2192,7 @@
     font-size: 16px;
   }
 
-  .about {
+  .about, .studio-about {
     max-width: 350px;
   }
 
