@@ -70,6 +70,8 @@ test('CI deploy requires pre-provisioned infrastructure and does not grant acces
   assert.doesNotMatch(deployScript, /\nyc serverless function allow-unauthenticated-invoke/);
   assert.match(deployScript, /function list-access-bindings/);
   assert.match(deployScript, /missing the one-time public functionInvoker binding/);
+  assert.match(deployScript, /YDB_DATABASE_SELECTOR=\(--id=/);
+  assert.match(workflow, /YDB_DATABASE_ID: \$\{\{ vars\.YDB_DATABASE_ID \}\}/);
 });
 
 test('CI deploy leaves the one-time retry trigger untouched', () => {

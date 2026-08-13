@@ -7,6 +7,7 @@ trap 'rm -rf -- "${SOURCE_DIR}"' EXIT
 FUNCTION_NAME="${YC_LEAD_FUNCTION_NAME:-zvenfit-estetika-telegram-lead}"
 TRIGGER_NAME="${YC_LEAD_RETRY_TRIGGER_NAME:-zvenfit-estetika-telegram-retry}"
 YDB_DATABASE_NAME="${YDB_DATABASE_NAME:-zvenfit-estetika-leads}"
+YDB_DATABASE_ID="${YDB_DATABASE_ID:-}"
 YDB_SUBMISSIONS_TABLE="${YDB_SUBMISSIONS_TABLE:-submissions}"
 YDB_RATE_LIMITS_TABLE="${YDB_RATE_LIMITS_TABLE:-submission_rate_limits}"
 LEAD_RATE_LIMIT_MAX="${LEAD_RATE_LIMIT_MAX:-5}"
@@ -63,12 +64,20 @@ fi
 yc config set folder-id "${YC_FOLDER_ID}" >/dev/null
 
 if [[ -z "${YDB_CONNECTION_STRING:-}" ]]; then
-  if ! yc ydb database get --name="${YDB_DATABASE_NAME}" >/dev/null 2>&1; then
-    echo "deploy-telegram-lead: YDB database ${YDB_DATABASE_NAME} must be provisioned before CI deploy" >&2
+  if [[ -n "${YDB_DATABASE_ID}" ]]; then
+    YDB_DATABASE_SELECTOR=(--id="${YDB_DATABASE_ID}")
+    YDB_DATABASE_LABEL="${YDB_DATABASE_ID}"
+  else
+    YDB_DATABASE_SELECTOR=(--name="${YDB_DATABASE_NAME}")
+    YDB_DATABASE_LABEL="${YDB_DATABASE_NAME}"
+  fi
+
+  if ! yc ydb database get "${YDB_DATABASE_SELECTOR[@]}" >/dev/null 2>&1; then
+    echo "deploy-telegram-lead: YDB database ${YDB_DATABASE_LABEL} must be provisioned and accessible before CI deploy" >&2
     exit 1
   fi
 
-  YDB_CONNECTION_STRING="$(yc ydb database get --name="${YDB_DATABASE_NAME}" --format=json | node -e "
+  YDB_CONNECTION_STRING="$(yc ydb database get "${YDB_DATABASE_SELECTOR[@]}" --format=json | node -e "
 const fs = require('fs');
 const data = JSON.parse(fs.readFileSync(0, 'utf8'));
 process.stdout.write(data.endpoint || '');

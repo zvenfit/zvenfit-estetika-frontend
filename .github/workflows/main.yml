@@ -74,6 +74,7 @@ jobs:
           YC_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
           YC_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
+          YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
           YANDEX_METRIKA_ID: ${{ vars.YANDEX_METRIKA_ID }}
         run: node scripts/check-deploy-config.cjs
 
@@ -125,6 +126,7 @@ jobs:
           MONIUM_METRICS_TIMEOUT_MS: ${{ vars.MONIUM_METRICS_TIMEOUT_MS || '1000' }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
+          YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
           YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
           YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}

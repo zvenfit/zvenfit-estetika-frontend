@@ -92,6 +92,11 @@ yc ydb database create \
   --sls-storage-size=1GB \
   --deletion-protection
 
+YDB_DATABASE_ID="$(yc ydb database get \
+  --name zvenfit-estetika-leads \
+  --format json | jq -r '.id')"
+echo "YDB_DATABASE_ID=$YDB_DATABASE_ID"
+
 yc ydb database add-access-binding \
   --name zvenfit-estetika-leads \
   --role ydb.editor \
@@ -265,6 +270,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `YANDEX_METRIKA_ID` | Идентификатор продакшен-счётчика Метрики |
 | `ASSET_VERSION` | Необязательная версия для сброса кеша; по умолчанию используется номер запуска workflow |
 | `YC_LEAD_SERVICE_ACCOUNT_ID` | Обязательный ID отдельного runtime SA функции и таймера |
+| `YDB_DATABASE_ID` | Обязательный ID заранее созданной YDB; позволяет изолированному CI обращаться к базе без права перечислять ресурсы каталога |
 | `YDB_DATABASE_NAME` | Имя Serverless БД; по умолчанию `zvenfit-estetika-leads` |
 | `YDB_SUBMISSIONS_TABLE` | Таблица заявок и подписок; по умолчанию `submissions` |
 | `YDB_RATE_LIMITS_TABLE` | TTL-таблица технических счётчиков; по умолчанию `submission_rate_limits` |

@@ -16,6 +16,7 @@ function validEnvironment() {
     YC_ACCESS_KEY_ID: 'access-test',
     YC_SECRET_ACCESS_KEY: 'secret-test',
     YC_LEAD_SERVICE_ACCOUNT_ID: 'aje-runtime-test',
+    YDB_DATABASE_ID: 'etn-database-test',
     YANDEX_METRIKA_ID: '12345678',
   };
 }
