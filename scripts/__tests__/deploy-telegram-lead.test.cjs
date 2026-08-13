@@ -38,6 +38,8 @@ test('function deploy integration-tests and verifies the pre-provisioned schema 
   assert.equal(schemaVerification > integration, true);
   assert.equal(deploy > schemaVerification, true);
   assert.doesNotMatch(deployScript, /run migrate/);
+  assert.match(deployScript, /SCHEMA_VERIFY_MAX_ATTEMPTS=3/);
+  assert.match(deployScript, /schema verification failed after/);
 });
 
 test('deployment package contains compiled runtime modules only', () => {

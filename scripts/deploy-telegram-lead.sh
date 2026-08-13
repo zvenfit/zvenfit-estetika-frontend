@@ -95,12 +95,23 @@ YDB_TEST_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
 YDB_ACCESS_TOKEN_CREDENTIALS="${YDB_IAM_TOKEN}" \
 npm --prefix "${ROOT_DIR}/functions/telegram-lead" run test:integration
 
-YDB_ACCESS_TOKEN_CREDENTIALS="${YDB_IAM_TOKEN}" \
-YDB_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
-YDB_SUBMISSIONS_TABLE="${YDB_SUBMISSIONS_TABLE}" \
-YDB_RATE_LIMITS_TABLE="${YDB_RATE_LIMITS_TABLE}" \
-YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
-npm --prefix "${ROOT_DIR}/functions/telegram-lead" run verify:schema
+SCHEMA_VERIFY_ATTEMPT=1
+SCHEMA_VERIFY_MAX_ATTEMPTS=3
+while ! YDB_ACCESS_TOKEN_CREDENTIALS="${YDB_IAM_TOKEN}" \
+  YDB_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
+  YDB_SUBMISSIONS_TABLE="${YDB_SUBMISSIONS_TABLE}" \
+  YDB_RATE_LIMITS_TABLE="${YDB_RATE_LIMITS_TABLE}" \
+  YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
+  npm --prefix "${ROOT_DIR}/functions/telegram-lead" run verify:schema; do
+  if (( SCHEMA_VERIFY_ATTEMPT >= SCHEMA_VERIFY_MAX_ATTEMPTS )); then
+    echo "deploy-telegram-lead: YDB schema verification failed after ${SCHEMA_VERIFY_MAX_ATTEMPTS} attempts" >&2
+    exit 1
+  fi
+
+  echo "deploy-telegram-lead: transient YDB schema verification failure; retrying" >&2
+  sleep $((SCHEMA_VERIFY_ATTEMPT * 2))
+  SCHEMA_VERIFY_ATTEMPT=$((SCHEMA_VERIFY_ATTEMPT + 1))
+done
 
 unset YDB_IAM_TOKEN
 
