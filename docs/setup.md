@@ -290,7 +290,7 @@ workflow использует стандартный `GITHUB_TOKEN`.
 GitHub Environment `production` использует custom deployment branch policy только для `main`.
 Не снимайте это ограничение: иначе ручной `workflow_dispatch` сможет развернуть feature-ветку.
 
-Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. При добавлении или удалении домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
+Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. Единственный production-домен проекта — `https://estetika.zvenfit.ru`. Вариант `www.estetika.zvenfit.ru` намеренно не поддерживается и не должен добавляться в DNS, TLS, CORS или CI. При добавлении или удалении другого домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
 ## 6. Первый деплой
 
