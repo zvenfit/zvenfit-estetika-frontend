@@ -118,6 +118,9 @@ for (const attribute of [
 if (!formPage.includes('id="contact-method-error"')) {
   throw new Error('check-build: contact method field error is missing');
 }
+if (!formPage.includes('Выберите способ связи')) {
+  throw new Error('check-build: concise contact method prompt is missing');
+}
 
 const homePage = read('index.html');
 if (!homePage.includes('<label class="visually-hidden" for="phone">Номер телефона</label>')) {
@@ -139,6 +142,12 @@ if (!homePage.includes('w-layout-blockcontainer home-hero w-container')) {
 }
 if (!homePage.includes('w-layout-blockcontainer studio-about w-container')) {
   throw new Error('check-build: static about class is missing');
+}
+if (!homePage.includes('/js/ui-polish.js?v=')) {
+  throw new Error('check-build: UI polish script is missing or has no cache version');
+}
+if (!homePage.includes('class="mobile-booking-cta"')) {
+  throw new Error('check-build: mobile booking CTA is missing');
 }
 
 const legal = read('documents/privacy-policy.html');

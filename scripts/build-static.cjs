@@ -34,6 +34,7 @@ const CACHE_BUST_SCRIPTS = [
   'custom-select.js',
   'back-button.js',
   'social-links.js',
+  'ui-polish.js',
 ];
 
 function loadEnvFile(filename) {

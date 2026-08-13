@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const serviceInput = form?.querySelector('[name="service"]');
   const serviceCombobox = form?.querySelector('[role="combobox"]');
   const serviceError = form?.querySelector('#contact-method-error');
-  const defaultServiceLabel = 'Выберите удобный для вас вариант...';
+  const defaultServiceLabel = 'Выберите способ связи';
 
   function setServiceValidity(isValid) {
     serviceCombobox?.setAttribute('aria-invalid', String(!isValid));
