@@ -50,22 +50,39 @@ test('deploy preflight validates formats without returning secret values', () =>
   });
 });
 
-test('site deploy preserves permanent redirects from legacy legal document URLs', () => {
+test('storage setup preserves permanent redirects from legacy legal document URLs', () => {
   const workflow = fs.readFileSync(path.join(rootDir, '.github', 'workflows', 'main.yml'), 'utf8');
-  const redirectScript = fs.readFileSync(
-    path.join(rootDir, 'scripts', 'upload-legacy-redirects.sh'),
-    'utf8',
+  const setupStorage = fs.readFileSync(path.join(rootDir, 'scripts', 'setup-storage.sh'), 'utf8');
+  const websiteSettings = JSON.parse(
+    fs.readFileSync(path.join(rootDir, 'scripts', 'website-settings.json'), 'utf8'),
   );
   const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
-  for (const [legacyKey, targetPath] of [
-    ['documents/privacy-policy.html', '/privacy/'],
-    ['documents/personal-data-processing.html', '/personal-data-processing/'],
-  ]) {
-    assert.ok(workflow.includes(`s3://\${{ env.S3_BUCKET }}/${legacyKey}`));
-    assert.ok(workflow.includes(`--website-redirect ${targetPath}`));
-    assert.ok(redirectScript.includes(`upload_redirect "${legacyKey}" "${targetPath}"`));
-  }
-
-  assert.match(packageJson.scripts['deploy:yc'], /bash scripts\/upload-legacy-redirects\.sh$/);
+  assert.deepEqual(websiteSettings, {
+    index: 'index.html',
+    error: '404.html',
+    routingRules: [
+      {
+        condition: { keyPrefixEquals: 'documents/privacy-policy.html' },
+        redirect: {
+          hostname: 'estetika.zvenfit.ru',
+          httpRedirectCode: '301',
+          protocol: 'PROTOCOL_HTTPS',
+          replaceKeyWith: 'privacy/',
+        },
+      },
+      {
+        condition: { keyPrefixEquals: 'documents/personal-data-processing.html' },
+        redirect: {
+          hostname: 'estetika.zvenfit.ru',
+          httpRedirectCode: '301',
+          protocol: 'PROTOCOL_HTTPS',
+          replaceKeyWith: 'personal-data-processing/',
+        },
+      },
+    ],
+  });
+  assert.match(setupStorage, /--website-settings-from-file "\$\{WEBSITE_SETTINGS_FILE\}"/);
+  assert.doesNotMatch(workflow, /--website-redirect/);
+  assert.doesNotMatch(packageJson.scripts['deploy:yc'], /upload-legacy-redirects/);
 });

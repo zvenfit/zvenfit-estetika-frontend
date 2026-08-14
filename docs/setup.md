@@ -202,7 +202,9 @@ js/*.js (скрипты приложения без CDN-библиотек)
 
 В нём не должно быть `images/`, `fonts/`, сторонних CSS, исходного CSS сайта и CDN-библиотек.
 Старые ключи `documents/privacy-policy.html` и `documents/personal-data-processing.html` в `dist/`
-не входят: после загрузки HTML деплой создаёт на их месте S3 website redirect objects с HTTP 301.
+не входят. HTTP 301 с них задаётся правилами `routingRules` из `scripts/website-settings.json`,
+которые применяет одноразовая административная команда `npm run setup:storage`. Обычный CI не
+меняет настройки бакета и только проверяет редиректы в production smoke.
 
 ### Загрузка изменяемых ассетов
 

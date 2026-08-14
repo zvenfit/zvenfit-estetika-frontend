@@ -1,0 +1,28 @@
+{
+  "index": "index.html",
+  "error": "404.html",
+  "routingRules": [
+    {
+      "condition": {
+        "keyPrefixEquals": "documents/privacy-policy.html"
+      },
+      "redirect": {
+        "hostname": "estetika.zvenfit.ru",
+        "httpRedirectCode": "301",
+        "protocol": "PROTOCOL_HTTPS",
+        "replaceKeyWith": "privacy/"
+      }
+    },
+    {
+      "condition": {
+        "keyPrefixEquals": "documents/personal-data-processing.html"
+      },
+      "redirect": {
+        "hostname": "estetika.zvenfit.ru",
+        "httpRedirectCode": "301",
+        "protocol": "PROTOCOL_HTTPS",
+        "replaceKeyWith": "personal-data-processing/"
+      }
+    }
+  ]
+}
