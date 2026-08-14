@@ -32,6 +32,7 @@ async function createSubmissionsTable({ sql, submissionsTable }: SchemaContext):
         service Utf8 NOT NULL,
         telegram_username Utf8 NOT NULL,
         utm_json Utf8 NOT NULL,
+        consent_json Utf8 NOT NULL,
         telegram_status Utf8 NOT NULL,
         telegram_attempts Uint32 NOT NULL,
         telegram_due_at Timestamp,
@@ -76,6 +77,7 @@ async function verifySubmissionColumns({ sql, submissionsTable }: SchemaContext)
         service,
         telegram_username,
         utm_json,
+        consent_json,
         telegram_status,
         telegram_attempts,
         telegram_due_at,
@@ -143,6 +145,22 @@ async function verifySchemaContext(context: SchemaContext): Promise<void> {
   await verifyRateLimitsSchema(context);
 }
 
+async function verifySchemaWithRetry(context: SchemaContext): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await verifySchemaContext(context);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      }
+    }
+  }
+  throw lastError;
+}
+
 function schemaContext(client: YdbClient): SchemaContext {
   return {
     ...client,
@@ -170,7 +188,23 @@ export async function verifySchema(): Promise<void> {
   const client = await createYdbClient();
 
   try {
-    await verifySchemaContext(schemaContext(client));
+    await verifySchemaWithRetry(schemaContext(client));
+  } finally {
+    await client.close();
+  }
+}
+
+export async function migrateConsentEvidenceSchema(): Promise<void> {
+  const client = await createYdbClient();
+
+  try {
+    await timed(
+      client.sql`
+        ALTER TABLE ${client.sql.identifier(tableName())}
+        ADD COLUMN consent_json Utf8;
+      `.idempotent(true),
+    );
+    await verifySchemaWithRetry(schemaContext(client));
   } finally {
     await client.close();
   }
@@ -179,11 +213,13 @@ export async function verifySchema(): Promise<void> {
 export const _private = {
   createRateLimitsTable,
   createSubmissionsTable,
+  migrateConsentEvidenceSchema,
   schemaContext,
   timed,
   verifyDueIndex,
   verifyQueueHealthIndex,
   verifyRateLimitsSchema,
   verifySchemaContext,
+  verifySchemaWithRetry,
   verifySubmissionColumns,
 };

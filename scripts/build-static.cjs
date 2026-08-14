@@ -124,6 +124,15 @@ function stripWebflowGenerator(html) {
   return html.replace(/\s*<meta content="Webflow" name="generator">\n?/g, '\n');
 }
 
+function stripOfficeMetadata(html) {
+  return html
+    .replace(
+      /\s*<meta name="(?:Author|LastAuthor|Description|CreationTime|ModificationTime|Generator|CocoaVersion)"[^>]*>\n?/g,
+      '\n',
+    )
+    .replace(/\s*<style type="text\/css">[\s\S]*?<\/style>\n?/i, '\n');
+}
+
 function minifySiteCss() {
   const sourcePath = path.join(publicDir, 'css', SITE_CSS_SOURCE);
   const distMinPath = path.join(distDir, 'css', SITE_CSS_MIN);
@@ -378,7 +387,7 @@ function runBuild() {
     // but do not inject landing-page analytics, OG or JSON-LD.
     if (pagePath.startsWith('/documents/')) {
       const html = bustAssetUrls(
-        fs.readFileSync(htmlPath, 'utf8'),
+        stripOfficeMetadata(fs.readFileSync(htmlPath, 'utf8')),
         assetVersion,
         assetsCdnBase,
       );

@@ -56,6 +56,12 @@ export type UtmKey =
 export type Utm = Partial<Record<UtmKey, string>>;
 export type TelegramStatus = 'pending' | 'sending' | 'sent' | 'failed';
 
+export interface ConsentEvidence {
+  version: string;
+  personalData: boolean;
+  marketing: boolean;
+}
+
 export interface Submission {
   submissionId: string;
   formType: FormType;
@@ -65,6 +71,7 @@ export interface Submission {
   service: string;
   telegramUsername: string;
   utm: Utm;
+  consents: ConsentEvidence;
 }
 
 export interface ClaimedSubmission extends Submission {

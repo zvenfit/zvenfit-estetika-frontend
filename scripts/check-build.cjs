@@ -83,6 +83,15 @@ for (const rel of ['index.html', 'form/index.html']) {
   if (!html.includes('<noscript>') || !html.includes('tel:+79688440088')) {
     throw new Error(`check-build: ${rel} has no safe no-JS fallback`);
   }
+  if (
+    !html.includes('data-consent-version="2026-08-14"') ||
+    !/<input[^>]*name=["']personal_data_consent["'][^>]*type=["']checkbox["'][^>]*required/i.test(html)
+  ) {
+    throw new Error(`check-build: ${rel} has no required versioned personal-data consent`);
+  }
+  if (/<input[^>]*name=["'](?:personal_data_consent|marketing_consent)["'][^>]*checked/i.test(html)) {
+    throw new Error(`check-build: ${rel} preselects a consent checkbox`);
+  }
 
   if (
     !html.includes(
@@ -141,6 +150,9 @@ if (!homePage.includes('<label class="visually-hidden" for="phone">Номер т
 if (/gsap|ScrollTrigger/i.test(homePage)) {
   throw new Error('check-build: home page still loads the removed motion libraries');
 }
+if (!/<input[^>]*name=["']marketing_consent["'][^>]*type=["']checkbox["'][^>]*required/i.test(homePage)) {
+  throw new Error('check-build: newsletter has no separate required marketing consent');
+}
 for (const motionHook of [
   '61539419-ce88-ac6e-2be5-a18971d536e7',
   '61539419-ce88-ac6e-2be5-a18971d536e2',
@@ -174,6 +186,9 @@ if (
 }
 if (!legal.includes('<span>ЗВЕНФИТ ЭСТЕТИКА</span>')) {
   throw new Error('check-build: legal footer has an incorrect brand name');
+}
+if (/<meta name="(?:Author|LastAuthor|Generator)"|<style type="text\/css">/i.test(legal)) {
+  throw new Error('check-build: office metadata or inline export styles remain in legal output');
 }
 
 const notFound = read('404.html');

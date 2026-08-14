@@ -42,6 +42,7 @@ export async function saveSubmission(
           service,
           telegram_username,
           utm_json,
+          consent_json,
           telegram_status,
           telegram_attempts,
           telegram_due_at
@@ -55,6 +56,11 @@ export async function saveSubmission(
           ${submission.service},
           ${submission.telegramUsername},
           ${JSON.stringify(submission.utm)},
+          ${JSON.stringify({
+            version: submission.consents.version,
+            personal_data: submission.consents.personalData,
+            marketing: submission.consents.marketing,
+          })},
           ${'pending'},
           ${ydbUint32(0)},
           ${createdAt}

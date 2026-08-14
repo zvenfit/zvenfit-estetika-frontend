@@ -97,10 +97,16 @@ export function telegramStatus(value: unknown): TelegramStatus {
 
 export function rowToSubmission(row: SqlRow): ClaimedSubmission {
   let utm = {};
+  let consentJson: Record<string, unknown> = {};
   try {
     utm = JSON.parse(stringValue(row.utm_json) || '{}') as Record<string, string>;
   } catch {
     utm = {};
+  }
+  try {
+    consentJson = JSON.parse(stringValue(row.consent_json) || '{}') as Record<string, unknown>;
+  } catch {
+    consentJson = {};
   }
 
   return {
@@ -112,6 +118,11 @@ export function rowToSubmission(row: SqlRow): ClaimedSubmission {
     service: stringValue(row.service),
     telegramUsername: stringValue(row.telegram_username),
     utm,
+    consents: {
+      version: stringValue(consentJson.version),
+      personalData: consentJson.personal_data === true,
+      marketing: consentJson.marketing === true,
+    },
     telegramAttempts: Number(row.telegram_attempts || 0),
   };
 }

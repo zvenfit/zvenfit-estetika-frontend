@@ -339,7 +339,22 @@ deploy только проверяет её командой `verify:schema` и 
 нет ценных данных, изменение схемы выполняется пересозданием пилотной БД или таблиц. До перехода к
 постоянному хранению и эволюции схемы без пересоздания нужно отдельно ввести стратегию миграций.
 
-Таблица `submissions` хранит заявки и подписки бессрочно, без TTL; TTL используется только для
+Для уже созданной production-таблицы один раз перед деплоем версии с раздельными согласиями
+добавьте совместимую nullable-колонку `consent_json`:
+
+```bash
+export YDB_CONNECTION_STRING="$(yc ydb database get --id="$YDB_DATABASE_ID" --format=json | jq -r '.endpoint')"
+export YDB_ACCESS_TOKEN_CREDENTIALS="$(yc iam create-token)"
+npm --prefix functions/telegram-lead run migrate:consent-evidence
+unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
+```
+
+Миграция только добавляет колонку и не изменяет существующие строки. Повторно её не запускайте:
+YDB вернёт ошибку для уже существующей колонки. Новая функция принимает только актуальную версию
+явного согласия и записывает в `consent_json` его версию, согласие на ПД и отдельное рекламное
+согласие; `created_at` фиксирует время принятия.
+
+Таблица `submissions` хранит заявки, подписки и доказательство полученных согласий бессрочно, без TTL; TTL используется только для
 технических счётчиков rate limit. Очередь Telegram использует синхронные индексы
 `idx_telegram_due` и `idx_telegram_status_created`. Статусы: `pending`, `sending`, `sent`, `failed`.
 Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"`

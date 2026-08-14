@@ -1134,7 +1134,7 @@
 }
 
 .inst-warning.form {
-  color: #16161699;
+  color: #161616;
   margin-bottom: 10px;
 }
 
@@ -1706,6 +1706,7 @@
   }
 
   .inst-warning.form {
+    font-size: 14px;
     line-height: 140%;
   }
 

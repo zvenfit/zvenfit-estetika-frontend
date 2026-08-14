@@ -32,6 +32,7 @@ function postEvent(overrides: Record<string, unknown> = {}, ip = '198.51.100.10'
       service: 'WhatsApp',
       telegram_username: '',
       utm: { utm_source: 'test', ignored: 'drop' },
+      consents: { version: '2026-08-14', personal_data: true, marketing: false },
       ...overrides,
     }),
   };
@@ -47,6 +48,7 @@ function claimedSubmission(overrides: Partial<ClaimedSubmission> = {}): ClaimedS
     service: 'WhatsApp',
     telegramUsername: '',
     utm: { utm_source: 'test' },
+    consents: { version: '2026-08-14', personalData: true, marketing: false },
     telegramAttempts: 1,
     ...overrides,
   };
@@ -113,6 +115,11 @@ test('POST persists a pending lead and returns before Telegram delivery', async 
   assert.equal(telegramCalled, false);
   const saved = calls[0]?.[1] as Submission;
   assert.deepEqual(saved.utm, { utm_source: 'test' });
+  assert.deepEqual(saved.consents, {
+    version: '2026-08-14',
+    personalData: true,
+    marketing: false,
+  });
   assert.equal('extra' in saved, false);
 });
 
@@ -136,13 +143,21 @@ test('POST stores a newsletter subscription for asynchronous delivery', async ()
   );
 
   const response = httpResponse(
-    await handler(postEvent({ form_type: 'newsletter', name: 'drop', service: 'drop' })),
+    await handler(
+      postEvent({
+        form_type: 'newsletter',
+        name: 'drop',
+        service: 'drop',
+        consents: { version: '2026-08-14', personal_data: true, marketing: true },
+      }),
+    ),
   );
 
   assert.equal(response.statusCode, 202);
   assert.equal(saved?.formType, 'newsletter');
   assert.equal(saved?.name, '');
   assert.equal(saved?.service, 'Рассылка');
+  assert.equal(saved?.consents.marketing, true);
   assert.equal(telegramCalled, false);
 });
 
@@ -260,6 +275,20 @@ test('rejects origin, honeypot, malformed values and oversized bodies', async ()
   const honeypot = httpResponse(await handler(postEvent({ website: 'bot' })));
   const invalidId = httpResponse(await handler(postEvent({ submission_id: 'invalid' })));
   const invalidService = httpResponse(await handler(postEvent({ service: 'Unknown' })));
+  const missingPersonalDataConsent = httpResponse(
+    await handler(postEvent({ consents: { version: '2026-08-14', personal_data: false } })),
+  );
+  const staleConsentVersion = httpResponse(
+    await handler(postEvent({ consents: { version: 'old', personal_data: true } })),
+  );
+  const missingMarketingConsent = httpResponse(
+    await handler(
+      postEvent({
+        form_type: 'newsletter',
+        consents: { version: '2026-08-14', personal_data: true, marketing: false },
+      }),
+    ),
+  );
   const oversizedEvent = postEvent();
   oversizedEvent.body = JSON.stringify({ website: 'x'.repeat(20_000) });
   const oversized = httpResponse(await handler(oversizedEvent));
@@ -268,6 +297,9 @@ test('rejects origin, honeypot, malformed values and oversized bodies', async ()
   assert.deepEqual(JSON.parse(honeypot.body), { ok: true });
   assert.equal(invalidId.statusCode, 400);
   assert.equal(invalidService.statusCode, 400);
+  assert.equal(missingPersonalDataConsent.statusCode, 400);
+  assert.equal(staleConsentVersion.statusCode, 400);
+  assert.equal(missingMarketingConsent.statusCode, 400);
   assert.equal(oversized.statusCode, 413);
 });
 

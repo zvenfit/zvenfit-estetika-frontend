@@ -18,6 +18,7 @@ test('message supports lead and newsletter payloads without leaking delivery sta
     service: 'Telegram',
     telegramUsername: '@username',
     utm: { utm_source: 'test' },
+    consents: { version: '2026-08-14', personalData: true, marketing: false },
     telegramAttempts: 2,
   });
   const newsletter = buildMessage({
@@ -29,6 +30,7 @@ test('message supports lead and newsletter payloads without leaking delivery sta
     service: 'Рассылка',
     telegramUsername: '',
     utm: {},
+    consents: { version: '2026-08-14', personalData: true, marketing: true },
     telegramAttempts: 1,
   });
 
@@ -105,6 +107,7 @@ test('Telegram network failures preserve a safe diagnostic code', async () => {
         service: 'Позвонить',
         telegramUsername: '',
         utm: {},
+        consents: { version: '2026-08-14', personalData: true, marketing: false },
         telegramAttempts: 1,
       }),
       (error: unknown) =>

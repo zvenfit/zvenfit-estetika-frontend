@@ -1,4 +1,5 @@
 import type {
+  ConsentEvidence,
   FormType,
   HandlerDependencies,
   JsonObject,
@@ -13,6 +14,7 @@ const SUBMISSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORM_TYPES = new Set<FormType>(['lead', 'newsletter']);
 const SERVICES = new Set(['Позвонить', 'WhatsApp', 'Макс', 'Telegram']);
+export const CONSENT_VERSION = '2026-08-14';
 
 export const TRACKED_UTM_PARAMS: readonly UtmKey[] = [
   'utm_source',
@@ -52,6 +54,16 @@ function formType(value: unknown): FormType | null {
   return FORM_TYPES.has(parsed as FormType) ? (parsed as FormType) : null;
 }
 
+function parseConsents(raw: unknown): ConsentEvidence {
+  const input = raw && typeof raw === 'object' ? (raw as JsonObject) : {};
+
+  return {
+    version: sanitize(input.version, 32),
+    personalData: input.personal_data === true,
+    marketing: input.marketing === true,
+  };
+}
+
 export function createSubmission(
   body: JsonObject,
   dependencies: Pick<HandlerDependencies, 'now' | 'uuid'>,
@@ -70,6 +82,7 @@ export function createSubmission(
     service: sanitize(body.service, 64),
     telegramUsername: sanitize(body.telegram_username),
     utm: parseUtm(body.utm),
+    consents: parseConsents(body.consents),
   };
 
   if (parsedFormType === 'newsletter') {
@@ -105,8 +118,11 @@ export function validateSubmission(submission: Submission | null): string | null
   if (!isValidPhone(submission.phone)) {
     return 'validation_failed';
   }
+  if (!submission.consents.personalData || submission.consents.version !== CONSENT_VERSION) {
+    return 'personal_data_consent_required';
+  }
   if (submission.formType === 'newsletter') {
-    return null;
+    return submission.consents.marketing ? null : 'marketing_consent_required';
   }
   if (!isValidName(submission.name) || !SERVICES.has(submission.service)) {
     return 'validation_failed';

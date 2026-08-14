@@ -3,7 +3,6 @@
 
   const requestTimeoutMs = 15000;
   const successMessageMs = 5000;
-
   function attribution() {
     const source = window.__ZVENFIT_ATTRIBUTION;
     if (source && typeof source.sync === 'function') {
@@ -12,7 +11,6 @@
 
     return source && typeof source.get === 'function' ? source.get() : {};
   }
-
   function messageFor(kind, status) {
     if (status === 429) {
       return 'Слишком много попыток. Подождите 10 минут и попробуйте снова.';
@@ -30,12 +28,9 @@
 
     return 'Сервис временно недоступен. Попробуйте ещё раз позже.';
   }
-
   async function post(apiUrl, payload) {
     const controller = new AbortController();
-    const timeout = setTimeout(function () {
-      controller.abort();
-    }, requestTimeoutMs);
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
 
     try {
       return await fetch(apiUrl, {
@@ -48,19 +43,17 @@
       clearTimeout(timeout);
     }
   }
-
   function mount(options) {
     const form = document.querySelector(options.form);
     const root = document.querySelector(options.root);
     if (!form || !root) {
       return;
     }
-
     const successBlock = root.querySelector('.success-message');
     const errorBlock = root.querySelector('.error-message');
-    const errorText = errorBlock ? errorBlock.firstElementChild || errorBlock : null;
+    const errorText = errorBlock?.firstElementChild || errorBlock;
     const submitButton = form.querySelector('[type="submit"]');
-    const defaultLabel = submitButton ? submitButton.value : 'Отправить';
+    const defaultLabel = submitButton?.value || 'Отправить';
     let submissionId = '';
     let successTimer;
 
@@ -105,6 +98,7 @@
               ? window.__ZVENFIT_CREATE_SUBMISSION_ID()
               : ''),
       );
+      payload.consents = { version: form.dataset.consentVersion, personal_data: form.elements.personal_data_consent.checked, marketing: !!form.elements.marketing_consent?.checked };
       const utm = attribution();
       if (utm && Object.keys(utm).length) {
         payload.utm = utm;

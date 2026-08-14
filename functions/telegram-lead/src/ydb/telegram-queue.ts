@@ -43,6 +43,7 @@ export async function claimForTelegram({
             service,
             telegram_username,
             utm_json,
+            consent_json,
             telegram_status,
             telegram_attempts,
             telegram_due_at
