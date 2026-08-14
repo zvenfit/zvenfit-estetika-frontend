@@ -34,9 +34,21 @@ for (const rel of [
   'documents/privacy-policy.html',
   'documents/personal-data-processing.html',
   'css/zvenfit-kosmetologiya.webflow.min.css',
+  'css/legal-documents.min.css',
 ]) read(rel);
 
 const files = walk(distDir);
+const publicEmail = 'zvenfit.estetika@yandex.ru';
+for (const rel of files.filter(file => file.endsWith('.html'))) {
+  const emailAddresses = read(rel).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  const unexpectedEmails = emailAddresses.filter(email => email.toLowerCase() !== publicEmail);
+  if (unexpectedEmails.length) {
+    throw new Error(
+      `check-build: unexpected public email in ${rel}: ${[...new Set(unexpectedEmails)].join(', ')}`,
+    );
+  }
+}
+
 for (const forbidden of [
   /^images\//,
   /^fonts\//,
@@ -153,6 +165,15 @@ if (!homePage.includes('class="mobile-booking-cta"')) {
 const legal = read('documents/privacy-policy.html');
 if (legal.includes('ZvenFit Estetika: analytics') || legal.includes('application/ld+json')) {
   throw new Error('check-build: legal document received landing-page injections');
+}
+if (
+  !legal.includes('/css/zvenfit-kosmetologiya.webflow.min.css?v=') ||
+  !legal.includes('/css/legal-documents.min.css?v=')
+) {
+  throw new Error('check-build: legal document CSS is missing or has no cache version');
+}
+if (!legal.includes('<span>ЗВЕНФИТ ЭСТЕТИКА</span>')) {
+  throw new Error('check-build: legal footer has an incorrect brand name');
 }
 
 const notFound = read('404.html');

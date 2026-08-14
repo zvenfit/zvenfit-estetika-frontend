@@ -16,6 +16,8 @@ const openGraphMarker = '<!-- ZvenFit Estetika: open-graph -->';
 const structuredDataMarker = '<!-- ZvenFit Estetika: structured-data -->';
 const SITE_CSS_SOURCE = 'zvenfit-kosmetologiya.webflow.css';
 const SITE_CSS_MIN = 'zvenfit-kosmetologiya.webflow.min.css';
+const LEGAL_CSS_MIN = 'legal-documents.min.css';
+const LEGAL_CSS_MARKER = '/* Branded editorial layout for legal documents converted from office files. */';
 const CDN_VENDOR_JS = [
   'jquery-3.5.1.min.js',
   'imask-7.6.1.min.js',
@@ -125,6 +127,7 @@ function stripWebflowGenerator(html) {
 function minifySiteCss() {
   const sourcePath = path.join(publicDir, 'css', SITE_CSS_SOURCE);
   const distMinPath = path.join(distDir, 'css', SITE_CSS_MIN);
+  const legalDistMinPath = path.join(distDir, 'css', LEGAL_CSS_MIN);
   const distSourcePath = path.join(distDir, 'css', SITE_CSS_SOURCE);
 
   if (!fs.existsSync(sourcePath)) {
@@ -133,7 +136,10 @@ function minifySiteCss() {
   }
 
   const source = fs.readFileSync(sourcePath, 'utf8');
-  const result = new CleanCSS({ level: 2 }).minify(source);
+  const legalMarkerIndex = source.indexOf(LEGAL_CSS_MARKER);
+  const siteSource = legalMarkerIndex === -1 ? source : source.slice(0, legalMarkerIndex);
+  const legalSource = legalMarkerIndex === -1 ? '' : source.slice(legalMarkerIndex);
+  const result = new CleanCSS({ level: 2 }).minify(siteSource);
 
   if (result.errors.length > 0) {
     throw new Error(`CSS minify failed: ${result.errors.join(', ')}`);
@@ -142,12 +148,23 @@ function minifySiteCss() {
   fs.mkdirSync(path.dirname(distMinPath), { recursive: true });
   fs.writeFileSync(distMinPath, result.styles, 'utf8');
 
+  if (legalSource) {
+    const legalResult = new CleanCSS({ level: 2 }).minify(legalSource);
+    if (legalResult.errors.length > 0) {
+      throw new Error(`Legal CSS minify failed: ${legalResult.errors.join(', ')}`);
+    }
+    fs.writeFileSync(legalDistMinPath, legalResult.styles, 'utf8');
+    console.log(
+      `build-static: legal CSS -> css/${LEGAL_CSS_MIN} (${legalSource.length} -> ${legalResult.styles.length} bytes)`,
+    );
+  }
+
   if (fs.existsSync(distSourcePath)) {
     fs.unlinkSync(distSourcePath);
   }
 
   console.log(
-    `build-static: css/${SITE_CSS_SOURCE} -> css/${SITE_CSS_MIN} (${source.length} -> ${result.styles.length} bytes)`,
+    `build-static: css/${SITE_CSS_SOURCE} -> css/${SITE_CSS_MIN} (${siteSource.length} -> ${result.styles.length} bytes)`,
   );
 }
 
@@ -164,6 +181,13 @@ function bustAssetUrls(html, assetVersion, assetsCdnBase) {
   nextHtml = nextHtml.replace(
     new RegExp(`(${cssMinLocalEscaped}|/css/${SITE_CSS_SOURCE.replace('.', '\\.')})(?:\\?v=[^"']*)?`, 'g'),
     `${cssMinLocal}?v=${assetVersion}`,
+  );
+
+  const legalCssMinLocal = `/css/${LEGAL_CSS_MIN}`;
+  const legalCssMinLocalEscaped = legalCssMinLocal.replace(/\//g, '\\/');
+  nextHtml = nextHtml.replace(
+    new RegExp(`(${legalCssMinLocalEscaped})(?:\\?v=[^"']*)?`, 'g'),
+    `${legalCssMinLocal}?v=${assetVersion}`,
   );
 
   for (const scriptName of CDN_VENDOR_JS) {
@@ -350,9 +374,15 @@ function runBuild() {
     const pagePath = getPagePath(htmlPath, distDir);
     pagePaths.push(pagePath);
 
-    // Legal documents are standalone converted HTML files. Publish them with
-    // the site, but do not inject landing-page analytics, OG or JSON-LD.
+    // Legal documents are standalone converted HTML files. Version their CSS,
+    // but do not inject landing-page analytics, OG or JSON-LD.
     if (pagePath.startsWith('/documents/')) {
+      const html = bustAssetUrls(
+        fs.readFileSync(htmlPath, 'utf8'),
+        assetVersion,
+        assetsCdnBase,
+      );
+      fs.writeFileSync(htmlPath, html, 'utf8');
       continue;
     }
 
