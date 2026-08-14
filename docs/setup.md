@@ -192,8 +192,8 @@ yc storage bucket update zvenfit-estetika-frontend \
 index.html
 form/index.html
 404.html
-documents/privacy-policy.html
-documents/personal-data-processing.html
+privacy/index.html
+personal-data-processing/index.html
 robots.txt
 sitemap.xml
 css/zvenfit-kosmetologiya.webflow.min.css
@@ -201,6 +201,8 @@ js/*.js (скрипты приложения без CDN-библиотек)
 ```
 
 В нём не должно быть `images/`, `fonts/`, сторонних CSS, исходного CSS сайта и CDN-библиотек.
+Старые ключи `documents/privacy-policy.html` и `documents/personal-data-processing.html` в `dist/`
+не входят: после загрузки HTML деплой создаёт на их месте S3 website redirect objects с HTTP 301.
 
 ### Загрузка изменяемых ассетов
 
@@ -241,6 +243,7 @@ npm run deploy:yc
 6. Отключите принудительный browser TTL: браузер должен получать `Cache-Control` объектов из бакета.
 7. Добавьте query-параметр `v` в whitelist ключа кеша, чтобы `app.js?v=1` и `app.js?v=2` считались разными объектами.
 8. Проверьте, что неизвестные пути отдают `/404.html` с HTTP 404 и `Cache-Control: no-cache, must-revalidate`.
+9. Проверьте HTTP 301 со старых `/documents/*.html` на `/privacy/` и `/personal-data-processing/`.
 
 CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-revalidate`, а версионированные CSS/JS — с `public, max-age=31536000, immutable`. После изменения CDN-настроек или первого деплоя очистите кеш ресурса. Значение `ASSET_VERSION`, переданное через окружение или GitHub Variables, должно меняться при каждом релизе с изменениями CSS/JS.
 

@@ -28,7 +28,7 @@
 |------|------------|
 | `public/` | Версионируемые HTML, CSS сайта, JS приложения, robots и sitemap |
 | `public/form/` | Страница формы заявки |
-| `public/documents/` | Юридические HTML-страницы без инъекций лендинга |
+| `public/privacy/`, `public/personal-data-processing/` | Юридические страницы с чистыми URL без инъекций лендинга |
 | `functions/telegram-lead/src/index.ts` | Точка входа Cloud Function, реэкспорт обработчика |
 | `functions/telegram-lead/src/handler.ts` | HTTP, валидация, идемпотентность и retry timer |
 | `functions/telegram-lead/src/ydb/` | Миграции, бессрочные заявки/подписки, индексированная очередь и rate limit |
@@ -41,7 +41,7 @@
 | `upload/` | Локальная папка для сырого экспорта Webflow, исключена из Git |
 | `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
 
-Основные маршруты: `/`, `/form/`, `/404.html` и две страницы в `/documents/`.
+Основные маршруты: `/`, `/form/`, `/privacy/`, `/personal-data-processing/` и `/404.html`.
 
 ## Требования
 

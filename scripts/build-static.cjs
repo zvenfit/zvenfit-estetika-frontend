@@ -18,6 +18,7 @@ const SITE_CSS_SOURCE = 'zvenfit-kosmetologiya.webflow.css';
 const SITE_CSS_MIN = 'zvenfit-kosmetologiya.webflow.min.css';
 const LEGAL_CSS_MIN = 'legal-documents.min.css';
 const LEGAL_CSS_MARKER = '/* Branded editorial layout for legal documents converted from office files. */';
+const LEGAL_PAGE_PATHS = new Set(['/privacy/', '/personal-data-processing/']);
 const CDN_VENDOR_JS = [
   'jquery-3.5.1.min.js',
   'imask-7.6.1.min.js',
@@ -385,7 +386,7 @@ function runBuild() {
 
     // Legal documents are standalone converted HTML files. Version their CSS,
     // but do not inject landing-page analytics, OG or JSON-LD.
-    if (pagePath.startsWith('/documents/')) {
+    if (LEGAL_PAGE_PATHS.has(pagePath)) {
       const html = bustAssetUrls(
         stripOfficeMetadata(fs.readFileSync(htmlPath, 'utf8')),
         assetVersion,

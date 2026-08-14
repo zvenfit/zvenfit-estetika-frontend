@@ -31,8 +31,8 @@ for (const rel of [
   '404.html',
   'robots.txt',
   'sitemap.xml',
-  'documents/privacy-policy.html',
-  'documents/personal-data-processing.html',
+  'privacy/index.html',
+  'personal-data-processing/index.html',
   'css/zvenfit-kosmetologiya.webflow.min.css',
   'css/legal-documents.min.css',
 ]) read(rel);
@@ -174,21 +174,41 @@ if (!homePage.includes('class="mobile-booking-cta"')) {
   throw new Error('check-build: mobile booking CTA is missing');
 }
 
-const legal = read('documents/privacy-policy.html');
-if (legal.includes('ZvenFit Estetika: analytics') || legal.includes('application/ld+json')) {
-  throw new Error('check-build: legal document received landing-page injections');
+for (const { rel, canonical } of [
+  { rel: 'privacy/index.html', canonical: 'https://estetika.zvenfit.ru/privacy/' },
+  {
+    rel: 'personal-data-processing/index.html',
+    canonical: 'https://estetika.zvenfit.ru/personal-data-processing/',
+  },
+]) {
+  const legal = read(rel);
+  if (legal.includes('ZvenFit Estetika: analytics') || legal.includes('application/ld+json')) {
+    throw new Error(`check-build: legal document received landing-page injections: ${rel}`);
+  }
+  if (
+    !legal.includes('/css/zvenfit-kosmetologiya.webflow.min.css?v=') ||
+    !legal.includes('/css/legal-documents.min.css?v=')
+  ) {
+    throw new Error(`check-build: legal document CSS is missing or has no cache version: ${rel}`);
+  }
+  if (!legal.includes(`<link rel="canonical" href="${canonical}">`)) {
+    throw new Error(`check-build: legal document has an incorrect canonical URL: ${rel}`);
+  }
+  if (!legal.includes('<span>ЗВЕНФИТ ЭСТЕТИКА</span>')) {
+    throw new Error(`check-build: legal footer has an incorrect brand name: ${rel}`);
+  }
+  if (/<meta name="(?:Author|LastAuthor|Generator)"|<style type="text\/css">/i.test(legal)) {
+    throw new Error(`check-build: office metadata or inline export styles remain in ${rel}`);
+  }
 }
-if (
-  !legal.includes('/css/zvenfit-kosmetologiya.webflow.min.css?v=') ||
-  !legal.includes('/css/legal-documents.min.css?v=')
-) {
-  throw new Error('check-build: legal document CSS is missing or has no cache version');
-}
-if (!legal.includes('<span>ЗВЕНФИТ ЭСТЕТИКА</span>')) {
-  throw new Error('check-build: legal footer has an incorrect brand name');
-}
-if (/<meta name="(?:Author|LastAuthor|Generator)"|<style type="text\/css">/i.test(legal)) {
-  throw new Error('check-build: office metadata or inline export styles remain in legal output');
+
+for (const legacyRel of [
+  'documents/privacy-policy.html',
+  'documents/personal-data-processing.html',
+]) {
+  if (files.includes(legacyRel)) {
+    throw new Error(`check-build: legacy legal document must not be present in dist: ${legacyRel}`);
+  }
 }
 
 const notFound = read('404.html');

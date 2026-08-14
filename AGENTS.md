@@ -127,7 +127,9 @@ npm run test:visual    # необязательное локальное сра�
 
 Основные страницы: `index.html`, `form/index.html`, `404.html`.
 
-Юридические HTML разворачиваются вместе с сайтом: `documents/privacy-policy.html`, `documents/personal-data-processing.html`.
+Юридические HTML разворачиваются вместе с сайтом как `privacy/index.html` и
+`personal-data-processing/index.html`, поэтому публичные URL не содержат расширение `.html`.
+Старые адреса в `/documents/*.html` сохраняются только как постоянные S3 website redirects.
 
 ## Документация
 

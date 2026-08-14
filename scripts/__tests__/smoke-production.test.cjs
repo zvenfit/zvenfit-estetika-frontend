@@ -29,10 +29,15 @@ test('production smoke uses only read-only GET and OPTIONS requests', async () =
   const routes = new Map([
     ['https://estetika.zvenfit.ru/', response(200, '<main>home</main>')],
     ['https://estetika.zvenfit.ru/form/', response(200, '<form id="wf-form-tg-send"></form>')],
-    ['https://estetika.zvenfit.ru/documents/privacy-policy.html', response(200, '<html></html>')],
+    ['https://estetika.zvenfit.ru/privacy/', response(200, '<html></html>')],
+    ['https://estetika.zvenfit.ru/personal-data-processing/', response(200, '<html></html>')],
+    [
+      'https://estetika.zvenfit.ru/documents/privacy-policy.html',
+      response(301, '', { location: '/privacy/' }),
+    ],
     [
       'https://estetika.zvenfit.ru/documents/personal-data-processing.html',
-      response(200, '<html></html>'),
+      response(301, '', { location: '/personal-data-processing/' }),
     ],
     ['https://estetika.zvenfit.ru/codex-production-smoke-not-found', response(404, 'not found')],
     ['https://estetika.zvenfit.ru/robots.txt', response(200, 'Sitemap: https://estetika.zvenfit.ru/sitemap.xml')],
@@ -49,7 +54,7 @@ test('production smoke uses only read-only GET and OPTIONS requests', async () =
   const result = await runSmoke({
     leadApiUrl: 'https://lead.example.test/',
     fetchImpl: async (url, options = {}) => {
-      requests.push({ method: options.method || 'GET', url });
+      requests.push({ method: options.method || 'GET', redirect: options.redirect, url });
       const route = routes.get(url);
       assert.ok(route, `unexpected request: ${options.method || 'GET'} ${url}`);
       return route;
@@ -62,7 +67,14 @@ test('production smoke uses only read-only GET and OPTIONS requests', async () =
   assert.equal(result.origin, 'https://estetika.zvenfit.ru');
   assert.deepEqual(
     requests.map(item => item.method),
-    ['GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'OPTIONS'],
+    ['GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'GET', 'OPTIONS'],
   );
   assert.ok(requests.every(item => item.method !== 'POST'));
+  assert.deepEqual(
+    requests.filter(item => item.redirect === 'manual').map(item => item.url),
+    [
+      'https://estetika.zvenfit.ru/documents/privacy-policy.html',
+      'https://estetika.zvenfit.ru/documents/personal-data-processing.html',
+    ],
+  );
 });
