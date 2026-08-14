@@ -14,7 +14,7 @@ const SUBMISSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORM_TYPES = new Set<FormType>(['lead', 'newsletter']);
 const SERVICES = new Set(['Позвонить', 'WhatsApp', 'Макс', 'Telegram']);
-export const CONSENT_VERSION = '2026-08-14';
+export const CONSENT_VERSION = '2026-08-14-v2';
 
 export const TRACKED_UTM_PARAMS: readonly UtmKey[] = [
   'utm_source',

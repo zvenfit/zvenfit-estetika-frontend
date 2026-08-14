@@ -84,13 +84,13 @@ for (const rel of ['index.html', 'form/index.html']) {
     throw new Error(`check-build: ${rel} has no safe no-JS fallback`);
   }
   if (
-    !html.includes('data-consent-version="2026-08-14"') ||
-    !/<input[^>]*name=["']personal_data_consent["'][^>]*type=["']checkbox["'][^>]*required/i.test(html)
+    !html.includes('data-consent-version="2026-08-14-v2"') ||
+    !html.includes('data-consent-mode="submit"')
   ) {
-    throw new Error(`check-build: ${rel} has no required versioned personal-data consent`);
+    throw new Error(`check-build: ${rel} has no versioned submit consent`);
   }
-  if (/<input[^>]*name=["'](?:personal_data_consent|marketing_consent)["'][^>]*checked/i.test(html)) {
-    throw new Error(`check-build: ${rel} preselects a consent checkbox`);
+  if (/<input[^>]*name=["'](?:personal_data_consent|marketing_consent)["']/i.test(html)) {
+    throw new Error(`check-build: ${rel} unexpectedly contains a consent checkbox`);
   }
 
   if (
@@ -150,8 +150,8 @@ if (!homePage.includes('<label class="visually-hidden" for="phone">Номер т
 if (/gsap|ScrollTrigger/i.test(homePage)) {
   throw new Error('check-build: home page still loads the removed motion libraries');
 }
-if (!/<input[^>]*name=["']marketing_consent["'][^>]*type=["']checkbox["'][^>]*required/i.test(homePage)) {
-  throw new Error('check-build: newsletter has no separate required marketing consent');
+if (!homePage.includes('data-marketing-consent="submit"')) {
+  throw new Error('check-build: newsletter has no marketing consent on submit');
 }
 for (const motionHook of [
   '61539419-ce88-ac6e-2be5-a18971d536e7',

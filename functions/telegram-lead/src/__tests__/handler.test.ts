@@ -32,7 +32,7 @@ function postEvent(overrides: Record<string, unknown> = {}, ip = '198.51.100.10'
       service: 'WhatsApp',
       telegram_username: '',
       utm: { utm_source: 'test', ignored: 'drop' },
-      consents: { version: '2026-08-14', personal_data: true, marketing: false },
+      consents: { version: '2026-08-14-v2', personal_data: true, marketing: false },
       ...overrides,
     }),
   };
@@ -48,7 +48,7 @@ function claimedSubmission(overrides: Partial<ClaimedSubmission> = {}): ClaimedS
     service: 'WhatsApp',
     telegramUsername: '',
     utm: { utm_source: 'test' },
-    consents: { version: '2026-08-14', personalData: true, marketing: false },
+    consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
     telegramAttempts: 1,
     ...overrides,
   };
@@ -116,7 +116,7 @@ test('POST persists a pending lead and returns before Telegram delivery', async 
   const saved = calls[0]?.[1] as Submission;
   assert.deepEqual(saved.utm, { utm_source: 'test' });
   assert.deepEqual(saved.consents, {
-    version: '2026-08-14',
+    version: '2026-08-14-v2',
     personalData: true,
     marketing: false,
   });
@@ -148,7 +148,7 @@ test('POST stores a newsletter subscription for asynchronous delivery', async ()
         form_type: 'newsletter',
         name: 'drop',
         service: 'drop',
-        consents: { version: '2026-08-14', personal_data: true, marketing: true },
+        consents: { version: '2026-08-14-v2', personal_data: true, marketing: true },
       }),
     ),
   );
@@ -276,7 +276,7 @@ test('rejects origin, honeypot, malformed values and oversized bodies', async ()
   const invalidId = httpResponse(await handler(postEvent({ submission_id: 'invalid' })));
   const invalidService = httpResponse(await handler(postEvent({ service: 'Unknown' })));
   const missingPersonalDataConsent = httpResponse(
-    await handler(postEvent({ consents: { version: '2026-08-14', personal_data: false } })),
+    await handler(postEvent({ consents: { version: '2026-08-14-v2', personal_data: false } })),
   );
   const staleConsentVersion = httpResponse(
     await handler(postEvent({ consents: { version: 'old', personal_data: true } })),
@@ -285,7 +285,7 @@ test('rejects origin, honeypot, malformed values and oversized bodies', async ()
     await handler(
       postEvent({
         form_type: 'newsletter',
-        consents: { version: '2026-08-14', personal_data: true, marketing: false },
+        consents: { version: '2026-08-14-v2', personal_data: true, marketing: false },
       }),
     ),
   );

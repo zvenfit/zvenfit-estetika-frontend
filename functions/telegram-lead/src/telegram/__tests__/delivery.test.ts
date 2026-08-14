@@ -20,7 +20,7 @@ test('message supports lead and newsletter payloads without leaking delivery sta
     service: 'Telegram',
     telegramUsername: '@username',
     utm: { utm_source: 'test' },
-    consents: { version: '2026-08-14', personalData: true, marketing: false },
+    consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
     telegramAttempts: 2,
   });
   const newsletter = buildMessage({
@@ -32,7 +32,7 @@ test('message supports lead and newsletter payloads without leaking delivery sta
     service: 'Рассылка',
     telegramUsername: '',
     utm: {},
-    consents: { version: '2026-08-14', personalData: true, marketing: true },
+    consents: { version: '2026-08-14-v2', personalData: true, marketing: true },
     telegramAttempts: 1,
   });
 
@@ -116,7 +116,7 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
           service: 'Позвонить',
           telegramUsername: '',
           utm: {},
-          consents: { version: '2026-08-14', personalData: true, marketing: false },
+          consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
           telegramAttempts: 1,
         },
         requestFactory,
@@ -174,7 +174,7 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
         service: 'Рассылка',
         telegramUsername: '',
         utm: {},
-        consents: { version: '2026-08-14', personalData: true, marketing: true },
+        consents: { version: '2026-08-14-v2', personalData: true, marketing: true },
         telegramAttempts: 1,
       },
       requestFactory,

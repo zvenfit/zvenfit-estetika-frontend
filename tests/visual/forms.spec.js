@@ -25,13 +25,12 @@ test('lead form submits once and shows the accepted state', async ({ page }) => 
   await page.locator('[name="phone"]').fill('9991234567');
   await page.locator('#custom-select').click();
   await page.locator('[data-value="WhatsApp"]').click();
-  await page.locator('[name="personal_data_consent"]').check();
   await page.locator('#wf-form-tg-send [type="submit"]').click();
 
   await expect(page.locator('#tg-send .success-message')).toBeVisible();
   expect(requests).toBe(1);
   expect(payload.consents).toEqual({
-    version: '2026-08-14',
+    version: '2026-08-14-v2',
     personal_data: true,
     marketing: false,
   });
@@ -50,15 +49,13 @@ test('newsletter explains rate limiting and moves focus to the error', async ({ 
   await page.goto('/');
 
   await page.locator('#wf-form-Form [name="phone"]').fill('9991234567');
-  await page.locator('#wf-form-Form [name="personal_data_consent"]').check();
-  await page.locator('#wf-form-Form [name="marketing_consent"]').check();
   await page.locator('#wf-form-Form [type="submit"]').click();
 
   const error = page.locator('#newsletter-send .error-message');
   await expect(error).toContainText('Подождите 10 минут');
   await expect(error).toBeFocused();
   expect(payload.consents).toEqual({
-    version: '2026-08-14',
+    version: '2026-08-14-v2',
     personal_data: true,
     marketing: true,
   });

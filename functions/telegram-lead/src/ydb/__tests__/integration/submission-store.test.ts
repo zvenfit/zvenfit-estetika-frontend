@@ -22,7 +22,7 @@ function submission(submissionId: string, createdAt: Date): Submission {
     service: 'Рассылка',
     telegramUsername: '',
     utm: { utm_source: 'integration' },
-    consents: { version: '2026-08-14', personalData: true, marketing: true },
+    consents: { version: '2026-08-14-v2', personalData: true, marketing: true },
   };
 }
 

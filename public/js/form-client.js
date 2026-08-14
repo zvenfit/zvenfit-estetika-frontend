@@ -98,7 +98,7 @@
               ? window.__ZVENFIT_CREATE_SUBMISSION_ID()
               : ''),
       );
-      payload.consents = { version: form.dataset.consentVersion, personal_data: form.elements.personal_data_consent.checked, marketing: !!form.elements.marketing_consent?.checked };
+      payload.consents = { version: form.dataset.consentVersion, personal_data: form.dataset.consentMode === 'submit', marketing: form.dataset.marketingConsent === 'submit' };
       const utm = attribution();
       if (utm && Object.keys(utm).length) {
         payload.utm = utm;
