@@ -39,6 +39,9 @@
   outline: none;
   transition: border-color 0.2s ease;
 }
+.custom-select:not(:has([role="option"][aria-selected="true"])) .select-selected {
+  color: #999;
+}
 /* Состояния active, focus и focus-keyboard (акцентируются цветом powder) */
 .select-selected:focus,
 .select-selected:active,

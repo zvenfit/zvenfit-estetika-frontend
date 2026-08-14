@@ -23,8 +23,10 @@ test('lead form submits once and shows the accepted state', async ({ page }) => 
 
   await page.locator('[name="name"]').fill('Анна');
   await page.locator('[name="phone"]').fill('9991234567');
+  await expect(page.locator('#custom-select')).toHaveCSS('color', 'rgb(153, 153, 153)');
   await page.locator('#custom-select').click();
   await page.locator('[data-value="WhatsApp"]').click();
+  await expect(page.locator('#custom-select')).toHaveCSS('color', 'rgb(22, 22, 22)');
   await page.locator('#wf-form-tg-send [type="submit"]').click();
 
   await expect(page.locator('#tg-send .success-message')).toBeVisible();
@@ -49,6 +51,11 @@ test('newsletter explains rate limiting and moves focus to the error', async ({ 
   await page.goto('/');
 
   await page.locator('#wf-form-Form [name="phone"]').fill('9991234567');
+  const consentLinks = page.locator('#wf-form-Form .inst-warning.form a');
+  await expect(consentLinks).toHaveCount(2);
+  for (const link of await consentLinks.all()) {
+    await expect(link).toHaveCSS('color', 'rgb(187, 122, 140)');
+  }
   await page.locator('#wf-form-Form [type="submit"]').click();
 
   const error = page.locator('#newsletter-send .error-message');
