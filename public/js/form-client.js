@@ -1,8 +1,8 @@
 (function () {
   'use strict';
 
-  const requestTimeoutMs = 15000;
-  const successMessageMs = 5000;
+  const timeoutMs = 15000;
+  const successMs = 5000;
   function attribution() {
     const source = window.__ZVENFIT_ATTRIBUTION;
     if (source && typeof source.sync === 'function') {
@@ -30,7 +30,7 @@
   }
   async function post(apiUrl, payload) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       return await fetch(apiUrl, {
@@ -134,7 +134,7 @@
         state('success');
         successTimer = setTimeout(function () {
           state(null);
-        }, successMessageMs);
+        }, successMs);
       } catch (error) {
         state(
           'error',
