@@ -61,11 +61,20 @@ async function runSmoke({
     if (!pattern.test(body)) throw new Error(`${pathname} does not contain the expected page marker`);
     return response;
   };
+  const assertRedirect = async (pathname, targetPathname) => {
+    const response = await fetchChecked(`${origin}${pathname}`, { redirect: 'manual' }, [301]);
+    const location = response.headers.get('location');
+    if (!location || new URL(location, origin).href !== `${origin}${targetPathname}`) {
+      throw new Error(`${pathname} redirects to ${location || 'nothing'} instead of ${targetPathname}`);
+    }
+  };
 
   const home = await assertPage('/', /<main[\s>]/i);
   await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
-  await assertPage('/documents/privacy-policy.html', /<html/i);
-  await assertPage('/documents/personal-data-processing.html', /<html/i);
+  await assertPage('/privacy/', /<html/i);
+  await assertPage('/personal-data-processing/', /<html/i);
+  await assertRedirect('/documents/privacy-policy.html', '/privacy/');
+  await assertRedirect('/documents/personal-data-processing.html', '/personal-data-processing/');
   await fetchChecked(`${origin}/codex-production-smoke-not-found`, {}, [404]);
 
   const robots = await fetchChecked(`${origin}/robots.txt`);

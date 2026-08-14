@@ -167,7 +167,7 @@
 
 - [x] Ссылки на CDN `zvenfit-estetika/` зафиксированы в `public/`
 - [x] CI загружает полный `dist/` в бакет сайта, HTML — с `no-cache`
-- [x] Юридические документы переименованы в `privacy-policy.html` и `personal-data-processing.html`
+- [x] Юридические документы опубликованы по чистым URL `/privacy/` и `/personal-data-processing/`; старые `.html`-адреса перенаправляются с HTTP 301
 - [x] Telegram-обработчик поддерживает заявки, рассылку и блок UTM в сообщении
 - [x] Страница `404.html` закрыта от индексации
 

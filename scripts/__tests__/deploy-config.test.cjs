@@ -1,9 +1,13 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const { REQUIRED, validate } = require('../check-deploy-config.cjs');
+
+const rootDir = path.join(__dirname, '..', '..');
 
 function validEnvironment() {
   return {
@@ -44,4 +48,24 @@ test('deploy preflight validates formats without returning secret values', () =>
       'YANDEX_METRIKA_ID',
     ],
   });
+});
+
+test('site deploy preserves permanent redirects from legacy legal document URLs', () => {
+  const workflow = fs.readFileSync(path.join(rootDir, '.github', 'workflows', 'main.yml'), 'utf8');
+  const redirectScript = fs.readFileSync(
+    path.join(rootDir, 'scripts', 'upload-legacy-redirects.sh'),
+    'utf8',
+  );
+  const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+
+  for (const [legacyKey, targetPath] of [
+    ['documents/privacy-policy.html', '/privacy/'],
+    ['documents/personal-data-processing.html', '/personal-data-processing/'],
+  ]) {
+    assert.ok(workflow.includes(`s3://\${{ env.S3_BUCKET }}/${legacyKey}`));
+    assert.ok(workflow.includes(`--website-redirect ${targetPath}`));
+    assert.ok(redirectScript.includes(`upload_redirect "${legacyKey}" "${targetPath}"`));
+  }
+
+  assert.match(packageJson.scripts['deploy:yc'], /bash scripts\/upload-legacy-redirects\.sh$/);
 });

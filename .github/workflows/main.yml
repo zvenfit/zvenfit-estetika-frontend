@@ -236,6 +236,34 @@ jobs:
             --cache-control "no-cache, must-revalidate"
             --metadata-directive REPLACE
 
+      - name: Redirect legacy privacy policy URL
+        uses: docker://amazon/aws-cli:2.25.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          AWS_REGION: ru-1
+          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
+        with:
+          args: >
+            s3 cp ./scripts/redirect-object.html s3://${{ env.S3_BUCKET }}/documents/privacy-policy.html
+            --website-redirect /privacy/
+            --cache-control "no-cache, must-revalidate"
+            --content-type text/html
+
+      - name: Redirect legacy personal data processing URL
+        uses: docker://amazon/aws-cli:2.25.1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          AWS_REGION: ru-1
+          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
+        with:
+          args: >
+            s3 cp ./scripts/redirect-object.html s3://${{ env.S3_BUCKET }}/documents/personal-data-processing.html
+            --website-redirect /personal-data-processing/
+            --cache-control "no-cache, must-revalidate"
+            --content-type text/html
+
       - name: Smoke production deployment
         env:
           SITE_URL: https://estetika.zvenfit.ru
