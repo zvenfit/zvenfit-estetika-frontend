@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { getDefaultResultOrder } from 'node:dns';
+import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import test from 'node:test';
 
 import { buildMessage, retryBatchSize, sendTelegram, telegramTimeoutMs } from '../delivery';
@@ -83,41 +85,102 @@ test('Telegram worker uses a small configurable retry batch', () => {
   }
 });
 
-test('Telegram network failures preserve a safe diagnostic code', async () => {
+test('Telegram forces an IPv4 socket and preserves a safe network diagnostic code', async () => {
   const previousToken = process.env.TELEGRAM_BOT_TOKEN;
   const previousChatId = process.env.TELEGRAM_CHAT_ID;
-  const previousFetch = globalThis.fetch;
+  let requestOptions: Record<string, unknown> = {};
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
-  globalThis.fetch = (async () => {
-    throw Object.assign(new TypeError('fetch failed'), {
-      cause: { code: 'UND_ERR_CONNECT_TIMEOUT' },
-    });
-  }) as typeof fetch;
+  const requestFactory = ((_url: URL, options: Record<string, unknown>) => {
+    requestOptions = options;
+    const request = new EventEmitter() as EventEmitter & { end: () => void };
+    request.end = () => {
+      process.nextTick(() => {
+        request.emit('error', Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' }));
+      });
+    };
+
+    return request;
+  }) as never;
 
   try {
     await assert.rejects(
-      sendTelegram({
-        submissionId: 'submission-network-test',
-        formType: 'lead',
-        createdAt: new Date('2026-08-09T00:00:00.000Z'),
-        name: 'Анна',
-        phone: '+79990000000',
-        service: 'Позвонить',
-        telegramUsername: '',
-        utm: {},
-        consents: { version: '2026-08-14', personalData: true, marketing: false },
-        telegramAttempts: 1,
-      }),
+      sendTelegram(
+        {
+          submissionId: 'submission-network-test',
+          formType: 'lead',
+          createdAt: new Date('2026-08-09T00:00:00.000Z'),
+          name: 'Анна',
+          phone: '+79990000000',
+          service: 'Позвонить',
+          telegramUsername: '',
+          utm: {},
+          consents: { version: '2026-08-14', personalData: true, marketing: false },
+          telegramAttempts: 1,
+        },
+        requestFactory,
+      ),
       (error: unknown) =>
         error instanceof Error &&
         'code' in error &&
-        error.code === 'telegram_und_err_connect_timeout' &&
+        error.code === 'telegram_etimedout' &&
         !error.message.includes(process.env.TELEGRAM_BOT_TOKEN ?? ''),
     );
+    assert.equal(requestOptions.family, 4);
   } finally {
-    globalThis.fetch = previousFetch;
+    if (previousToken === undefined) {
+      delete process.env.TELEGRAM_BOT_TOKEN;
+    } else {
+      process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    }
+    if (previousChatId === undefined) {
+      delete process.env.TELEGRAM_CHAT_ID;
+    } else {
+      process.env.TELEGRAM_CHAT_ID = previousChatId;
+    }
+  }
+});
+
+test('Telegram accepts a successful bounded JSON response over the IPv4 request', async () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  let requestBody = '';
+
+  process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  const requestFactory = ((_url: URL, _options: Record<string, unknown>, callback: Function) => {
+    const request = new EventEmitter() as EventEmitter & { end: (body: string) => void };
+    request.end = body => {
+      requestBody = body;
+      const response = new Readable({ read() {} }) as Readable & { statusCode: number };
+      response.statusCode = 200;
+      callback(response);
+      response.push('{"ok":true}');
+      response.push(null);
+    };
+
+    return request;
+  }) as never;
+
+  try {
+    await sendTelegram(
+      {
+        submissionId: 'submission-success-test',
+        formType: 'newsletter',
+        createdAt: new Date('2026-08-09T00:00:00.000Z'),
+        name: '',
+        phone: '+79990000000',
+        service: 'Рассылка',
+        telegramUsername: '',
+        utm: {},
+        consents: { version: '2026-08-14', personalData: true, marketing: true },
+        telegramAttempts: 1,
+      },
+      requestFactory,
+    );
+    assert.equal(JSON.parse(requestBody).chat_id, '-1001234567890');
+  } finally {
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
     } else {
