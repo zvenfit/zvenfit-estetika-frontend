@@ -2,10 +2,12 @@
 # Create site bucket (CI deploy) + assets bucket (direct object publishing).
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SITE_BUCKET="${YC_S3_BUCKET:-zvenfit-estetika-frontend}"
 ASSETS_BUCKET="${YC_ASSETS_BUCKET:-zvenfit-estetika}"
 FOLDER_ID="${YC_FOLDER_ID:-}"
 SA_NAME="${YC_SA_NAME:-github-ci-zvenfit-estetika}"
+WEBSITE_SETTINGS_FILE="${SCRIPT_DIR}/website-settings.json"
 
 if [[ -z "${FOLDER_ID}" ]]; then
   FOLDER_ID="$(yc config get folder-id 2>/dev/null || true)"
@@ -40,7 +42,7 @@ create_bucket() {
   if [[ "${website}" == "yes" ]]; then
     yc storage bucket update \
       --name "${name}" \
-      --website-settings '{"index":"index.html","error":"404.html"}'
+      --website-settings-from-file "${WEBSITE_SETTINGS_FILE}"
   fi
 
 }
