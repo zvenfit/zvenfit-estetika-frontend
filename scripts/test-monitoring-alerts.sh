@@ -5,6 +5,8 @@ LOG_GROUP_NAME="${YC_LOG_GROUP_NAME:-default}"
 APPLICATION_NAME="zvenfit-estetika-frontend"
 SERVICE_NAME="zvenfit-estetika-telegram-lead"
 MONITORING_ENVIRONMENT="production"
+RESOURCE_TYPE="serverless.function"
+RESOURCE_ID="zvenfit-estetika-telegram-lead"
 
 if [[ "${1:-}" != "--confirm" ]]; then
   echo "Usage: bash scripts/test-monitoring-alerts.sh --confirm" >&2
@@ -24,6 +26,8 @@ write_event() {
 
   yc logging write \
     --group-name="${LOG_GROUP_NAME}" \
+    --resource-type="${RESOURCE_TYPE}" \
+    --resource-id="${RESOURCE_ID}" \
     --level="${level}" \
     --message="${event}" \
     --json-payload="{\"application\":\"${APPLICATION_NAME}\",\"environment\":\"${MONITORING_ENVIRONMENT}\",\"service\":\"${SERVICE_NAME}\",\"event\":\"${event}\",\"synthetic\":true,\"source\":\"monitoring-smoke-test\"${extra}}"

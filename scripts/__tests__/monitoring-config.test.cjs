@@ -249,6 +249,10 @@ test('safe smoke script exercises only synthetic application events', () => {
   assert.match(smokeScript, /\\"service\\":\\"\$\{SERVICE_NAME\}\\"/);
   assert.match(smokeScript, /MONITORING_ENVIRONMENT="production"/);
   assert.doesNotMatch(smokeScript, /MONITORING_ENVIRONMENT="\$\{NODE_ENV/);
+  assert.match(smokeScript, /RESOURCE_TYPE="serverless\.function"/);
+  assert.match(smokeScript, /RESOURCE_ID="zvenfit-estetika-telegram-lead"/);
+  assert.match(smokeScript, /--resource-type="\$\{RESOURCE_TYPE\}"/);
+  assert.match(smokeScript, /--resource-id="\$\{RESOURCE_ID\}"/);
   assert.match(smokeScript, /\\"synthetic\\":true/);
   assert.doesNotMatch(smokeScript, /retry_worker_completed/);
   assert.doesNotMatch(smokeScript, /TELEGRAM_BOT_TOKEN|telegram_username|phone|utm|\\"name\\"/i);

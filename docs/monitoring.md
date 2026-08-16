@@ -169,8 +169,10 @@ display names, selectors, thresholds, delay/no-data, labels, channels, policy и
 
 ## Безопасная проверка
 
-Smoke всегда пишет `environment=production`, независимо от локального `NODE_ENV`, и содержит только
-синтетические технические события без заявок и персональных данных. Он
+Smoke всегда пишет `environment=production`, независимо от локального `NODE_ENV`, и явно передаёт
+`resource_type=serverless.function` / `resource_id=zvenfit-estetika-telegram-lead`, чтобы записи
+совпадали с resource-aware selectors log metrics. Он содержит только синтетические технические
+события без заявок и персональных данных. Smoke
 намеренно переводит application log alerts в Warning/Alarm, поэтому требует явного подтверждения:
 
 ```bash
