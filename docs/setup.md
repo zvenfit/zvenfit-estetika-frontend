@@ -112,8 +112,8 @@ yc iam workload-identity federated-credential create \
 Workflow получает GitHub OIDC JWT и выбирает audience конкретной identity. Перед положительным
 обменом verifier JWT CI обязан доказать, что тот же token отклоняется для `DEPLOY_SA_ID`. Forbidden
 ID передаётся output-ом из `production` preflight, а не дублируется переменной
-`production-verify`; тест принимает только ожидаемый `HTTP 400 invalid_grant`, а любой другой
-4xx/5xx/network response завершает job ошибкой.
+`production-verify`; тест принимает только ожидаемый `HTTP 401` OAuth denial с JSON error и без
+`access_token`, а любой другой 4xx/5xx/network response завершает job ошибкой.
 После обмена OIDC request variables удаляются из окружения шага, исполняющего verifier artifact.
 `VERIFY_SA_ID` имеет доступ только к Estetika YDB; `DEPLOY_SA_ID` создаёт версию только
 Estetika-функции и выпускает одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA

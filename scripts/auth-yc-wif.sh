@@ -63,20 +63,22 @@ if [[ -n "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
     echo 'auth-yc-wif: FAILED; OIDC subject can target the forbidden service account' >&2
     exit 1
   fi
-  if [[ "${FORBIDDEN_HTTP_STATUS}" != '400' ]] || ! node -e '
+  if [[ "${FORBIDDEN_HTTP_STATUS}" != '401' ]] || ! FORBIDDEN_ERROR="$(node -e '
 let response;
 try {
   response = JSON.parse(process.argv[1]);
 } catch {
   process.exit(1);
 }
-if (response.error !== "invalid_grant") process.exit(1);
-' "${FORBIDDEN_BODY}"; then
+if (typeof response.error !== "string" || !/^[a-z][a-z0-9_]{0,63}$/.test(response.error)) process.exit(1);
+if (Object.hasOwn(response, "access_token")) process.exit(1);
+process.stdout.write(response.error);
+' "${FORBIDDEN_BODY}")"; then
     echo "auth-yc-wif: unexpected forbidden exchange response (HTTP ${FORBIDDEN_HTTP_STATUS})" >&2
     exit 1
   fi
-  echo 'auth-yc-wif: forbidden cross-service-account exchange rejected (HTTP 400 invalid_grant)'
-  unset FORBIDDEN_RESPONSE FORBIDDEN_HTTP_STATUS FORBIDDEN_BODY
+  echo "auth-yc-wif: forbidden cross-service-account exchange rejected (HTTP 401 ${FORBIDDEN_ERROR})"
+  unset FORBIDDEN_RESPONSE FORBIDDEN_HTTP_STATUS FORBIDDEN_BODY FORBIDDEN_ERROR
 fi
 
 echo 'auth-yc-wif: exchanging the GitHub OIDC token for a Yandex Cloud IAM token'

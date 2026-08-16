@@ -30,7 +30,7 @@ Federation `zvenfit-estetika-production-github` связана с deploy SA subj
 subject
 `repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify`.
 Verifier job получает deploy SA ID из проверенного `production` preflight, принимает только
-ожидаемый `HTTP 400 invalid_grant` при негативной попытке обмена своего JWT на deploy SA, а затем удаляет GitHub OIDC
+ожидаемый `HTTP 401` OAuth denial при негативной попытке обмена своего JWT на deploy SA, а затем удаляет GitHub OIDC
 request variables перед запуском verifier artifact. В `production-verify` нет runtime/application
 secrets; прежний verifier credential с `production` subject отозван после успешной проверки.
 `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
