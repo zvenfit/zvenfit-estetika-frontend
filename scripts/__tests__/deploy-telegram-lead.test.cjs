@@ -36,6 +36,15 @@ test('production deploy jobs wait for quality checks', () => {
   assert.match(workflow.slice(siteDeploy, smoke), /needs: \[deploy-function, build-site\]/);
 });
 
+test('pull requests run quality only and cannot enter a production environment', () => {
+  const quality = workflow.slice(workflow.indexOf('  quality-checks:'), workflow.indexOf('  deploy-preflight:'));
+  const preflight = workflow.slice(workflow.indexOf('  deploy-preflight:'), workflow.indexOf('  verify-ydb:'));
+
+  assert.match(workflow, /pull_request:\s+branches:\s+- main/);
+  assert.doesNotMatch(quality, /environment: production|id-token: write/);
+  assert.match(preflight, /if: github\.event_name != 'pull_request'/);
+});
+
 test('deploy fails fast on missing configuration and smoke-checks production', () => {
   assert.match(workflow, /deploy-preflight:[\s\S]*node scripts\/check-deploy-config\.cjs/);
   assert.match(workflow, /Smoke production deployment[\s\S]*node scripts\/smoke-production\.cjs/);

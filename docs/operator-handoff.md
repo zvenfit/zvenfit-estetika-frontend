@@ -11,6 +11,10 @@ credentials созданы 2026-08-16. Deploy использует GitHub Enviro
 — отдельный `production-verify`; оба разрешают только ветку `main`. В `production` настроены
 следующие Variables:
 
+`main` защищён active repository ruleset без bypass: required PR, зелёный `quality-checks`, одно
+approval с повторным approval последнего push, запрет force-push и удаления. Pull request не входит
+ни в один production Environment и не получает secrets/OIDC.
+
 - `YC_FOLDER_ID=b1ge1e4iopttj79hfdfm`;
 - `YC_DEPLOY_SERVICE_ACCOUNT_ID=ajeousto2q45k6b9as32`;
 - `YC_YDB_VERIFY_SERVICE_ACCOUNT_ID=ajed7h4ho8nu8pkruj6s`;

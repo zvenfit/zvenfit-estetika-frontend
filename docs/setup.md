@@ -390,6 +390,11 @@ output, application/runtime secrets туда не
 копируются. Не снимайте branch restriction: иначе ручной `workflow_dispatch` сможет получить WIF
 token из feature-ветки.
 
+Repository ruleset для `main` активен без bypass: изменения проходят только через pull request,
+требуют зелёный `quality-checks`, минимум одно approval и approval последнего push; удаление и
+force-push запрещены. На `pull_request` workflow выполняет только job без secrets/OIDC, а все
+production jobs начинаются лишь после merge/push в `main`.
+
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. Единственный production-домен проекта — `https://estetika.zvenfit.ru`. Вариант `www.estetika.zvenfit.ru` намеренно не поддерживается и не должен добавляться в DNS, TLS, CORS или CI. При добавлении или удалении другого домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
 После первого успешного WIF deploy удалите GitHub Secrets `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID` и

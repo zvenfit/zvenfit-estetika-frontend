@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -84,6 +87,7 @@ jobs:
 
   deploy-preflight:
     needs: quality-checks
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
     outputs:

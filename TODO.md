@@ -188,7 +188,7 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
 
 ## Чек-лист перед релизом
 
-- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 38 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
+- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 39 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
 - [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
 - [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)
