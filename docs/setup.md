@@ -76,6 +76,12 @@ RUNTIME_SA_ID="$(yc iam service-account get \
 Создайте отдельную federation для Estetika production и свяжите её только с subject GitHub
 Environment этого репозитория:
 
+В организации `zvenfit` OIDC subject использует numeric owner/repository IDs. Для этого
+репозитория production subject равен
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`.
+Стандартная форма без numeric IDs здесь не совпадает с JWT и не должна добавляться как
+альтернативный credential.
+
 ```bash
 yc iam workload-identity oidc federation create \
   --name zvenfit-estetika-production-github \
@@ -92,7 +98,7 @@ for WIF_SA_ID in "$DEPLOY_SA_ID" "$VERIFY_SA_ID"; do
     --service-account-id "$WIF_SA_ID" \
     --federation-id "$FEDERATION_ID" \
     --external-subject-id \
-    'repo:zvenfit/zvenfit-estetika-frontend:environment:production'
+    'repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production'
 done
 ```
 
@@ -206,7 +212,7 @@ binding, не изменяет timer и останавливает deploy с и�
 
 | Identity | Scope | Role / access | Зачем |
 | --- | --- | --- | --- |
-| deploy SA | federation credential | subject только `zvenfit-estetika-frontend:environment:production` | обмен GitHub OIDC на IAM token |
+| deploy SA | federation credential | точный subject `repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production` | обмен GitHub OIDC на IAM token |
 | deploy SA | `zvenfit-estetika-telegram-lead` | `functions.editor` | создавать версии своей функции |
 | deploy SA | runtime SA | `iam.serviceAccounts.user` | назначать runtime identity версии функции |
 | deploy SA | storage SA | `iam.serviceAccounts.ephemeralAccessKeyAdmin` | выпускать ephemeral key только для storage SA |

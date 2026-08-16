@@ -24,7 +24,7 @@ Cloud-side identities, resource bindings, Estetika federation и две federate
 - `MONIUM_API_KEY`.
 
 Federation `zvenfit-estetika-production-github` уже связана с deploy/verifier SA точным subject
-`repo:zvenfit/zvenfit-estetika-frontend:environment:production`. После успешного WIF deploy удалите
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`. После успешного WIF deploy удалите
 `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` из GitHub, отзовите их в Yandex Cloud и
 повторно запустите `npm run setup:storage` администраторской сессией: он оставит bucket ACL только
 storage SA и уберёт временно сохранённый legacy deploy-SA grant. Значения секретов в чат не
