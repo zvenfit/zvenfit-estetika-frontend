@@ -2,7 +2,6 @@ import { ExportResultCode } from '@opentelemetry/core';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
 import {
   AggregationTemporality,
-  InstrumentType,
   MeterProvider,
   MetricReader,
   type PushMetricExporter,
@@ -15,7 +14,6 @@ const METER_NAME = 'zvenfit-estetika-telegram-lead';
 const METER_VERSION = '1';
 
 export interface MetricsTransport {
-  addCounter(name: string, value: number, attributes?: MetricAttributes): void;
   recordGauge(name: string, value: number, attributes?: MetricAttributes): void;
   flush(): Promise<void>;
 }
@@ -34,7 +32,6 @@ class OneShotMetricReader extends MetricReader {
 }
 
 class OtelMetricsTransport implements MetricsTransport {
-  private readonly counters = new Map<string, ReturnType<Meter['createCounter']>>();
   private readonly gauges = new Map<string, ReturnType<Meter['createGauge']>>();
 
   public constructor(
@@ -44,15 +41,6 @@ class OtelMetricsTransport implements MetricsTransport {
     private readonly meter: Meter,
     private readonly timeoutMs: number,
   ) {}
-
-  public addCounter(name: string, value: number, attributes?: MetricAttributes): void {
-    let counter = this.counters.get(name);
-    if (!counter) {
-      counter = this.meter.createCounter(name);
-      this.counters.set(name, counter);
-    }
-    counter.add(value, attributes);
-  }
 
   public recordGauge(name: string, value: number, attributes?: MetricAttributes): void {
     let gauge = this.gauges.get(name);
@@ -76,13 +64,21 @@ class OtelMetricsTransport implements MetricsTransport {
       exportFailure = normalizeMetricError(error, 'metrics_export_failed');
     }
 
-    const results = await Promise.allSettled([
-      this.provider.shutdown({ timeoutMillis: this.timeoutMs }),
-      this.exporter.shutdown(),
+    const [providerShutdown, exporterShutdown] = await Promise.all([
+      settle(this.provider.shutdown({ timeoutMillis: this.timeoutMs })),
+      settle(this.exporter.shutdown()),
     ]);
     if (exportFailure !== undefined) throw exportFailure;
-    for (const result of results) if (result.status === 'rejected') throw result.reason;
+    if (providerShutdown.status === 'rejected') throw providerShutdown.reason;
+    if (exporterShutdown.status === 'rejected') throw exporterShutdown.reason;
   }
+}
+
+function settle<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {
+  return promise.then(
+    value => ({ status: 'fulfilled', value }),
+    reason => ({ status: 'rejected', reason }),
+  );
 }
 
 function normalizeMetricError(error: unknown, code: string): Error {
@@ -125,19 +121,8 @@ function createOtelExporter(options: MetricsTransportOptions): PushMetricExporte
     url: options.endpoint,
     headers: options.headers,
     timeoutMillis: options.timeoutMs,
-    temporalityPreference: AggregationTemporality.DELTA,
+    temporalityPreference: AggregationTemporality.CUMULATIVE,
   });
-}
-
-function selectAggregationTemporality(instrumentType: InstrumentType): AggregationTemporality {
-  switch (instrumentType) {
-    case InstrumentType.COUNTER:
-    case InstrumentType.OBSERVABLE_COUNTER:
-    case InstrumentType.HISTOGRAM:
-      return AggregationTemporality.DELTA;
-    default:
-      return AggregationTemporality.CUMULATIVE;
-  }
 }
 
 export function createOtelTransport(
@@ -146,8 +131,8 @@ export function createOtelTransport(
 ): MetricsTransport {
   const exporter = exporterFactory(options);
   const reader = new OneShotMetricReader({
-    // Counters describe one invocation. Gauges stay cumulative so zero is exported as a real sample.
-    aggregationTemporalitySelector: selectAggregationTemporality,
+    // An explicit zero is a real queue-health sample, not missing telemetry.
+    aggregationTemporalitySelector: () => AggregationTemporality.CUMULATIVE,
   });
   const provider = new MeterProvider({ readers: [reader] });
 

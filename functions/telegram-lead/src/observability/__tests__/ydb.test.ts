@@ -34,5 +34,8 @@ test('logs a safe error code without the database error message', async () => {
 
   assert.equal(records[0]?.fields.event, 'ydb_operation_failed');
   assert.equal(records[0]?.fields.error_code, 'OVERLOADED');
+  assert.equal(records[0]?.fields.error_type, 'Error');
+  assert.equal(records[0]?.fields.retriable, true);
+  assert.match(String(records[0]?.fields.stack_fingerprint), /^[a-f0-9]{16}$/);
   assert.doesNotMatch(JSON.stringify(records), /private row data/);
 });

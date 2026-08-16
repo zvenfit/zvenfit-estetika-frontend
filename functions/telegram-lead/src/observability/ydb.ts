@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { channel } from 'node:diagnostics_channel';
 
+import { safeErrorFields } from './errors';
 import { slowOperationMs } from '../ydb/config';
 
 import type { JsonObject, LoggerLike } from '../types';
@@ -29,16 +30,6 @@ function subscribeToRetries(): void {
     }
   });
   subscribed = true;
-}
-
-function errorCode(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return 'ydb_error';
-  }
-
-  const codedError = error as Error & { code?: unknown; cause?: { code?: unknown } };
-
-  return String(codedError.code || codedError.cause?.code || error.name || 'ydb_error').slice(0, 64);
 }
 
 function writeLog(
@@ -92,10 +83,10 @@ export async function observeYdbOperation<T>(
       operation: operationName,
       duration_ms: Date.now() - startedAt,
       retry_attempts: operation.retries,
-      error_code: errorCode(error),
+      ...safeErrorFields(error, { fallbackCode: 'ydb_error' }),
     });
     throw error;
   }
 }
 
-export const _private = { errorCode, subscribeToRetries, writeLog };
+export const _private = { subscribeToRetries, writeLog };

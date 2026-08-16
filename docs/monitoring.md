@@ -1,85 +1,181 @@
-# Мониторинг Cloud Function
+# Monitoring and alerts
 
-Машиночитаемый desired state находится в `scripts/monitoring.config.json`. Функция отправляет
-критичные счётчики и здоровье retry-контура напрямую в Monium по OTLP. Логи остаются резервным
-источником диагностики и не содержат имя, телефон, Telegram username, IP, UTM, body, headers или
-секреты.
+Машиночитаемый desired state находится в
+[`scripts/monitoring.config.json`](../scripts/monitoring.config.json). Он описывает восемь log
+metrics, тринадцать alerts, два notification channels и компактный production dashboard. Эти
+ресурсы относятся только к Estetika и не используют функции, YDB или бакеты `zvenfit-frontend`.
 
-## Источники
+Log metrics, alert rules, channels и dashboard остаются console-managed: публичные `yc` CLI и
+Terraform provider не покрывают полный жизненный цикл этих ресурсов Monium. Git хранит точную
+проверенную конфигурацию, а read-only drift check сравнивает её с экспортированным live snapshot.
 
-- Monium project: `folder__b1ge1e4iopttj79hfdfm`;
-- direct metrics: `cluster="default"`, `service="zvenfit-estetika-frontend"`;
-- Cloud Logging: группа `default`, retention 3 дня;
-- application/environment: `zvenfit-estetika-frontend` / `production`;
-- function/database/retry trigger: `zvenfit-estetika-telegram-lead` /
-  `zvenfit-estetika-leads` / `a1sc2t1ro4alukatrf99`.
+## Taxonomy и источники
 
-Прямой экспорт включается переменной `MONIUM_METRICS_ENABLED=true`. Секрет `MONIUM_API_KEY`
-должен иметь право записи метрик; `MONIUM_PROJECT` по умолчанию равен `folder__<YC_FOLDER_ID>`.
-Функция использует DELTA temporality и одноразовый exporter на invocation, поэтому сброс процесса
-не искажает счётчики. Ошибка экспорта логируется безопасным кодом и не влияет на приём заявки.
+| Уровень | Значение |
+| --- | --- |
+| Monium project | `folder__b1ge1e4iopttj79hfdfm` |
+| Application | `zvenfit-estetika-frontend` |
+| Environment | `production` |
+| Component / log service | `zvenfit-estetika-telegram-lead` |
+| Function resource | `zvenfit-estetika-telegram-lead` |
+| YDB | `zvenfit-estetika-leads` |
+| Retry trigger | `a1sc2t1ro4alukatrf99` |
+| Raw logs | `cluster="default"`, `service="default"`, retention 3 дня |
+| Log metric output | `cluster="default"`, `service="logging_aggregates"` |
+| Direct gauges | `cluster="default"`, `service="zvenfit-estetika-frontend"` |
 
-## События и прямые метрики
+Pino пишет structured JSON в stdout Cloud Function. Во всех application logs присутствуют
+`application`, `environment`, `service`, `event`, уровень и при наличии `request_id`. Логгер
+редактирует имя, телефон, Telegram username, IP/rate key, UTM, body, headers, токены и секреты.
+Ошибки представлены только безопасными полями `error_type`, `error_code`, `retriable`,
+`upstream_status` и `stack_fingerprint`; исходный message и stack в лог не попадают.
 
-| Event | Прямая метрика | Назначение |
-|---|---|---|
-| `submission_storage_error` | `zvenfit_estetika_storage_errors` | Заявку не удалось сохранить |
-| `telegram_delivery_retry_error` | `zvenfit_estetika_storage_errors` | Retry не смог обработать сохранённую запись |
-| `telegram_delivery_failed_permanently` | `zvenfit_estetika_telegram_failed_1m` | Попытки Telegram исчерпаны |
-| `submission_rate_limit_error` | `zvenfit_estetika_rate_limit_errors_5m` | Rate limiter недоступен, запрос пропущен fail-open |
-| `submission_blocked` с `reason=rate_limit` | `zvenfit_estetika_rate_limited_5m` | Антиспам отклонил запрос |
-| `submission_persisted` | `zvenfit_estetika_submissions_5m` + `form_type` | Сохранённая lead/newsletter запись |
-| `ydb_retry` | `zvenfit_estetika_ydb_retries_5m` | YDB SDK повторил операцию |
-| `ydb_slow_operation` | `zvenfit_estetika_ydb_slow_5m` | Превышен `YDB_SLOW_OPERATION_MS` |
+Открыть raw logs:
 
-Диагностические log-only события: `telegram_delivery_retry_scheduled`,
-`ydb_operation_completed`, `ydb_operation_failed`.
+```text
+https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs
+```
 
-Timer после retry pass экспортирует:
+Базовый фильтр: `application=zvenfit-estetika-frontend`, `environment=production`,
+`service=zvenfit-estetika-telegram-lead`. Для разбора инцидента добавьте `event`, `request_id`,
+`submission_id`, `error_code` или `stack_fingerprint`.
+
+## Log metrics
+
+Дискретные события считаются log-derived metrics. Прямые invocation counters не используются:
+одно событие, экспортированное за короткий invocation, могло интерпретироваться Monium как rate и
+дать значение больше `1`. Log aggregate с `count` сохраняет настоящую семантику количества и
+переживает обработанные приложением ошибки, которые не видны в platform `functions_errors`.
+
+| Metric ID | События / фильтр | Окно |
+| --- | --- | --- |
+| `zvenfit_estetika_storage_errors_1m` | `submission_storage_error`, `telegram_delivery_retry_error` | 1m |
+| `zvenfit_estetika_telegram_failed_1m` | `telegram_delivery_failed_permanently` | 1m |
+| `zvenfit_estetika_ydb_retries_5m` | `ydb_retry` | 5m |
+| `zvenfit_estetika_ydb_slow_5m` | `ydb_slow_operation` | 5m |
+| `zvenfit_estetika_rate_limit_errors_5m` | `submission_rate_limit_error` | 5m |
+| `zvenfit_estetika_rate_limited_5m` | `submission_blocked`, `meta.reason=rate_limit` | 5m |
+| `zvenfit_estetika_submissions_5m` | `submission_persisted`, group by `meta.form_type` | 5m |
+| `zvenfit_estetika_retry_worker_log_heartbeat_1m` | `retry_worker_completed`, реальные timer logs | 1m |
+
+`telegram_delivery_retry_scheduled`, `ydb_operation_completed` и `ydb_operation_failed` остаются
+диагностическими log-only событиями. Log heartbeat не имеет paging-alert: он независимо показывает
+работоспособность цепочки Cloud Logging → log metric, а недоступность retry-worker уже покрыта
+прямым heartbeat.
+
+## Direct gauges
+
+Direct OTLP включается `MONIUM_METRICS_ENABLED=true`. Функция использует cumulative gauges и
+добавляет ко всем точкам полный набор labels:
+
+```text
+application="zvenfit-estetika-frontend"
+environment="production"
+component="zvenfit-estetika-telegram-lead"
+resource_id="zvenfit-estetika-telegram-lead"
+```
+
+Timer после успешного retry pass и чтения YDB экспортирует:
 
 - `zvenfit_estetika_retry_worker_heartbeat=1`;
-- `zvenfit_estetika_telegram_pending_submissions` — размер очереди для dashboard;
+- `zvenfit_estetika_telegram_pending_submissions` — текущий размер очереди;
 - `zvenfit_estetika_telegram_oldest_pending_age_seconds` — возраст старейшей записи.
 
-## Алерты
+Явный ноль очереди экспортируется настоящей cumulative-точкой. Если retry pass, чтение YDB или
+экспорт не завершились, heartbeat не записывается. Ошибка OTLP безопасно логируется как
+`monium_metrics_init_error` или `monium_metrics_export_error` и не меняет результат приёма заявки.
 
-В Monium вручную создаются два независимых канала: `zvenfit_estetika_telegram_alerts` и
-`zvenfit_estetika_email_alerts`. Подключить оба канала ко всем алертам из конфига и уведомлять о
-переходах `ALARM`, `WARNING`, `OK` с повтором каждые 30 минут.
+## Notification channels
+
+В Monium создаются два независимых канала:
+
+- `zvenfit_estetika_telegram_alerts` — **ZvenFit Estetika · production · Telegram**, со screenshot;
+- `zvenfit_estetika_email_alerts` — **ZvenFit Estetika · production · Email**.
+
+Оба канала подключаются ко всем alerts. Уведомления отправляются при переходах `ALARM`, `WARNING`
+и `OK`, повтор активного состояния — каждые 30 минут.
+
+## Alerts
 
 | Alert ID | Сигнал | Warning / Alarm | No data |
-|---|---|---|---|
-| `zvenfit_estetika_storage_errors` | direct storage counter | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_permanent_telegram_failures` | direct permanent failure | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_ydb_retries` | direct retry sum | `>4.5` / `>5.5` | OK |
-| `zvenfit_estetika_slow_ydb` | direct slow-operation sum | `>0.5` / `>2.5` | OK |
-| `zvenfit_estetika_rate_limited` | direct blocked sum | `>0` / `>5` | OK |
-| `zvenfit_estetika_submission_volume` | direct accepted volume | `>10` / `>20` | OK |
-| `zvenfit_estetika_retry_worker_heartbeat` | latest heartbeat | `<0.9` / `<0.5` | ALARM |
-| `zvenfit_estetika_telegram_backlog` | oldest pending, seconds | `>600` / `>1800` | OK |
-| `zvenfit_estetika_rate_limit_health` | fail-open errors | `>0` / `>2` | OK |
-| `zvenfit_estetika_function_runtime_errors` | Cloud Functions errors | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_retry_trigger_errors` | Cloud Functions trigger access/runtime errors | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_ydb_storage_usage` | `(used / limit) * 100` | `>=70` / `>=85` | WARNING |
+| --- | --- | --- | --- |
+| `zvenfit_estetika_storage_errors` | log count ошибок сохранения/retry | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_permanent_telegram_failures` | log count окончательных сбоев Telegram | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_ydb_retries` | log count YDB retries | `>4.5` / `>5.5` | OK |
+| `zvenfit_estetika_slow_ydb` | log count медленных YDB операций | `>0.5` / `>2.5` | OK |
+| `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
+| `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
+| `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
+| `zvenfit_estetika_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
+| `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
+| `zvenfit_estetika_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_function_throttles` | Cloud Functions `functions_throttles` | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_retry_trigger_errors` | trigger access/runtime errors | `>0` / `>0.5` | OK |
+| `zvenfit_estetika_ydb_storage_usage` | `(used_bytes / limit_bytes) * 100` | `>=70` / `>=85` | WARNING |
 
-Heartbeat пишется только после успешного retry pass и чтения здоровья очереди. Он имеет корректно
-упорядоченные пороги для оператора `<` и `No data = ALARM`: исчезновение timer, YDB или OTLP-точек
-не выглядит как норма. Нулевые queue gauges экспортируются
-как CUMULATIVE instant values, поэтому пустая очередь остаётся настоящей точкой, а не no-data.
-Backlog предупреждает после 10 минут и алармит после 30 минут. Для storage отсутствие данных
-считается `WARNING`.
+Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов. Direct gauges и
+platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` единичное превышение даёт
+`Warning`, а `Alarm` требует минимум три превышения за 10 минут. Backlog предупреждает после 10
+минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие
+storage metrics считается `Warning`, остальные no-data состояния — `OK`.
 
-Селекторы, агрегации, окна и задержки зафиксированы в `scripts/monitoring.config.json`. Они
-создаются в консоли после первого успешного deploy, потому что notification channels и alerts не
-представлены как управляемые ресурсы используемого публичного `yc` CLI/Terraform provider.
+## Dashboard
+
+Desired dashboard: **ZvenFit Estetika · production**,
+ID `zvenfit-estetika-production-monitoring`.
+
+```text
+https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/dashboards/zvenfit-estetika-production-monitoring
+```
+
+Он содержит:
+
+1. ошибки единственной Cloud Function;
+2. p95 длительности функции;
+3. tile прямого retry heartbeat;
+4. размер и возраст Telegram-очереди;
+5. сохранённые обращения с разложением `lead` / `newsletter`;
+6. диагностический log-pipeline heartbeat;
+7. заполнение отдельной YDB `zvenfit-estetika-leads`.
+
+Dashboard намеренно не содержит Fitbase, расписание, traffic-function, CDN основного сайта или
+бакеты `zvenfit-frontend`. Точные queries и selectors хранятся в конфиге.
+
+## Provisioning и drift
+
+После первого успешного deploy вручную создайте/обновите ресурсы в таком порядке:
+
+1. восемь log metrics;
+2. Telegram и email channels;
+3. тринадцать alerts и общую notification policy;
+4. dashboard из семи operational widgets.
+
+Затем экспортируйте live metadata в JSON с массивами `logMetrics`, `alerts`,
+`notificationChannels`, объектами `notificationPolicy` и `dashboard`. Сравнение read-only и ничего
+не меняет в Monium:
+
+```bash
+npm run check:monitoring-drift -- --snapshot /path/to/monium-live.json
+```
+
+Exit code `0` означает совпадение, `1` — drift, `2` — неверный input. Проверяются IDs,
+display names, selectors, thresholds, delay/no-data, labels, channels, policy и dashboard. При
+расхождении `notificationChannels.recipient` фактический email/chat identity заменяется на
+`[redacted]` и не попадает в терминал или CI-log.
 
 ## Безопасная проверка
 
-Скрипт ниже пишет только синтетические технические события и не создаёт заявок:
+Smoke всегда пишет `environment=production`, независимо от локального `NODE_ENV`, и содержит только
+синтетические технические события без заявок и персональных данных. Он
+намеренно переводит application log alerts в Warning/Alarm, поэтому требует явного подтверждения:
 
 ```bash
 bash scripts/test-monitoring-alerts.sh --confirm
 ```
 
-После настройки проверить доставку в Telegram и email, затем возврат алертов в `OK`. Контракт
-репозитория проверяется командой `npm run test:monitoring`.
+Проверьте доставку в Telegram и email, затем уведомления о возврате в `OK`. Runtime, throttling,
+trigger, direct heartbeat и YDB storage проверяются только реальными platform metrics: намеренно
+ронять функцию, timer или заполнять production YDB запрещено.
+
+Контракты runtime/config/drift проверяются командами `npm run test:lead-fn` и
+`npm run test:monitoring`.

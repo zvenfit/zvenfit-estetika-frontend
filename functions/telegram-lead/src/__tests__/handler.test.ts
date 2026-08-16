@@ -61,7 +61,7 @@ function dependencies(
   return {
     loggerFactory: () => logger,
     maxAttempts: () => 12,
-    metricsFactory: () => ({ addCounter() {}, recordGauge() {}, async flush() {} }),
+    metricsFactory: () => ({ recordGauge() {}, async flush() {} }),
     now: () => NOW,
     rateLimiter: async () => true,
     store: {

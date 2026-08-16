@@ -1,173 +1,313 @@
 {
-  "application": "zvenfit-estetika-frontend",
-  "environment": "production",
   "project": "folder__b1ge1e4iopttj79hfdfm",
+  "source": {
+    "cluster": "default",
+    "service": "default",
+    "labels": {
+      "meta.application": "zvenfit-estetika-frontend",
+      "meta.environment": "production",
+      "meta.service": "zvenfit-estetika-telegram-lead"
+    },
+    "retentionDays": 3
+  },
+  "metricOutput": {
+    "cluster": "default",
+    "service": "logging_aggregates",
+    "idLabel": "name"
+  },
   "directMetrics": {
     "cluster": "default",
     "service": "zvenfit-estetika-frontend",
-    "transport": "OTLP delta",
-    "endpoint": "https://ingest.monium.yandex.cloud/otlp/v1/metrics"
-  },
-  "logGroup": {
-    "name": "default",
-    "retentionDays": 3
+    "transport": "OTLP cumulative gauges",
+    "endpoint": "https://ingest.monium.yandex.cloud/otlp/v1/metrics",
+    "labels": {
+      "application": "zvenfit-estetika-frontend",
+      "environment": "production",
+      "component": "zvenfit-estetika-telegram-lead",
+      "resource_id": "zvenfit-estetika-telegram-lead"
+    }
   },
   "resources": {
     "function": "zvenfit-estetika-telegram-lead",
     "database": "zvenfit-estetika-leads",
     "retryTriggerId": "a1sc2t1ro4alukatrf99"
   },
+  "dashboard": {
+    "id": "zvenfit-estetika-production-monitoring",
+    "title": "ZvenFit Estetika · production",
+    "runtimeErrors": {
+      "title": "Ошибки Cloud Function",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "chart",
+      "pagingAlert": true
+    },
+    "functionDurationP95": {
+      "title": "Cloud Function: длительность p95",
+      "query": "histogram_percentile(95, {project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"duration_ms_histogram\", resource_id=\"zvenfit-estetika-telegram-lead\"})",
+      "unit": "milliseconds",
+      "visualization": "chart",
+      "pagingAlert": false
+    },
+    "retryWorkerHeartbeat": {
+      "title": "Retry-worker: heartbeat",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "tile",
+      "pagingAlert": true
+    },
+    "telegramQueue": {
+      "title": "Telegram: очередь и возраст",
+      "metricSelectors": [
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_submissions\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}"
+      ],
+      "visualization": "chart",
+      "pagingAlert": true
+    },
+    "submissionVolume": {
+      "title": "Сохранённые обращения",
+      "query": "series_sum(\"meta.form_type\", {project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_submissions_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
+      "visualization": "chart",
+      "decomposeBy": ["meta.form_type"],
+      "pagingAlert": true
+    },
+    "logPipelineHeartbeat": {
+      "title": "Поставка логов: heartbeat retry-worker",
+      "source": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
+      "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\"})",
+      "visualization": "chart",
+      "pagingAlert": false
+    },
+    "ydbStorage": {
+      "title": "YDB: заполнение хранилища",
+      "queries": [
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}",
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
+      ],
+      "visualization": "chart",
+      "pagingAlert": true
+    }
+  },
   "provisioning": {
+    "logMetrics": "manual-console",
     "notificationChannels": "manual-console",
     "alerts": "manual-console",
-    "reason": "Yandex Monitoring does not expose these resources in the public YC CLI or Terraform provider"
+    "dashboard": "manual-console",
+    "reason": "Monium log metrics, alert rules, notification channels and dashboards are console-managed; Git stores the reviewed desired state and validates read-only snapshots"
   },
   "notificationChannels": [
-    "zvenfit_estetika_telegram_alerts",
-    "zvenfit_estetika_email_alerts"
+    {
+      "id": "zvenfit_estetika_telegram_alerts",
+      "name": "ZvenFit Estetika · production · Telegram",
+      "method": "telegram",
+      "recipient": "cloud-account",
+      "sendScreenshot": true
+    },
+    {
+      "id": "zvenfit_estetika_email_alerts",
+      "name": "ZvenFit Estetika · production · Email",
+      "method": "email",
+      "recipient": "cloud-account"
+    }
   ],
+  "notificationPolicy": {
+    "channelIds": [
+      "zvenfit_estetika_telegram_alerts",
+      "zvenfit_estetika_email_alerts"
+    ],
+    "statuses": ["ALARM", "WARNING", "OK"],
+    "repeatMinutes": 30
+  },
   "logMetrics": [
     {
       "id": "zvenfit_estetika_storage_errors_1m",
+      "displayName": "ZvenFit Estetika · Заявки: ошибки сохранения",
       "events": ["submission_storage_error", "telegram_delivery_retry_error"],
       "aggregation": "count",
       "window": "1m"
     },
     {
       "id": "zvenfit_estetika_telegram_failed_1m",
+      "displayName": "ZvenFit Estetika · Telegram: окончательные сбои",
       "events": ["telegram_delivery_failed_permanently"],
       "aggregation": "count",
       "window": "1m"
     },
     {
       "id": "zvenfit_estetika_ydb_retries_5m",
+      "displayName": "ZvenFit Estetika · YDB: повторы",
       "events": ["ydb_retry"],
       "aggregation": "count",
       "window": "5m"
     },
     {
       "id": "zvenfit_estetika_ydb_slow_5m",
+      "displayName": "ZvenFit Estetika · YDB: медленные операции",
       "events": ["ydb_slow_operation"],
       "aggregation": "count",
       "window": "5m"
     },
     {
+      "id": "zvenfit_estetika_rate_limit_errors_5m",
+      "displayName": "ZvenFit Estetika · Rate limiter: ошибки",
+      "events": ["submission_rate_limit_error"],
+      "aggregation": "count",
+      "window": "5m"
+    },
+    {
       "id": "zvenfit_estetika_rate_limited_5m",
+      "displayName": "ZvenFit Estetika · Обращения: блокировки rate limit",
       "events": ["submission_blocked"],
-      "filters": { "reason": "rate_limit" },
+      "filters": { "meta.reason": "rate_limit" },
       "aggregation": "count",
       "window": "5m"
     },
     {
       "id": "zvenfit_estetika_submissions_5m",
+      "displayName": "ZvenFit Estetika · Сохранённые обращения",
       "events": ["submission_persisted"],
-      "groupBy": ["form_type"],
       "aggregation": "count",
-      "window": "5m"
+      "window": "5m",
+      "grouping": ["meta.form_type"]
+    },
+    {
+      "id": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
+      "displayName": "ZvenFit Estetika · Retry-worker: поставка логов",
+      "events": ["retry_worker_completed"],
+      "filters": { "resource_id": "*" },
+      "aggregation": "count",
+      "window": "1m",
+      "grouping": ["meta.application", "meta.environment", "meta.service", "resource_id"],
+      "synthetic": false
     }
   ],
   "alerts": [
     {
       "id": "zvenfit_estetika_storage_errors",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_storage_errors\"}",
+      "displayName": "ZvenFit Estetika · Заявки: ошибки сохранения",
+      "metricId": "zvenfit_estetika_storage_errors_1m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_storage_errors_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "max",
       "operator": ">",
       "warning": 0,
       "alarm": 0.5,
       "window": "5m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_permanent_telegram_failures",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_failed_1m\"}",
+      "displayName": "ZvenFit Estetika · Telegram: окончательные сбои доставки",
+      "metricId": "zvenfit_estetika_telegram_failed_1m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_telegram_failed_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "max",
       "operator": ">",
       "warning": 0,
       "alarm": 0.5,
       "window": "5m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_ydb_retries",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_ydb_retries_5m\"}",
+      "displayName": "ZvenFit Estetika · YDB: слишком много повторов",
+      "metricId": "zvenfit_estetika_ydb_retries_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_ydb_retries_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 4.5,
       "alarm": 5.5,
       "window": "10m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_slow_ydb",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_ydb_slow_5m\"}",
+      "displayName": "ZvenFit Estetika · YDB: медленные операции",
+      "metricId": "zvenfit_estetika_ydb_slow_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_ydb_slow_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 0.5,
       "alarm": 2.5,
       "window": "10m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_rate_limited",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_rate_limited_5m\"}",
+      "displayName": "ZvenFit Estetika · Обращения: блокировки rate limit",
+      "metricId": "zvenfit_estetika_rate_limited_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_rate_limited_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 0,
       "alarm": 5,
       "window": "10m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_submission_volume",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_submissions_5m\"}",
+      "displayName": "ZvenFit Estetika · Обращения: аномальный объём",
+      "metricId": "zvenfit_estetika_submissions_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_submissions_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 10,
       "alarm": 20,
       "window": "10m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_retry_worker_heartbeat",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\"}",
+      "displayName": "ZvenFit Estetika · Retry-worker: нет активности",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "last",
       "operator": "<",
       "warning": 0.9,
       "alarm": 0.5,
       "window": "5m",
       "delay": "30s",
-      "noData": "ALARM"
+      "noData": "ALARM",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_telegram_backlog",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\"}",
+      "displayName": "ZvenFit Estetika · Telegram: растёт очередь доставки",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "last",
       "operator": ">",
       "warning": 600,
       "alarm": 1800,
       "window": "5m",
       "delay": "30s",
-      "noData": "OK"
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_rate_limit_health",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_rate_limit_errors_5m\"}",
+      "displayName": "ZvenFit Estetika · Rate limiter: внутренние ошибки",
+      "metricId": "zvenfit_estetika_rate_limit_errors_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_rate_limit_errors_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 0,
       "alarm": 2,
       "window": "10m",
-      "delay": "30s",
-      "noData": "OK"
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_function_runtime_errors",
+      "displayName": "ZvenFit Estetika · Cloud Function: ошибки выполнения",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
@@ -175,10 +315,25 @@
       "alarm": 0.5,
       "window": "5m",
       "delay": "30s",
-      "noData": "OK"
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
+    },
+    {
+      "id": "zvenfit_estetika_function_throttles",
+      "displayName": "ZvenFit Estetika · Cloud Function: ограничения запуска",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_throttles\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "aggregation": "sum",
+      "operator": ">",
+      "warning": 0,
+      "alarm": 0.5,
+      "window": "5m",
+      "delay": "30s",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
       "id": "zvenfit_estetika_retry_trigger_errors",
+      "displayName": "ZvenFit Estetika · Retry-trigger: ошибки",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"serverless.triggers.access_error_per_second|serverless.triggers.error_per_second\", trigger=\"a1sc2t1ro4alukatrf99\", type=\"request\"}",
       "aggregation": "max",
       "operator": ">",
@@ -186,19 +341,15 @@
       "alarm": 0.5,
       "window": "5m",
       "delay": "30s",
-      "noData": "OK"
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead", "trigger_id": "a1sc2t1ro4alukatrf99" }
     },
     {
       "id": "zvenfit_estetika_ydb_storage_usage",
+      "displayName": "ZvenFit Estetika · YDB: заполнение хранилища",
       "queries": [
-        {
-          "name": "A",
-          "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
-        },
-        {
-          "name": "B",
-          "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
-        },
+        { "name": "A", "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}" },
+        { "name": "B", "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}" },
         { "name": "C", "query": "(A / B) * 100" }
       ],
       "signal": "C",
@@ -208,7 +359,8 @@
       "alarm": 85,
       "window": "15m",
       "delay": "30s",
-      "noData": "WARNING"
+      "noData": "WARNING",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-leads" }
     }
   ]
 }

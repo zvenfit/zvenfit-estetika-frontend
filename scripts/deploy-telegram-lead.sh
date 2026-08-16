@@ -2,8 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="$(mktemp -d /tmp/zvenfit-estetika-lead.XXXXXX)"
-trap 'rm -rf -- "${SOURCE_DIR}"' EXIT
+FUNCTION_SOURCE_DIR="${FUNCTION_SOURCE_DIR:-}"
+PACKAGE_TEMP_DIR=''
+cleanup() {
+  if [[ -n "${PACKAGE_TEMP_DIR}" ]]; then
+    rm -rf -- "${PACKAGE_TEMP_DIR}"
+  fi
+}
+trap cleanup EXIT
 FUNCTION_NAME="${YC_LEAD_FUNCTION_NAME:-zvenfit-estetika-telegram-lead}"
 TRIGGER_NAME="${YC_LEAD_RETRY_TRIGGER_NAME:-zvenfit-estetika-telegram-retry}"
 YDB_DATABASE_NAME="${YDB_DATABASE_NAME:-zvenfit-estetika-leads}"
@@ -27,6 +33,10 @@ MONIUM_METRICS_ENABLED="${MONIUM_METRICS_ENABLED:-true}"
 MONIUM_PROJECT="${MONIUM_PROJECT:-folder__${YC_FOLDER_ID:-}}"
 MONIUM_CLUSTER="${MONIUM_CLUSTER:-default}"
 MONIUM_SERVICE="${MONIUM_SERVICE:-zvenfit-estetika-frontend}"
+MONIUM_APPLICATION="${MONIUM_APPLICATION:-zvenfit-estetika-frontend}"
+MONIUM_ENVIRONMENT="${MONIUM_ENVIRONMENT:-production}"
+MONIUM_COMPONENT="${MONIUM_COMPONENT:-zvenfit-estetika-telegram-lead}"
+MONIUM_RESOURCE_ID="${MONIUM_RESOURCE_ID:-${FUNCTION_NAME}}"
 MONIUM_METRICS_TIMEOUT_MS="${MONIUM_METRICS_TIMEOUT_MS:-1000}"
 
 if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" || -z "${LEAD_RATE_LIMIT_SECRET:-}" ]]; then
@@ -61,6 +71,23 @@ if [[ -z "${YC_LEAD_SERVICE_ACCOUNT_ID:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${FUNCTION_SOURCE_DIR}" ]]; then
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo 'deploy-telegram-lead: CI requires a prebuilt FUNCTION_SOURCE_DIR artifact' >&2
+    exit 1
+  fi
+
+  PACKAGE_TEMP_DIR="$(mktemp -d /tmp/zvenfit-estetika-lead.XXXXXX)"
+  npm --prefix "${ROOT_DIR}/functions/telegram-lead" run build
+  bash "${ROOT_DIR}/scripts/package-telegram-lead.sh" "${PACKAGE_TEMP_DIR}"
+  FUNCTION_SOURCE_DIR="${PACKAGE_TEMP_DIR}"
+fi
+
+if [[ ! -f "${FUNCTION_SOURCE_DIR}/index.js" || ! -f "${FUNCTION_SOURCE_DIR}/package.json" ]]; then
+  echo 'deploy-telegram-lead: FUNCTION_SOURCE_DIR is not a deployable artifact' >&2
+  exit 1
+fi
+
 yc config set folder-id "${YC_FOLDER_ID}" >/dev/null
 
 if [[ -z "${YDB_CONNECTION_STRING:-}" ]]; then
@@ -89,32 +116,6 @@ if [[ -z "${YDB_CONNECTION_STRING}" ]]; then
   exit 1
 fi
 
-YDB_IAM_TOKEN="$(yc iam create-token)"
-
-YDB_TEST_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
-YDB_ACCESS_TOKEN_CREDENTIALS="${YDB_IAM_TOKEN}" \
-npm --prefix "${ROOT_DIR}/functions/telegram-lead" run test:integration
-
-SCHEMA_VERIFY_ATTEMPT=1
-SCHEMA_VERIFY_MAX_ATTEMPTS=3
-while ! YDB_ACCESS_TOKEN_CREDENTIALS="${YDB_IAM_TOKEN}" \
-  YDB_CONNECTION_STRING="${YDB_CONNECTION_STRING}" \
-  YDB_SUBMISSIONS_TABLE="${YDB_SUBMISSIONS_TABLE}" \
-  YDB_RATE_LIMITS_TABLE="${YDB_RATE_LIMITS_TABLE}" \
-  YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
-  npm --prefix "${ROOT_DIR}/functions/telegram-lead" run verify:schema; do
-  if (( SCHEMA_VERIFY_ATTEMPT >= SCHEMA_VERIFY_MAX_ATTEMPTS )); then
-    echo "deploy-telegram-lead: YDB schema verification failed after ${SCHEMA_VERIFY_MAX_ATTEMPTS} attempts" >&2
-    exit 1
-  fi
-
-  echo "deploy-telegram-lead: transient YDB schema verification failure; retrying" >&2
-  sleep $((SCHEMA_VERIFY_ATTEMPT * 2))
-  SCHEMA_VERIFY_ATTEMPT=$((SCHEMA_VERIFY_ATTEMPT + 1))
-done
-
-unset YDB_IAM_TOKEN
-
 if ! yc serverless function get --name="${FUNCTION_NAME}" >/dev/null 2>&1; then
   echo "deploy-telegram-lead: function ${FUNCTION_NAME} must be provisioned before CI deploy" >&2
   exit 1
@@ -135,21 +136,13 @@ process.exit(publicInvoker ? 0 : 1);
   exit 1
 fi
 
-cp -R "${ROOT_DIR}/functions/telegram-lead/build/." "${SOURCE_DIR}/"
-cp \
-  "${ROOT_DIR}/functions/telegram-lead/package.json" \
-  "${ROOT_DIR}/functions/telegram-lead/package-lock.json" \
-  "${SOURCE_DIR}/"
-
-npm pkg delete devDependencies --prefix "${SOURCE_DIR}"
-
 yc serverless function version create \
   --function-name="${FUNCTION_NAME}" \
   --runtime="${RUNTIME}" \
   --entrypoint=index.handler \
   --memory="${MEMORY}" \
   --execution-timeout="${TIMEOUT}" \
-  --source-path="${SOURCE_DIR}" \
+  --source-path="${FUNCTION_SOURCE_DIR}" \
   --service-account-id="${YC_LEAD_SERVICE_ACCOUNT_ID}" \
   --environment TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}" \
   --environment TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID}" \
@@ -171,6 +164,10 @@ yc serverless function version create \
   --environment MONIUM_PROJECT="${MONIUM_PROJECT}" \
   --environment MONIUM_CLUSTER="${MONIUM_CLUSTER}" \
   --environment MONIUM_SERVICE="${MONIUM_SERVICE}" \
+  --environment MONIUM_APPLICATION="${MONIUM_APPLICATION}" \
+  --environment MONIUM_ENVIRONMENT="${MONIUM_ENVIRONMENT}" \
+  --environment MONIUM_COMPONENT="${MONIUM_COMPONENT}" \
+  --environment MONIUM_RESOURCE_ID="${MONIUM_RESOURCE_ID}" \
   --environment MONIUM_METRICS_TIMEOUT_MS="${MONIUM_METRICS_TIMEOUT_MS}" \
   --environment LOG_LEVEL="${LOG_LEVEL}" \
   --environment NODE_ENV="${NODE_ENV:-production}"

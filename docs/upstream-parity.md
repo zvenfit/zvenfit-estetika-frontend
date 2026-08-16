@@ -4,10 +4,24 @@
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
 не копируются автоматически.
 
-Текущий аудит выполнен 2026-08-13 до опубликованного commit
-`18fccbace173cf95ac0b48fd3c1d60349521355f`. В аудит вошли исправление OTLP heartbeat/нулевых
-gauge, стабильность TTL integration-теста, обновление зависимостей и production smoke/release
-readiness. Последующее изменение цены групповой тренировки не относится к продукту Estetika.
+Текущий аудит выполнен 2026-08-16 до опубликованного commit
+`782cff989a9723191311fe888d8bad8082853689`. Перенесены архитектурные изменения production
+observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
+direct gauges, log-pipeline heartbeat, throttling alert, dashboard desired state, read-only drift
+check, GitHub OIDC/WIF и bucket-scoped ephemeral Object Storage credentials.
+
+После локального security review WIF-паттерн усилен без смены базовой модели upstream:
+dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а
+ephemeral issuer ограничен storage SA и подтверждается негативными live-проверками. На audited
+commit upstream те же WIF/ephemeral сущности используются в jobs с более широкой trust boundary;
+это сознательное security hardening, которое следует предложить обратно в `zvenfit-frontend`, а не
+считать продуктовым расхождением.
+
+Адаптация сохраняет отдельную resource map Estetika:
+`zvenfit-estetika-frontend`, `zvenfit-estetika`, `zvenfit-estetika-telegram-lead` и
+`zvenfit-estetika-leads`. Fitbase, schedule, staging gateway/fixtures, traffic beacon/function,
+CDN analytics основного сайта, fitness UI и project-local `knowledge-base/` не перенесены как
+неприменимые к архитектуре и правилам этого репозитория.
 Baseline хранится в
 `scripts/upstream-parity.json`; локальная и еженедельная CI-проверки сообщат, когда `main`
 основного проекта уйдёт вперёд.

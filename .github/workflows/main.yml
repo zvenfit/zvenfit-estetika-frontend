@@ -6,11 +6,14 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: '22'
   S3_BUCKET: 'zvenfit-estetika-frontend'
   FUNCTION_NAME: 'zvenfit-estetika-telegram-lead'
-  YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+  SITE_URL: 'https://estetika.zvenfit.ru'
   ALLOWED_ORIGINS: 'https://estetika.zvenfit.ru'
   LOG_LEVEL: 'info'
 
@@ -24,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -54,6 +57,31 @@ jobs:
           SITE_URL: https://estetika.zvenfit.ru
         run: npm run test:build
 
+      - name: Prepare immutable function and YDB verifier artifacts
+        run: |
+          mkdir -p "${RUNNER_TEMP}/lead-function"
+          bash scripts/package-telegram-lead.sh "${RUNNER_TEMP}/lead-function"
+          tar -czf "${RUNNER_TEMP}/lead-function.tar.gz" -C "${RUNNER_TEMP}/lead-function" .
+          tar -czf "${RUNNER_TEMP}/lead-verifier.tar.gz" \
+            -C functions/telegram-lead \
+            package.json package-lock.json tsconfig.json tsconfig.build.json src node_modules
+
+      - name: Upload function artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lead-function
+          path: ${{ runner.temp }}/lead-function.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload YDB verifier artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lead-verifier
+          path: ${{ runner.temp }}/lead-verifier.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
   deploy-preflight:
     needs: quality-checks
     runs-on: ubuntu-latest
@@ -61,68 +89,131 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Validate deploy configuration
         env:
-          YC_SA_JSON_KEY: ${{ secrets.YC_SA_JSON_KEY }}
-          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+          YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
+          YC_YDB_VERIFY_SERVICE_ACCOUNT_ID: ${{ vars.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID }}
+          YC_STORAGE_SERVICE_ACCOUNT_ID: ${{ vars.YC_STORAGE_SERVICE_ACCOUNT_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LEAD_RATE_LIMIT_SECRET: ${{ secrets.LEAD_RATE_LIMIT_SECRET }}
           MONIUM_API_KEY: ${{ secrets.MONIUM_API_KEY }}
-          YC_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-          YC_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
           YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
           YANDEX_METRIKA_ID: ${{ vars.YANDEX_METRIKA_ID }}
+          SITE_URL: ${{ env.SITE_URL }}
+          S3_BUCKET: ${{ env.S3_BUCKET }}
+          FUNCTION_NAME: ${{ env.FUNCTION_NAME }}
+          YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
+          ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
         run: node scripts/check-deploy-config.cjs
 
-  deploy-function:
+  verify-ydb:
     needs: [quality-checks, deploy-preflight]
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      connection_string: ${{ steps.verify.outputs.connection_string }}
+
+    steps:
+      - name: Checkout deployment scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download prebuilt YDB verifier
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lead-verifier
+          path: ${{ runner.temp }}
+
+      - name: Extract YDB verifier
+        run: |
+          mkdir -p "${RUNNER_TEMP}/lead-verifier"
+          tar -xzf "${RUNNER_TEMP}/lead-verifier.tar.gz" -C "${RUNNER_TEMP}/lead-verifier"
+
+      - name: Install Yandex Cloud CLI
+        run: bash scripts/install-yc-cli.sh
+
+      - name: Authenticate YDB verifier with GitHub OIDC
+        env:
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+          YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID }}
+          YC_WIF_AUDIENCE: https://github.com/zvenfit
+        run: bash scripts/auth-yc-wif.sh
+
+      - name: Integration-test and verify Estetika YDB
+        id: verify
+        env:
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+          YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
+          YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
+          YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
+          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}
+          YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
+        run: bash scripts/verify-telegram-lead-ydb.sh "${RUNNER_TEMP}/lead-verifier"
+
+  deploy-function:
+    needs: [verify-ydb]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       function_url: ${{ steps.get-url.outputs.url }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - name: Checkout deployment scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - name: Download prebuilt function
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          name: lead-function
+          path: ${{ runner.temp }}
 
-      - name: Install lead function dependencies
-        run: npm ci --prefix functions/telegram-lead
+      - name: Extract function artifact
+        run: |
+          mkdir -p "${RUNNER_TEMP}/lead-function"
+          tar -xzf "${RUNNER_TEMP}/lead-function.tar.gz" -C "${RUNNER_TEMP}/lead-function"
 
       - name: Install Yandex Cloud CLI
-        run: |
-          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+        run: bash scripts/install-yc-cli.sh
 
-      - name: Authenticate with service account
+      - name: Authenticate function deploy with GitHub OIDC
         env:
-          YC_SA_KEY: ${{ secrets.YC_SA_JSON_KEY }}
-        run: |
-          echo "$YC_SA_KEY" > /tmp/sa-key.json
-          yc config profile create ci-profile
-          yc config set service-account-key /tmp/sa-key.json
-          yc config set folder-id ${{ env.YC_FOLDER_ID }}
-          rm /tmp/sa-key.json
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+          YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
+          YC_WIF_AUDIENCE: https://github.com/zvenfit
+        run: bash scripts/auth-yc-wif.sh
 
-      - name: Deploy Cloud Function
+      - name: Deploy Cloud Function from verified artifact
         env:
+          FUNCTION_SOURCE_DIR: ${{ runner.temp }}/lead-function
+          YDB_CONNECTION_STRING: ${{ needs.verify-ydb.outputs.connection_string }}
           NODE_ENV: production
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LEAD_RATE_LIMIT_SECRET: ${{ secrets.LEAD_RATE_LIMIT_SECRET }}
           MONIUM_API_KEY: ${{ secrets.MONIUM_API_KEY }}
           MONIUM_METRICS_ENABLED: ${{ vars.MONIUM_METRICS_ENABLED || 'true' }}
-          MONIUM_PROJECT: ${{ vars.MONIUM_PROJECT || format('folder__{0}', secrets.YC_FOLDER_ID) }}
+          MONIUM_PROJECT: ${{ vars.MONIUM_PROJECT || format('folder__{0}', vars.YC_FOLDER_ID) }}
           MONIUM_CLUSTER: ${{ vars.MONIUM_CLUSTER || 'default' }}
           MONIUM_SERVICE: ${{ vars.MONIUM_SERVICE || 'zvenfit-estetika-frontend' }}
+          MONIUM_APPLICATION: zvenfit-estetika-frontend
+          MONIUM_ENVIRONMENT: production
+          MONIUM_COMPONENT: zvenfit-estetika-telegram-lead
+          MONIUM_RESOURCE_ID: zvenfit-estetika-telegram-lead
           MONIUM_METRICS_TIMEOUT_MS: ${{ vars.MONIUM_METRICS_TIMEOUT_MS || '1000' }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
@@ -140,6 +231,7 @@ jobs:
           YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '1000' }}
           YDB_SESSION_POOL_SIZE: ${{ vars.YDB_SESSION_POOL_SIZE || '5' }}
           LOG_LEVEL: ${{ env.LOG_LEVEL }}
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
         run: bash scripts/deploy-telegram-lead.sh
 
       - name: Get function URL
@@ -150,20 +242,20 @@ jobs:
             echo "ERROR: Failed to get function URL" >&2
             exit 1
           fi
-          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
           echo "Function URL: ${URL}"
 
-  deploy-site:
-    runs-on: ubuntu-latest
+  build-site:
     needs: [deploy-function]
+    runs-on: ubuntu-latest
     environment: production
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -171,12 +263,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build site
+      - name: Build verified site artifact
         env:
           LEAD_API_URL: ${{ needs.deploy-function.outputs.function_url }}
           YANDEX_METRIKA_ID: ${{ vars.YANDEX_METRIKA_ID }}
           ASSET_VERSION: ${{ vars.ASSET_VERSION || github.run_number }}
-          SITE_URL: https://estetika.zvenfit.ru
+          SITE_URL: ${{ env.SITE_URL }}
         run: |
           if [ -z "$LEAD_API_URL" ]; then
             echo "ERROR: LEAD_API_URL is empty" >&2
@@ -185,58 +277,107 @@ jobs:
           npm run build
           node scripts/check-build.cjs
           node scripts/check-performance-budget.cjs
+          tar -czf "${RUNNER_TEMP}/site-dist.tar.gz" -C dist .
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: site-dist
+          path: ${{ runner.temp }}/site-dist.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-site:
+    needs: [deploy-function, build-site]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout deployment scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Download prebuilt site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: site-dist
+          path: ${{ runner.temp }}
+
+      - name: Extract site artifact
+        run: |
+          mkdir -p dist
+          tar -xzf "${RUNNER_TEMP}/site-dist.tar.gz" -C dist
+
+      - name: Install Yandex Cloud CLI
+        run: bash scripts/install-yc-cli.sh
+
+      - name: Authenticate storage deploy with GitHub OIDC
+        env:
+          YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+          YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
+          YC_WIF_AUDIENCE: https://github.com/zvenfit
+        run: bash scripts/auth-yc-wif.sh
+
+      - name: Prove ephemeral-key issuer is service-account scoped
+        env:
+          YC_STORAGE_SERVICE_ACCOUNT_ID: ${{ vars.YC_STORAGE_SERVICE_ACCOUNT_ID }}
+          YC_FORBIDDEN_EPHEMERAL_SUBJECT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
+        run: bash scripts/assert-ephemeral-key-boundary.sh
+
+      - name: Issue bucket-scoped ephemeral Object Storage credentials
+        env:
+          YC_STORAGE_SERVICE_ACCOUNT_ID: ${{ vars.YC_STORAGE_SERVICE_ACCOUNT_ID }}
+          OBJECT_STORAGE_BUCKET: ${{ env.S3_BUCKET }}
+        run: bash scripts/issue-ephemeral-storage-key.sh
+
+      - name: Prove Object Storage session boundary
+        env:
+          OBJECT_STORAGE_BUCKET: ${{ env.S3_BUCKET }}
+          FORBIDDEN_STORAGE_BUCKETS: zvenfit-estetika,zvenfit-frontend
+        run: bash scripts/assert-storage-boundary.sh
 
       - name: Upload immutable assets to Yandex Object Storage
-        uses: docker://amazon/aws-cli:2.25.1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
-          AWS_REGION: ru-1
-          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
-        with:
-          args: >
-            s3 sync ./dist s3://${{ env.S3_BUCKET }}
-            --delete
-            --exclude "*.html"
-            --exclude "robots.txt"
-            --exclude "sitemap.xml"
-            --cache-control "public, max-age=31536000, immutable"
+        run: |
+          aws s3 sync ./dist "s3://${S3_BUCKET}" \
+            --delete \
+            --exclude '*.html' \
+            --exclude 'robots.txt' \
+            --exclude 'sitemap.xml' \
+            --cache-control 'public, max-age=31536000, immutable' \
             --metadata-directive REPLACE
 
       - name: Upload crawl metadata (no-cache)
-        uses: docker://amazon/aws-cli:2.25.1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
-          AWS_REGION: ru-1
-          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
-        with:
-          args: >
-            s3 sync ./dist s3://${{ env.S3_BUCKET }}
-            --delete
-            --exclude "*"
-            --include "robots.txt"
-            --include "sitemap.xml"
-            --cache-control "no-cache, must-revalidate"
+        run: |
+          aws s3 sync ./dist "s3://${S3_BUCKET}" \
+            --delete \
+            --exclude '*' \
+            --include 'robots.txt' \
+            --include 'sitemap.xml' \
+            --cache-control 'no-cache, must-revalidate' \
             --metadata-directive REPLACE
 
       - name: Upload HTML (no-cache)
-        uses: docker://amazon/aws-cli:2.25.1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
-          AWS_REGION: ru-1
-          AWS_ENDPOINT_URL: https://storage.yandexcloud.net
-        with:
-          args: >
-            s3 sync ./dist s3://${{ env.S3_BUCKET }}
-            --delete
-            --exclude "*"
-            --include "*.html"
-            --cache-control "no-cache, must-revalidate"
+        run: |
+          aws s3 sync ./dist "s3://${S3_BUCKET}" \
+            --delete \
+            --exclude '*' \
+            --include '*.html' \
+            --cache-control 'no-cache, must-revalidate' \
             --metadata-directive REPLACE
 
-      - name: Smoke production deployment
+  smoke-production:
+    needs: [deploy-function, deploy-site]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout smoke test
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Smoke production deployment without cloud credentials
         env:
           SITE_URL: https://estetika.zvenfit.ru
           LEAD_API_URL: ${{ needs.deploy-function.outputs.function_url }}

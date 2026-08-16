@@ -1,6 +1,6 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-13**: отдельная инфраструктура Estetika создана, production secrets/variables настроены, а первый технический deploy полностью прошёл в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673). Функция активна, сайт и юридические страницы доступны через CDN, Метрика встроена, кеш первого 404 очищен. До приёма реальных заявок остаются юридические решения и проверка одного реального цикла форма → YDB → Telegram; мониторинговые уведомления и security hardening перечислены ниже. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
+Состояние проверено **2026-08-16**: отдельная инфраструктура Estetika создана, а первый технический deploy через прежние статические credentials прошёл в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673). Код переведён на OIDC/WIF, разделённые build/deploy jobs, отдельные deploy/verifier/storage/runtime identities, bucket-scoped ephemeral credentials и полный observability desired state; перед следующим production deploy нужно применить новые bindings/variables и затем отозвать прежние ключи. До приёма реальных заявок также остаются юридические решения, live monitoring resources и проверка цикла форма → YDB → Telegram. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
 
@@ -8,7 +8,7 @@
 
 1. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
 2. **Провести release smoke-test с реальными данными** — одна маркированная заявка, одна подписка, Telegram, YDB и визит Метрики; read-only smoke страниц уже проходит в CI.
-3. **Довести мониторинг** — подключить Telegram/email notification channels ко всем 12 алертам и проверить синтетическое уведомление.
+3. **Довести monitoring live state** — создать 8 log metrics, Telegram/email channels, 13 alerts и dashboard, затем проверить synthetic notifications и drift.
 4. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
 5. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
 
@@ -16,9 +16,14 @@
 
 ## Блокеры запуска
 
-- [x] **Авторизация Yandex Cloud в GitHub Actions** — отдельный CI service account успешно прошёл авторизацию и полный deploy в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673)
-  - [x] `YC_SA_JSON_KEY` и `YC_FOLDER_ID` проверены реальным созданием версии функции
+- [ ] **Завершить переход GitHub Actions на OIDC/WIF** — код больше не читает постоянные cloud credentials; Estetika federation/credentials уже созданы, осталось добавить Variables `YC_FOLDER_ID`, `YC_DEPLOY_SERVICE_ACCOUNT_ID`, `YC_YDB_VERIFY_SERVICE_ACCOUNT_ID`, `YC_STORAGE_SERVICE_ACCOUNT_ID`, выполнить deploy, затем удалить GitHub Secrets `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` и отозвать соответствующие ключи
+  - [x] В Yandex Cloud созданы отдельные verifier/storage SA, Estetika federation и две federated credentials; deploy SA лишён YDB-доступа и не имеет folder-level ролей (проверено 2026-08-16)
+  - [x] `npm ci` и build jobs не имеют OIDC; credentialed jobs получают только заранее собранные artifacts
+  - [x] Live YDB probe использует отдельный verifier SA, а function/storage deploy — отдельный deploy SA
+  - [x] Object Storage получает одночасовой session key с policy только для `zvenfit-estetika-frontend`; `zvenfit-estetika` и бакеты основного сайта исключены
+  - [x] CI негативно проверяет запрет выпуска ключа для runtime SA и запрет доступа session к соседним бакетам
   - [x] Обязательные production secrets/variables прошли preflight; `ASSET_VERSION` остаётся необязательным
+  - [ ] Добавить новые SA IDs в GitHub Environment, выполнить первый WIF deploy, затем отозвать legacy keys и убрать временный deploy-SA grant из ACL site bucket
 - [x] **JS-библиотеки в CDN** — обязательные Webflow-зависимости перенесены в `storage.yandexcloud.net/zvenfit-estetika/js/`
   - [x] Зафиксировать `jquery@3.5.1`; ранее загруженные GSAP и ScrollTrigger удалены из runtime и зависимостей после motion-cleanup 2026-08-13
   - [x] Напрямую загрузить jQuery и `webflow.js` в Object Storage без staging и `sync --delete`; URL отвечают HTTP 200, хеши совпадают (2026-08-07)
@@ -31,7 +36,7 @@
   - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
   - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
-- [ ] **После первого деплоя создать мониторинг в Monium** — по `docs/monitoring.md` и `scripts/monitoring.config.json` создать log metrics, Telegram/email notification channels и alerts, затем выполнить безопасный smoke-тест алертов
+- [ ] **Создать monitoring live state в Monium** — по `docs/monitoring.md` и `scripts/monitoring.config.json` создать 8 log metrics, Telegram/email channels, 13 alerts и dashboard; выполнить безопасный smoke и read-only drift check
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - [ ] **Юридическая проверка форм до приёма заявок** — по решению владельца согласие выражается отправкой формы без отдельных чекбоксов и сохраняется с версией в YDB; остаётся подтвердить такой способ и формулировки с юристом
 - [x] **Проверить владельца данных в документах** — ИП, ИНН, адрес и телефон подтверждены владельцем проекта 2026-08-14
@@ -60,7 +65,7 @@
   - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
   - [ ] Проверить заголовки для `/`, `/form/`, `/404.html` и юридических страниц командой `curl -I` после распространения настроек CDN
 - [ ] **Content Security Policy** — вынести исполняемый inline-код, запустить CSP сначала в `Report-Only`, учесть домены Яндекс Метрики, затем включить enforcement с `frame-ancestors 'none'`
-- [x] **Код и контракт мониторинга заявок** — Pino/redaction, direct OTLP counters, queue gauges, heartbeat, YDB latency/retries, конфиг, contract tests и безопасный smoke-скрипт
+- [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через log aggregates; direct OTLP только для queue gauges/heartbeat; 13 alerts, dashboard, drift check и безопасный smoke-скрипт
 
 ---
 
@@ -175,7 +180,7 @@
 
 ## Чек-лист перед релизом
 
-- [x] `npm test` проходит: линтер, strict TypeScript, 34 unit-теста Cloud Function, проверка CommonJS-артефакта, 22 contract-теста CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-13)
+- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 36 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
 - [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
 - [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)

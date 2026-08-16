@@ -193,3 +193,61 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
     }
   }
 });
+
+test('Telegram HTTP failures preserve a safe type and upstream status', async () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+
+  process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  const requestFactory = ((_url: URL, _options: Record<string, unknown>, callback: Function) => {
+    const request = new EventEmitter() as EventEmitter & { end: () => void };
+    request.end = () => {
+      const response = new Readable({ read() {} }) as Readable & { statusCode: number };
+      response.statusCode = 429;
+      callback(response);
+      response.push('{"ok":false}');
+      response.push(null);
+    };
+
+    return request;
+  }) as never;
+
+  try {
+    await assert.rejects(
+      sendTelegram(
+        {
+          submissionId: 'submission-http-error-test',
+          formType: 'lead',
+          createdAt: new Date('2026-08-09T00:00:00.000Z'),
+          name: 'Анна',
+          phone: '+79990000000',
+          service: 'Позвонить',
+          telegramUsername: '',
+          utm: {},
+          consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
+          telegramAttempts: 1,
+        },
+        requestFactory,
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.name === 'TelegramError' &&
+        'code' in error &&
+        error.code === 'telegram_error' &&
+        'status' in error &&
+        error.status === 429,
+    );
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.TELEGRAM_BOT_TOKEN;
+    } else {
+      process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    }
+    if (previousChatId === undefined) {
+      delete process.env.TELEGRAM_CHAT_ID;
+    } else {
+      process.env.TELEGRAM_CHAT_ID = previousChatId;
+    }
+  }
+});

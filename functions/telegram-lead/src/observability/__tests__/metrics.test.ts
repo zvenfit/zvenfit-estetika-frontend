@@ -11,6 +11,7 @@ import { createInvocationMetrics } from '../metrics';
 import { createOtelTransport } from '../otel-transport';
 
 import type { JsonObject, LoggerLike } from '../../types';
+import type { MetricAttributes } from '@opentelemetry/api';
 
 class TestLogger implements LoggerLike {
   public readonly errors: JsonObject[] = [];
@@ -45,7 +46,7 @@ test('stays inert when metrics are disabled and validates required credentials',
     },
   });
 
-  disabled.addCounter('test_counter');
+  disabled.recordGauge('test_gauge', 1);
   await disabled.flush();
   assert.equal(factoryCalls, 0);
 
@@ -57,9 +58,9 @@ test('stays inert when metrics are disabled and validates required credentials',
   ]);
 });
 
-test('initializes lazily with bounded Monium settings and flushes once', async () => {
+test('records gauges with canonical taxonomy and flushes once', async () => {
   const logger = new TestLogger();
-  const calls: Array<{ kind: string; name: string; value: number }> = [];
+  const calls: Array<{ name: string; value: number; attributes?: MetricAttributes }> = [];
   const options: unknown[] = [];
   let flushCalls = 0;
   const metrics = createInvocationMetrics(undefined, logger, {
@@ -71,8 +72,7 @@ test('initializes lazily with bounded Monium settings and flushes once', async (
       options.push(transportOptions);
 
       return {
-        addCounter: (name, value) => calls.push({ kind: 'counter', name, value }),
-        recordGauge: (name, value) => calls.push({ kind: 'gauge', name, value }),
+        recordGauge: (name, value, attributes) => calls.push({ name, value, attributes }),
         async flush() {
           flushCalls += 1;
         },
@@ -81,14 +81,21 @@ test('initializes lazily with bounded Monium settings and flushes once', async (
   });
 
   assert.deepEqual(options, []);
-  metrics.addCounter('submission_saved', 2);
-  metrics.recordGauge('queue_depth', 3);
+  metrics.recordGauge('queue_depth', 3, { resource_id: 'must-not-override' });
   await metrics.flush();
   await metrics.flush();
 
   assert.deepEqual(calls, [
-    { kind: 'counter', name: 'submission_saved', value: 2 },
-    { kind: 'gauge', name: 'queue_depth', value: 3 },
+    {
+      name: 'queue_depth',
+      value: 3,
+      attributes: {
+        application: 'zvenfit-estetika-frontend',
+        environment: 'production',
+        component: 'zvenfit-estetika-telegram-lead',
+        resource_id: 'zvenfit-estetika-telegram-lead',
+      },
+    },
   ]);
   assert.equal(flushCalls, 1);
   assert.deepEqual(options, [
@@ -113,7 +120,7 @@ test('does not propagate initialization or export failures or expose credentials
       throw Object.assign(new Error('unavailable'), { code: 'collector_unavailable' });
     },
   });
-  assert.doesNotThrow(() => initializationMetrics.addCounter('storage_errors'));
+  assert.doesNotThrow(() => initializationMetrics.recordGauge('queue_health', 0));
   assert.deepEqual(initializationLogger.errors, [
     { event: 'monium_metrics_init_error', error_code: 'collector_unavailable' },
   ]);
@@ -122,14 +129,13 @@ test('does not propagate initialization or export failures or expose credentials
   const exportMetrics = createInvocationMetrics(undefined, exportLogger, {
     env: enabledEnv(),
     transportFactory: () => ({
-      addCounter() {},
       recordGauge() {},
       async flush() {
         throw Object.assign(new Error('timeout'), { code: 'export_timeout' });
       },
     }),
   });
-  exportMetrics.addCounter('storage_errors');
+  exportMetrics.recordGauge('queue_health', 0);
   await assert.doesNotReject(exportMetrics.flush());
   assert.deepEqual(exportLogger.errors, [
     { event: 'monium_metrics_export_error', error_code: 'export_timeout' },
@@ -145,15 +151,15 @@ test('bounds exporter timeout', () => {
       transportFactory: options => {
         timeouts.push(options.timeoutMs);
 
-        return { addCounter() {}, recordGauge() {}, async flush() {} };
+        return { recordGauge() {}, async flush() {} };
       },
     });
-    metrics.addCounter('test_counter');
+    metrics.recordGauge('test_gauge', 1);
   }
   assert.deepEqual(timeouts, [100, 5000]);
 });
 
-test('exports delta metrics and surfaces collector rejection', async () => {
+test('exports cumulative gauges and surfaces collector rejection', async () => {
   let exportedMetrics: ResourceMetrics | undefined;
   const exporter: PushMetricExporter = {
     export(metrics, callback) {
@@ -167,14 +173,14 @@ test('exports delta metrics and surfaces collector rejection', async () => {
     { endpoint: 'https://example.test', headers: {}, timeoutMs: 100 },
     () => exporter,
   );
-  transport.addCounter('zvenfit_test_events', 2, { outcome: 'stored' });
+  transport.recordGauge('zvenfit_test_health', 2, { outcome: 'stored' });
   await transport.flush();
 
   const metric = exportedMetrics?.scopeMetrics
     .flatMap(scope => scope.metrics)
-    .find(item => item.descriptor.name === 'zvenfit_test_events');
+    .find(item => item.descriptor.name === 'zvenfit_test_health');
   assert.ok(metric);
-  assert.equal(metric.aggregationTemporality, AggregationTemporality.DELTA);
+  assert.equal(metric.aggregationTemporality, AggregationTemporality.CUMULATIVE);
   assert.equal(metric.dataPoints[0]?.value, 2);
 
   const rejected: PushMetricExporter = {
@@ -191,11 +197,11 @@ test('exports delta metrics and surfaces collector rejection', async () => {
     { endpoint: 'https://example.test', headers: {}, timeoutMs: 100 },
     () => rejected,
   );
-  rejectedTransport.addCounter('zvenfit_test_events', 1);
+  rejectedTransport.recordGauge('zvenfit_test_health', 1);
   await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
 });
 
-test('exports zero-valued queue gauges as cumulative instant values', async () => {
+test('exports zero-valued queue gauges as real samples', async () => {
   let exportedMetrics: ResourceMetrics | undefined;
   const exporter: PushMetricExporter = {
     export(metrics, callback) {

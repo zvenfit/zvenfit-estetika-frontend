@@ -15,6 +15,7 @@
     "test:build": "node scripts/test-build.cjs",
     "test:performance": "node scripts/check-performance-budget.cjs",
     "test:monitoring": "node --test scripts/__tests__/*.test.cjs",
+    "check:monitoring-drift": "node scripts/check-monitoring-drift.cjs",
     "test:deploy-config": "node scripts/check-deploy-config.cjs",
     "smoke:production": "node scripts/smoke-production.cjs",
     "check:upstream-parity": "node scripts/check-upstream-parity.cjs",

@@ -43,42 +43,83 @@ curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
 
 ## 2. Изолированные service accounts, YDB и функция
 
-Estetika использует отдельные service accounts и resource-level bindings. Не выдавайте CI
-folder-level роли `functions.editor`, `storage.editor` или `ydb.editor`: иначе его ключи смогут
-изменять ресурсы основного `zvenfit-frontend` в том же каталоге.
+Estetika использует отдельные service accounts, GitHub OIDC/WIF и resource-level bindings. Не
+выдавайте CI folder-level роли `functions.editor`, `storage.editor` или `ydb.editor`: в общей
+production folder это откроет ресурсы основного `zvenfit-frontend`. Постоянные authorized JSON и
+S3 access keys для GitHub Actions не создаются.
 
 ```bash
 yc init
 export YC_FOLDER_ID="$(yc config get folder-id)"
-export SA_NAME=github-ci-zvenfit-estetika
 
-yc iam service-account create --name "$SA_NAME"
-SA_ID="$(yc iam service-account get --name "$SA_NAME" --format json | jq -r '.id')"
+yc iam service-account create --name zvenfit-estetika-frontend-ci-sa
+yc iam service-account create --name zvenfit-estetika-ydb-verify-sa
+yc iam service-account create --name zvenfit-estetika-site-storage-sa
+yc iam service-account create --name zvenfit-estetika-lead-runtime
+
+DEPLOY_SA_ID="$(yc iam service-account get \
+  --name zvenfit-estetika-frontend-ci-sa --format json | jq -r '.id')"
+VERIFY_SA_ID="$(yc iam service-account get \
+  --name zvenfit-estetika-ydb-verify-sa --format json | jq -r '.id')"
+STORAGE_SA_ID="$(yc iam service-account get \
+  --name zvenfit-estetika-site-storage-sa --format json | jq -r '.id')"
+RUNTIME_SA_ID="$(yc iam service-account get \
+  --name zvenfit-estetika-lead-runtime --format json | jq -r '.id')"
 ```
 
-Для этого аккаунта нужны два набора реквизитов:
+Если уже существует прежний `github-ci-zvenfit-estetika`, используйте его ID и переименуйте аккаунт,
+не создавая вторую deploy identity. Verifier, storage и runtime identities всё равно должны быть
+отдельными: preflight отклоняет совпадающие ID.
 
-- авторизованный JSON-ключ для использования `yc` в CI → секрет GitHub `YC_SA_JSON_KEY`;
-- статические ID и секретный ключ Object Storage → `YC_ACCESS_KEY_ID` и `YC_SECRET_ACCESS_KEY`.
+### GitHub OIDC / Workload Identity Federation
 
-Авторизованный ключ можно создать локально:
+Создайте отдельную federation для Estetika production и свяжите её только с subject GitHub
+Environment этого репозитория:
 
 ```bash
-yc iam key create --service-account-name "$SA_NAME" --output sa-key.json
+yc iam workload-identity oidc federation create \
+  --name zvenfit-estetika-production-github \
+  --folder-id "$YC_FOLDER_ID" \
+  --issuer https://token.actions.githubusercontent.com \
+  --audiences https://github.com/zvenfit \
+  --jwks-url https://token.actions.githubusercontent.com/.well-known/jwks
+
+FEDERATION_ID="$(yc iam workload-identity oidc federation get \
+  --name zvenfit-estetika-production-github --format json | jq -r '.id')"
+
+for WIF_SA_ID in "$DEPLOY_SA_ID" "$VERIFY_SA_ID"; do
+  yc iam workload-identity federated-credential create \
+    --service-account-id "$WIF_SA_ID" \
+    --federation-id "$FEDERATION_ID" \
+    --external-subject-id \
+    'repo:zvenfit/zvenfit-estetika-frontend:environment:production'
+done
 ```
 
-Скопируйте JSON целиком в GitHub Secrets, затем безопасно удалите локальный файл. Статический ключ создайте в консоли Yandex Cloud или актуальной командой `yc iam access-key`: его секрет показывается только при создании.
+Workflow получает GitHub OIDC JWT и выбирает audience конкретной identity. `VERIFY_SA_ID` имеет
+доступ только к Estetika YDB; `DEPLOY_SA_ID` создаёт версию только Estetika-функции и выпускает
+одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA имеет READ/WRITE только на
+`zvenfit-estetika-frontend`.
 
-Для runtime функции создайте отдельный сервисный аккаунт без статических ключей. Его ID потребуется
-как GitHub Variable `YC_LEAD_SERVICE_ACCOUNT_ID`:
+Роль выпуска ephemeral keys назначается на ресурс storage SA, а не на общую folder:
 
 ```bash
-export RUNTIME_SA_NAME=zvenfit-estetika-lead-runtime
-yc iam service-account create --name "$RUNTIME_SA_NAME"
-RUNTIME_SA_ID="$(yc iam service-account get --name "$RUNTIME_SA_NAME" --format json | jq -r '.id')"
-
-echo "YC_LEAD_SERVICE_ACCOUNT_ID=$RUNTIME_SA_ID"
+yc iam service-account add-access-binding \
+  --id "$STORAGE_SA_ID" \
+  --role iam.serviceAccounts.ephemeralAccessKeyAdmin \
+  --service-account-id "$DEPLOY_SA_ID"
 ```
+
+Не заменяйте binding ролью на folder. CI сначала пытается выпустить deny-only ключ для runtime SA и
+обязан получить `PERMISSION_DENIED`, затем выпускает ключ для storage SA и проверяет, что session не
+может читать `zvenfit-estetika` или `zvenfit-frontend`. Если Yandex Cloud не принимает
+service-account-scoped binding в конкретной организации, безопасный fallback — отдельный folder или
+credential broker с фиксированными subject/policy; folder-level issuer в общей folder не используется.
+
+`npm ci`, TypeScript и сборка сайта выполняются в jobs без OIDC. Jobs с `id-token: write` скачивают
+готовые SHA-pinned Actions artifacts. Исключение — live YDB integration/schema probe: он исполняет
+предварительно собранный verifier под отдельным `VERIFY_SA_ID`, который не может менять функцию,
+выпускать S3 keys или обращаться к другим YDB.
 
 До первого CI deploy администратор один раз создаёт YDB, финальную схему, функцию и retry timer и
 выдаёт доступы на конкретные ресурсы. Обычный deploy после этого только проверяет инфраструктуру
@@ -100,7 +141,7 @@ echo "YDB_DATABASE_ID=$YDB_DATABASE_ID"
 yc ydb database add-access-binding \
   --name zvenfit-estetika-leads \
   --role ydb.editor \
-  --service-account-id "$SA_ID"
+  --service-account-id "$VERIFY_SA_ID"
 
 yc ydb database add-access-binding \
   --name zvenfit-estetika-leads \
@@ -117,13 +158,13 @@ unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
 yc iam service-account add-access-binding \
   --id "$RUNTIME_SA_ID" \
   --role iam.serviceAccounts.user \
-  --service-account-id "$SA_ID"
+  --service-account-id "$DEPLOY_SA_ID"
 
 yc serverless function create --name zvenfit-estetika-telegram-lead
 yc serverless function add-access-binding \
   --name zvenfit-estetika-telegram-lead \
   --role functions.editor \
-  --service-account-id "$SA_ID"
+  --service-account-id "$DEPLOY_SA_ID"
 
 yc serverless function allow-unauthenticated-invoke zvenfit-estetika-telegram-lead
 yc serverless function add-access-binding \
@@ -161,6 +202,28 @@ yc iam api-key create \
 binding, не изменяет timer и останавливает deploy с инструкцией, если функция или binding
 отсутствуют; выдавать `functions.admin` CI не требуется.
 
+### Минимальная IAM-матрица
+
+| Identity | Scope | Role / access | Зачем |
+| --- | --- | --- | --- |
+| deploy SA | federation credential | subject только `zvenfit-estetika-frontend:environment:production` | обмен GitHub OIDC на IAM token |
+| deploy SA | `zvenfit-estetika-telegram-lead` | `functions.editor` | создавать версии своей функции |
+| deploy SA | runtime SA | `iam.serviceAccounts.user` | назначать runtime identity версии функции |
+| deploy SA | storage SA | `iam.serviceAccounts.ephemeralAccessKeyAdmin` | выпускать ephemeral key только для storage SA |
+| verifier SA | federation credential | тот же точный GitHub Environment subject | отдельная WIF identity для live YDB probe |
+| verifier SA | `zvenfit-estetika-leads` | `ydb.editor` | integration probe и schema verification |
+| storage SA | `zvenfit-estetika-frontend` | bucket READ/WRITE ACL | загружать только артефакт сайта |
+| runtime SA | `zvenfit-estetika-leads` | `ydb.editor` | хранить заявки, rate limit и retry state |
+| runtime SA | Monium project | `monium.metrics.writer` + scoped API key | писать direct queue gauges |
+| runtime SA | функция | `functions.functionInvoker` | timer вызывает функцию |
+| `allUsers` | функция | `functions.functionInvoker` | публичная форма до появления Gateway/SWS |
+| `allUsers` | оба Estetika buckets | public read | CDN origin и прямые ассеты |
+
+У deploy и verifier SA нет доступа к данным Object Storage. Storage SA не имеет доступа к
+`zvenfit-estetika`, `zvenfit-frontend` и другим бакетам общей folder.
+Обычный CI не создаёт YDB, function, trigger, bucket, federation и IAM bindings — это
+административный bootstrap.
+
 ## 3. Object Storage
 
 | Бакет | Содержимое | Как обновляется |
@@ -175,15 +238,15 @@ export YC_FOLDER_ID="$(yc config get folder-id)"
 npm run setup:storage
 ```
 
-Скрипт выдаёт `READ` + `WRITE` CI service account только через ACL бакета
+Скрипт выдаёт `READ` + `WRITE` storage service account только через ACL бакета
 `zvenfit-estetika-frontend`. Доступ к бакету ассетов `zvenfit-estetika` и к бакетам основного
 проекта CI не получает. Команда ACL, если инфраструктура настраивается вручную:
 
 ```bash
 yc storage bucket update zvenfit-estetika-frontend \
   --public-read \
-  --grants grant-type=grant-type-account,grantee-id="$SA_ID",permission=permission-read \
-  --grants grant-type=grant-type-account,grantee-id="$SA_ID",permission=permission-write
+  --grants grant-type=grant-type-account,grantee-id="$STORAGE_SA_ID",permission=permission-read \
+  --grants grant-type=grant-type-account,grantee-id="$STORAGE_SA_ID",permission=permission-write
 ```
 
 Сгенерированный артефакт сайта содержит:
@@ -232,6 +295,7 @@ node scripts/check-build.cjs
 
 AWS_ACCESS_KEY_ID=... \
 AWS_SECRET_ACCESS_KEY=... \
+AWS_SESSION_TOKEN=... \
 npm run deploy:yc
 ```
 
@@ -257,19 +321,19 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 
 | Имя | Значение |
 |-----|----------|
-| `YC_SA_JSON_KEY` | Полный JSON авторизованного ключа сервисного аккаунта |
-| `YC_FOLDER_ID` | Идентификатор каталога Yandex Cloud для `yc` |
 | `TELEGRAM_BOT_TOKEN` | Токен Telegram-бота |
 | `TELEGRAM_CHAT_ID` | Идентификатор целевой группы |
 | `LEAD_RATE_LIMIT_SECRET` | Случайная строка длиной от 32 символов для HMAC IP (`openssl rand -hex 32`) |
 | `MONIUM_API_KEY` | API key с правом записи direct metrics в Monium; передаётся только функции |
-| `YC_ACCESS_KEY_ID` | ID статического ключа Object Storage |
-| `YC_SECRET_ACCESS_KEY` | Секретная часть статического ключа Object Storage |
 
 Переменные репозитория:
 
 | Имя | Значение |
 |-----|----------|
+| `YC_FOLDER_ID` | Идентификатор production folder Yandex Cloud |
+| `YC_DEPLOY_SERVICE_ACCOUNT_ID` | ID `zvenfit-estetika-frontend-ci-sa`, связанного с WIF |
+| `YC_YDB_VERIFY_SERVICE_ACCOUNT_ID` | ID отдельного `zvenfit-estetika-ydb-verify-sa`, связанного с той же federation |
+| `YC_STORAGE_SERVICE_ACCOUNT_ID` | ID `zvenfit-estetika-site-storage-sa`; WIF к нему не привязывается |
 | `YANDEX_METRIKA_ID` | Идентификатор продакшен-счётчика Метрики |
 | `ASSET_VERSION` | Необязательная версия для сброса кеша; по умолчанию используется номер запуска workflow |
 | `YC_LEAD_SERVICE_ACCOUNT_ID` | Обязательный ID отдельного runtime SA функции и таймера |
@@ -301,19 +365,27 @@ GitHub Environment `production` использует custom deployment branch po
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. Единственный production-домен проекта — `https://estetika.zvenfit.ru`. Вариант `www.estetika.zvenfit.ru` намеренно не поддерживается и не должен добавляться в DNS, TLS, CORS или CI. При добавлении или удалении другого домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
+После первого успешного WIF deploy удалите GitHub Secrets `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID` и
+`YC_SECRET_ACCESS_KEY`, отзовите соответствующие authorized/static access keys в Yandex Cloud и не
+оставляйте их как fallback. Повторно выполните `npm run setup:storage`: скрипт перепишет ACL site
+bucket на отдельный storage SA и удалит временный legacy deploy-SA grant. Runtime-секреты Telegram,
+rate limit и Monium к WIF не относятся.
+
 ## 6. Первый деплой
 
 1. Убедитесь, что изображения и шрифты уже находятся в бакете ассетов.
 2. Убедитесь, что все используемые сторонние CSS и JS-библиотеки уже доступны из бакета ассетов.
 3. Настройте все перечисленные выше секреты и переменные GitHub.
 4. Отправьте изменения в `main` или вручную запустите workflow `Deploy to Production`.
-5. Убедитесь, что успешно завершились проверка YDB, integration test, read-only проверка схемы, деплой версии функции, сборка сайта, проверка артефакта и три синхронизации с S3.
+5. Убедитесь, что успешно завершились artifact packaging, отдельная WIF-проверка YDB, integration test, read-only проверка схемы, деплой версии функции, сборка сайта без OIDC, обе негативные проверки доступа и три синхронизации с S3.
 
 Порядок шагов workflow:
 
 ```text
-quality checks → deploy preflight → проверка YDB → integration test → проверка схемы → версия функции →
-получение URL → сборка → проверка dist → immutable-ассеты → robots/sitemap → HTML → production smoke
+quality checks + immutable artifacts → deploy preflight → verifier OIDC/WIF → integration test →
+проверка схемы → function deploy OIDC/WIF → версия функции → получение URL → сборка сайта без OIDC →
+storage deploy OIDC/WIF → negative issuer test → bucket-scoped ephemeral key → negative bucket test →
+immutable-ассеты → robots/sitemap → HTML → production smoke без cloud credentials
 ```
 
 Для полного ручного деплоя сначала разверните функцию, затем используйте напечатанный скриптом URL при сборке сайта:
@@ -326,6 +398,7 @@ export TELEGRAM_CHAT_ID=...
 export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
 export MONIUM_API_KEY=...
 export ALLOWED_ORIGINS=https://estetika.zvenfit.ru
+bash scripts/verify-telegram-lead-ydb.sh
 npm run deploy:lead-fn
 
 export LEAD_API_URL=...  # значение из вывода deploy:lead-fn
@@ -334,8 +407,10 @@ export ASSET_VERSION=manual
 npm run build
 node scripts/check-build.cjs
 
+# Только короткоживущие credentials Object Storage:
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
+export AWS_SESSION_TOKEN=...
 npm run deploy:yc
 ```
 

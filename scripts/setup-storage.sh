@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SITE_BUCKET="${YC_S3_BUCKET:-zvenfit-estetika-frontend}"
 ASSETS_BUCKET="${YC_ASSETS_BUCKET:-zvenfit-estetika}"
 FOLDER_ID="${YC_FOLDER_ID:-}"
-SA_NAME="${YC_SA_NAME:-github-ci-zvenfit-estetika}"
+STORAGE_SA_NAME="${YC_STORAGE_SA_NAME:-zvenfit-estetika-site-storage-sa}"
 WEBSITE_SETTINGS_FILE="${SCRIPT_DIR}/website-settings.json"
 
 if [[ -z "${FOLDER_ID}" ]]; then
@@ -59,16 +59,19 @@ yc storage bucket update \
   --cors allowed-methods='[method-get,method-head]',allowed-origins='[*]',allowed-headers='[*]',max-age-seconds=86400
 echo "    CORS enabled for public fonts and assets"
 
-if yc iam service-account get --name "${SA_NAME}" >/dev/null 2>&1; then
-  SA_ID="$(yc iam service-account get --name "${SA_NAME}" --format json | jq -r '.id')"
-  echo ""
-  echo "==> Grant bucket-scoped read/write ACL to ${SA_NAME}"
-  yc storage bucket update \
-    --name "${SITE_BUCKET}" \
-    --public-read \
-    --grants grant-type=grant-type-account,grantee-id="${SA_ID}",permission=permission-read \
-    --grants grant-type=grant-type-account,grantee-id="${SA_ID}",permission=permission-write
+if ! yc iam service-account get --name "${STORAGE_SA_NAME}" >/dev/null 2>&1; then
+  echo "setup-storage: required storage identity ${STORAGE_SA_NAME} does not exist" >&2
+  exit 1
 fi
+
+STORAGE_SA_ID="$(yc iam service-account get --name "${STORAGE_SA_NAME}" --format json | jq -r '.id')"
+echo ""
+echo "==> Grant bucket-scoped read/write ACL to storage identity ${STORAGE_SA_NAME}"
+yc storage bucket update \
+  --name "${SITE_BUCKET}" \
+  --public-read \
+  --grants grant-type=grant-type-account,grantee-id="${STORAGE_SA_ID}",permission=permission-read \
+  --grants grant-type=grant-type-account,grantee-id="${STORAGE_SA_ID}",permission=permission-write
 
 echo ""
 echo "setup-storage: OK"

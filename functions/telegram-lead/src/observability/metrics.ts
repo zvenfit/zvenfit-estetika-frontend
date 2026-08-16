@@ -1,10 +1,15 @@
 import { createOtelTransport, type MetricsTransport, type MetricsTransportOptions } from './otel-transport';
 
 import type { ApplicationMetrics, FunctionContext, LoggerLike } from '../types';
+import type { MetricAttributes } from '@opentelemetry/api';
 
 const DEFAULT_ENDPOINT = 'https://ingest.monium.yandex.cloud/otlp/v1/metrics';
 const DEFAULT_CLUSTER = 'default';
 const DEFAULT_SERVICE = 'zvenfit-estetika-frontend';
+const DEFAULT_APPLICATION = 'zvenfit-estetika-frontend';
+const DEFAULT_ENVIRONMENT = 'production';
+const DEFAULT_COMPONENT = 'zvenfit-estetika-telegram-lead';
+const DEFAULT_RESOURCE_ID = 'zvenfit-estetika-telegram-lead';
 const DEFAULT_TIMEOUT_MS = 1000;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 5000;
@@ -16,7 +21,12 @@ interface CreateInvocationMetricsOptions {
   transportFactory?: MetricsTransportFactory;
 }
 
-class LazyInvocationMetrics implements ApplicationMetrics {
+export interface InvocationMetrics extends ApplicationMetrics {
+  recordGauge(name: string, value: number, attributes?: MetricAttributes): void;
+  flush(): Promise<void>;
+}
+
+class LazyInvocationMetrics implements InvocationMetrics {
   private transport?: MetricsTransport;
   private initializationFailed = false;
   private flushed = false;
@@ -25,14 +35,13 @@ class LazyInvocationMetrics implements ApplicationMetrics {
     private readonly transportOptions: MetricsTransportOptions,
     private readonly transportFactory: MetricsTransportFactory,
     private readonly logger: LoggerLike,
+    private readonly defaultAttributes: MetricAttributes,
   ) {}
 
-  public addCounter(name: string, value = 1, attributes?: Record<string, string | number | boolean>): void {
-    this.record(transport => transport.addCounter(name, value, attributes));
-  }
-
-  public recordGauge(name: string, value: number, attributes?: Record<string, string | number | boolean>): void {
-    this.record(transport => transport.recordGauge(name, value, attributes));
+  public recordGauge(name: string, value: number, attributes?: MetricAttributes): void {
+    this.record(transport =>
+      transport.recordGauge(name, value, { ...attributes, ...this.defaultAttributes }),
+    );
   }
 
   public async flush(): Promise<void> {
@@ -57,8 +66,7 @@ class LazyInvocationMetrics implements ApplicationMetrics {
   }
 }
 
-const NOOP_METRICS: ApplicationMetrics = {
-  addCounter() {},
+const NOOP_METRICS: InvocationMetrics = {
   recordGauge() {},
   async flush() {},
 };
@@ -89,7 +97,7 @@ export function createInvocationMetrics(
   _context: FunctionContext | undefined,
   logger: LoggerLike,
   options: CreateInvocationMetricsOptions = {},
-): ApplicationMetrics {
+): InvocationMetrics {
   const env = options.env ?? process.env;
   if (!metricsEnabled(env)) return NOOP_METRICS;
 
@@ -117,7 +125,26 @@ export function createInvocationMetrics(
     },
     options.transportFactory ?? createOtelTransport,
     logger,
+    {
+      application: env.MONIUM_APPLICATION?.trim() || DEFAULT_APPLICATION,
+      environment: env.MONIUM_ENVIRONMENT?.trim() || DEFAULT_ENVIRONMENT,
+      component: env.MONIUM_COMPONENT?.trim() || DEFAULT_COMPONENT,
+      resource_id: env.MONIUM_RESOURCE_ID?.trim() || DEFAULT_RESOURCE_ID,
+    },
   );
 }
 
-export const _private = { metricsEnabled, metricsTimeoutMs };
+export const _private = {
+  DEFAULT_APPLICATION,
+  DEFAULT_CLUSTER,
+  DEFAULT_COMPONENT,
+  DEFAULT_ENDPOINT,
+  DEFAULT_ENVIRONMENT,
+  DEFAULT_RESOURCE_ID,
+  DEFAULT_SERVICE,
+  MAX_TIMEOUT_MS,
+  MIN_TIMEOUT_MS,
+  createOtelTransport,
+  metricsEnabled,
+  metricsTimeoutMs,
+};

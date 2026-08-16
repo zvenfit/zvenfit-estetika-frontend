@@ -30,11 +30,6 @@ export interface LoggerLike {
 }
 
 export interface ApplicationMetrics {
-  addCounter(
-    name: string,
-    value?: number,
-    attributes?: Record<string, string | number | boolean>,
-  ): void;
   recordGauge(
     name: string,
     value: number,

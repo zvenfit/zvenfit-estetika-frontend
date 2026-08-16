@@ -4,6 +4,7 @@ import { request as httpsRequest } from 'node:https';
 import type { ClientRequest, IncomingMessage, RequestOptions } from 'node:http';
 
 import { sanitize, TRACKED_UTM_PARAMS } from '../submission-payload';
+import { safeErrorFields } from '../observability/errors';
 
 import type {
   ClaimedSubmission,
@@ -93,10 +94,21 @@ export function logDeliveryFailure(
   logger: LoggerLike,
   event: string,
   submissionId: string,
-  code: string,
-  attempts: number,
+  error: unknown,
+  options: { attempts: number; fallbackCode: string; retriable: boolean },
 ): void {
-  logger.error({ event, submission_id: submissionId, error_code: code, attempts }, event);
+  logger.error(
+    {
+      event,
+      submission_id: submissionId,
+      attempts: options.attempts,
+      ...safeErrorFields(error, {
+        fallbackCode: options.fallbackCode,
+        retriable: options.retriable,
+      }),
+    },
+    event,
+  );
 }
 
 export function maxTelegramAttempts(): number {
@@ -127,8 +139,12 @@ function nextRetryAt(now: Date, attempts: number): Date {
   return new Date(now.getTime() + delayMinutes * 60 * 1000);
 }
 
-function telegramError(message: string, code: string): Error & { code: string } {
-  return Object.assign(new Error(message), { code });
+function telegramError(
+  message: string,
+  code: string,
+  status?: number,
+): Error & { code: string; status?: number } {
+  return Object.assign(new Error(message), { code, name: 'TelegramError', status });
 }
 
 function telegramNetworkErrorCode(error: unknown): string {
@@ -215,7 +231,7 @@ export async function sendTelegram(
     'ok' in responseBody &&
     responseBody.ok === true;
   if (response.statusCode < 200 || response.statusCode >= 300 || !telegramOk) {
-    throw telegramError('Telegram returned an error', 'telegram_error');
+    throw telegramError('Telegram returned an error', 'telegram_error', response.statusCode);
   }
 }
 
@@ -262,8 +278,12 @@ export async function deliverSubmission(
       logger,
       terminal ? 'telegram_delivery_failed_permanently' : 'telegram_delivery_retry_scheduled',
       submissionId,
-      code,
-      claimed.telegramAttempts,
+      error,
+      {
+        attempts: claimed.telegramAttempts,
+        fallbackCode: code,
+        retriable: !terminal,
+      },
     );
 
     return terminal ? 'failed' : 'pending';
@@ -296,8 +316,8 @@ export async function retryPendingSubmissions(
         logger,
         'telegram_delivery_retry_error',
         submissionId,
-        errorCode(error, 'storage_error'),
-        0,
+        error,
+        { attempts: 0, fallbackCode: 'storage_error', retriable: true },
       );
     }
   }

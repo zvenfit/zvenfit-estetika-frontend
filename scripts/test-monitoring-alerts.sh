@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+LOG_GROUP_NAME="${YC_LOG_GROUP_NAME:-default}"
+APPLICATION_NAME="zvenfit-estetika-frontend"
+SERVICE_NAME="zvenfit-estetika-telegram-lead"
+MONITORING_ENVIRONMENT="production"
+
 if [[ "${1:-}" != "--confirm" ]]; then
   echo "Usage: bash scripts/test-monitoring-alerts.sh --confirm" >&2
-  exit 1
+  echo "This writes synthetic technical records and intentionally triggers production alerts." >&2
+  exit 2
 fi
 
 if ! command -v yc >/dev/null 2>&1; then
@@ -11,26 +17,39 @@ if ! command -v yc >/dev/null 2>&1; then
   exit 1
 fi
 
-LOG_GROUP_NAME="${LOG_GROUP_NAME:-default}"
-APPLICATION_NAME="zvenfit-estetika-frontend"
-MONITORING_ENVIRONMENT="production"
-
 write_event() {
   local event="$1"
-  local extra="${2:-}"
+  local level="${2:-ERROR}"
+  local extra="${3:-}"
+
   yc logging write \
     --group-name="${LOG_GROUP_NAME}" \
-    --level=ERROR \
+    --level="${level}" \
     --message="${event}" \
-    --json-payload="{\"application\":\"${APPLICATION_NAME}\",\"environment\":\"${MONITORING_ENVIRONMENT}\",\"event\":\"${event}\",\"synthetic\":true,\"source\":\"monitoring-smoke-test\"${extra}}"
+    --json-payload="{\"application\":\"${APPLICATION_NAME}\",\"environment\":\"${MONITORING_ENVIRONMENT}\",\"service\":\"${SERVICE_NAME}\",\"event\":\"${event}\",\"synthetic\":true,\"source\":\"monitoring-smoke-test\"${extra}}"
 }
 
 write_event submission_storage_error
 write_event telegram_delivery_failed_permanently
-write_event ydb_retry
-write_event ydb_slow_operation
-write_event submission_blocked ',"reason":"rate_limit"'
-write_event submission_persisted ',"form_type":"lead"'
+
+for _ in 1 2 3 4 5 6; do
+  write_event ydb_retry WARN
+done
+
+write_event ydb_slow_operation WARN
+
+for _ in 1 2 3; do
+  write_event submission_rate_limit_error
+done
+
+for _ in 1 2 3 4 5 6; do
+  write_event submission_blocked WARN ',"reason":"rate_limit"'
+done
+
+for _ in {1..21}; do
+  write_event submission_persisted INFO ',"form_type":"lead"'
+done
 
 echo "test-monitoring-alerts: synthetic events written to ${LOG_GROUP_NAME}"
-echo "Verify Telegram/email notifications and wait for alerts to return to OK."
+echo "Runtime, throttling, trigger, heartbeat and YDB storage alerts require live platform metrics."
+echo "Verify Telegram and email delivery, then acknowledge the test alerts in Monium."

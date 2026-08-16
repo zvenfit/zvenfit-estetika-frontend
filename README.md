@@ -110,12 +110,13 @@ npm run check:upstream-parity # есть ли новые неразобранн�
 
 При пуше в `main` или ручном запуске workflow выполняется `.github/workflows/main.yml`:
 
-1. независимо от облака запускает линтер, strict typecheck, unit/artifact-тесты функции, мониторинговый контракт и проверку сайта;
-2. fail-fast проверяет наличие и формат обязательных production secrets/variables без вывода значений;
-3. проверяет заранее созданную YDB Serverless, прогоняет integration-тесты на временных таблицах и read-only проверку готовой схемы;
-4. упаковывает только скомпилированный CommonJS runtime, разворачивает функцию и использует заранее созданный минутный retry timer;
-5. собирает сайт с URL функции, проверяет `dist/` и performance-budget;
-6. синхронизирует сайт и выполняет безопасный production smoke без создания реальной заявки.
+1. независимо от облака запускает линтер, strict typecheck, unit/artifact-тесты функции, мониторинговый контракт и проверку сайта, затем публикует неизменяемые function/verifier artifacts;
+2. fail-fast проверяет точную карту Estetika resources и обязательные production secrets/variables без вывода значений;
+3. под отдельным YDB verifier SA прогоняет integration-тесты на временных таблицах и read-only проверку готовой схемы;
+4. под deploy SA разворачивает готовый CommonJS artifact функции и использует заранее созданный минутный retry timer;
+5. в job без OIDC собирает сайт с URL функции, проверяет `dist/` и performance-budget;
+6. под deploy SA доказывает запрет выпуска ephemeral key для runtime SA, выпускает одночасовой key для отдельного storage SA и проверяет доступ только к `zvenfit-estetika-frontend`;
+7. синхронизирует готовый site artifact и отдельным job без cloud credentials выполняет безопасный production smoke без создания реальной заявки.
 
 Ручной деплой:
 
@@ -127,14 +128,16 @@ export TELEGRAM_BOT_TOKEN=...
 export TELEGRAM_CHAT_ID=...
 export LEAD_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
 export MONIUM_API_KEY=...
+bash scripts/verify-telegram-lead-ydb.sh
 npm run deploy:lead-fn
 
 export LEAD_API_URL=...       # значение из вывода deploy:lead-fn
 export YANDEX_METRIKA_ID=...
 npm run build
 
-export AWS_ACCESS_KEY_ID=...  # ID статического ключа Yandex Object Storage
+export AWS_ACCESS_KEY_ID=...  # короткоживущий Object Storage key
 export AWS_SECRET_ACCESS_KEY=...
+export AWS_SESSION_TOKEN=...
 npm run deploy:yc
 ```
 

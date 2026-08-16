@@ -10,11 +10,9 @@ import {
   requestBodyBytes,
 } from './http';
 import { createInvocationLogger } from './observability/logger';
-import { withEventMetrics } from './observability/event-metrics';
 import { createInvocationMetrics } from './observability/metrics';
 import { createSubmission, hasHoneypotValue, validateSubmission } from './submission-payload';
 import {
-  errorCode,
   logDeliveryFailure,
   maxTelegramAttempts,
   retryPendingSubmissions,
@@ -122,13 +120,11 @@ async function persistSubmission(
       headers,
     );
   } catch (error) {
-    logDeliveryFailure(
-      logger,
-      'submission_storage_error',
-      submission.submissionId,
-      errorCode(error, 'storage_error'),
-      0,
-    );
+    logDeliveryFailure(logger, 'submission_storage_error', submission.submissionId, error, {
+      attempts: 0,
+      fallbackCode: 'storage_error',
+      retriable: true,
+    });
 
     return jsonResponse(503, { ok: false, error: 'storage_unavailable' }, headers);
   }
@@ -140,7 +136,7 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
   return async (event, context) => {
     const baseLogger = dependencies.loggerFactory(context);
     const metrics = dependencies.metricsFactory(context, baseLogger);
-    const logger = withEventMetrics(baseLogger, metrics);
+    const logger = baseLogger;
 
     try {
       if (isTimerEvent(event)) {
@@ -158,6 +154,16 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
           queueHealth.oldestPendingAgeSeconds,
         );
         metrics.recordGauge('zvenfit_estetika_retry_worker_heartbeat', 1);
+        const heartbeatEvent = 'retry_worker_completed';
+        logger.info?.(
+          {
+            event: heartbeatEvent,
+            ...retrySummary,
+            queue_pending: queueHealth.pendingCount,
+            oldest_pending_age_seconds: queueHealth.oldestPendingAgeSeconds,
+          },
+          heartbeatEvent,
+        );
 
         return retrySummary;
       }
