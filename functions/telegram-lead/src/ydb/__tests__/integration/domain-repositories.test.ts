@@ -84,13 +84,52 @@ function newsletterNotification(value: NewsletterOptInRequest): NewsletterTelegr
 }
 
 async function dropTable(sql: YdbSql, name: string): Promise<void> {
-  try {
-    await sql`DROP TABLE ${sql.identifier(name)};`.timeout(queryTimeoutMs());
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (!message.includes('NOT_FOUND')) {
-      throw error;
+  const maxAttempts = 5;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await sql`DROP TABLE ${sql.identifier(name)};`.timeout(queryTimeoutMs());
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/NOT_FOUND|path does not exist|cannot find table/i.test(message)) {
+        return;
+      }
+
+      const transient = /SCHEME_ERROR|Type annotation|OVERLOADED|UNAVAILABLE|ABORTED/i.test(
+        message,
+      );
+      if (!transient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, attempt * 250));
     }
+  }
+}
+
+async function dropTemporaryTables(names: string[]): Promise<void> {
+  const client = await createYdbClient();
+  const errors: unknown[] = [];
+
+  try {
+    for (const name of names) {
+      try {
+        await dropTable(client.sql, name);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  } finally {
+    try {
+      await client.close();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new AggregateError(errors, 'temporary_ydb_table_cleanup_failed');
   }
 }
 
@@ -442,14 +481,25 @@ test(
         await client.close();
       }
     } finally {
-      await close();
-      const client = await createYdbClient();
-      await dropTable(client.sql, telegramOutboxTableName());
-      await dropTable(client.sql, newsletterConsentEventsTableName());
-      await dropTable(client.sql, newsletterSubscriptionsTableName());
-      await dropTable(client.sql, leadsTableName());
-      await dropTable(client.sql, rateLimitsTableName());
-      await client.close();
+      const cleanupErrors: unknown[] = [];
+
+      try {
+        await close();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+
+      try {
+        await dropTemporaryTables([
+          telegramOutboxTableName(),
+          newsletterConsentEventsTableName(),
+          newsletterSubscriptionsTableName(),
+          leadsTableName(),
+          rateLimitsTableName(),
+        ]);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
 
       for (const [name, value] of Object.entries({
         YDB_CONNECTION_STRING: previous.connectionString,
@@ -465,6 +515,10 @@ test(
         } else {
           process.env[name] = value;
         }
+      }
+
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, 'ydb_integration_cleanup_failed');
       }
     }
   },
