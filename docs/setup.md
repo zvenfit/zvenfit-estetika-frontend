@@ -372,7 +372,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `TELEGRAM_TIMEOUT_MS` | Таймаут одного запроса Telegram; по умолчанию `15000`, максимум `25000` |
 | `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
 | `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; production default `10000`, как в обкатанной конфигурации `zvenfit-frontend` |
-| `YDB_SLOW_OPERATION_MS` | Порог события медленной операции; по умолчанию `1000` |
+| `YDB_SLOW_OPERATION_MS` | Порог события медленной бизнес-операции; по умолчанию `3000`. Инициализация YDB-клиента в холодном контейнере измеряется вне этого порога |
 | `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
 | `MONIUM_METRICS_ENABLED` | Прямой экспорт метрик; production default `true` |
 | `MONIUM_PROJECT` | Проект Monium; по умолчанию `folder__<YC_FOLDER_ID>` |

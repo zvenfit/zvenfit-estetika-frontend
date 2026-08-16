@@ -76,6 +76,9 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
     statuses: ['ALARM', 'WARNING', 'OK'],
     repeatMinutes: 30,
   });
+  const slowYdbAlert = config.alerts.find(alert => alert.id === 'zvenfit_estetika_slow_ydb');
+  assert.deepEqual(slowYdbAlert.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
+  assert.equal(slowYdbAlert.notificationRepeatMinutes, 24 * 60);
 });
 
 test('count-sensitive and caught events use true log aggregates', () => {

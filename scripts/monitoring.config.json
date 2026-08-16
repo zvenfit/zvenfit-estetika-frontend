@@ -280,6 +280,8 @@
       "window": "10m",
       "delay": "3m",
       "noData": "OK",
+      "notificationChannelIds": ["zvenfit_estetika_email_alerts"],
+      "notificationRepeatMinutes": 1440,
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {

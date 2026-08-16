@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { observeYdbOperation } from '../ydb';
+import { observeYdbOperation, prepareAndObserveYdbOperation } from '../ydb';
 
 import type { JsonObject, LoggerLike } from '../../types';
 
@@ -22,6 +22,27 @@ test('records YDB latency without query text or data', async () => {
   assert.equal(records[0]?.fields.operation, 'save_submission');
   assert.equal(typeof records[0]?.fields.duration_ms, 'number');
   assert.equal('query' in (records[0]?.fields || {}), false);
+});
+
+test('excludes client preparation from the observed business operation', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let prepared = false;
+
+  const result = await prepareAndObserveYdbOperation(
+    'list_telegram_candidates',
+    recordingLogger(records),
+    async () => {
+      prepared = true;
+    },
+    async () => {
+      assert.equal(prepared, true);
+      return 42;
+    },
+  );
+
+  assert.equal(result, 42);
+  assert.equal(records[0]?.fields.event, 'ydb_operation_completed');
+  assert.equal(records[0]?.fields.operation, 'list_telegram_candidates');
 });
 
 test('logs a safe error code without the database error message', async () => {

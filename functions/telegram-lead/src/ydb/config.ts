@@ -2,7 +2,7 @@ const DEFAULT_TABLE_NAME = 'submissions';
 const DEFAULT_SUBSCRIPTIONS_TABLE_NAME = 'subscriptions';
 const DEFAULT_RATE_LIMITS_TABLE_NAME = 'submission_rate_limits';
 const DEFAULT_QUERY_TIMEOUT_MS = 10000;
-const DEFAULT_SLOW_OPERATION_MS = 1000;
+const DEFAULT_SLOW_OPERATION_MS = 3000;
 const DEFAULT_SESSION_POOL_SIZE = 5;
 
 export function parsePositiveInt(value: string | undefined, fallback: number): number {

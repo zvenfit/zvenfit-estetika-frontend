@@ -243,7 +243,7 @@ jobs:
           TELEGRAM_TIMEOUT_MS: ${{ vars.TELEGRAM_TIMEOUT_MS || '15000' }}
           YC_LEAD_TIMEOUT: ${{ vars.YC_LEAD_TIMEOUT || '120s' }}
           YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
-          YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '1000' }}
+          YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '3000' }}
           YDB_SESSION_POOL_SIZE: ${{ vars.YDB_SESSION_POOL_SIZE || '5' }}
           LOG_LEVEL: ${{ env.LOG_LEVEL }}
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
