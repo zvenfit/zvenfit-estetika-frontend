@@ -98,10 +98,12 @@ test('count-sensitive and caught events use true log aggregates', () => {
     assert.match(metric.selector, /meta\.environment="production"/);
     assert.match(metric.selector, /meta\.service="zvenfit-estetika-telegram-lead"/);
     assert.match(metric.selector, /resource_id="\*"/);
-    assert.deepEqual(
-      metric.groupBy.slice(-4),
-      ['meta.application', 'meta.environment', 'meta.service', 'resource_id'],
-    );
+    const expectedGroupBy =
+      metricId === 'zvenfit_estetika_submissions_5m'
+        ? ['meta.form_type', 'meta.application', 'meta.environment', 'meta.service']
+        : ['meta.application', 'meta.environment', 'meta.service', 'resource_id'];
+    assert.deepEqual(metric.groupBy, expectedGroupBy);
+    assert.ok(metric.groupBy.length <= 4, `${metricId} exceeds Monium groupBy limit`);
   }
 });
 

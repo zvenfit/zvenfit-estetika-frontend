@@ -180,7 +180,7 @@
       "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_persisted\", meta.form_type=\"*\", resource_id=\"*\"}",
       "aggregation": "count",
       "window": "5m",
-      "groupBy": ["meta.form_type", "meta.application", "meta.environment", "meta.service", "resource_id"]
+      "groupBy": ["meta.form_type", "meta.application", "meta.environment", "meta.service"]
     },
     {
       "id": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
