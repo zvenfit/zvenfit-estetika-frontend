@@ -32,6 +32,7 @@ test('production deploy jobs wait for quality checks', () => {
   assert.match(functionJob, /environment: production/);
   const verifyJob = workflow.slice(verifyYdb, functionDeploy);
   assert.match(verifyJob, /needs: \[quality-checks, deploy-preflight\]/);
+  assert.match(verifyJob, /timeout-minutes: 10/);
   assert.match(verifyJob, /environment: production-verify/);
   assert.match(workflow.slice(siteDeploy, smoke), /needs: \[deploy-function, build-site\]/);
 });

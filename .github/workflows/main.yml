@@ -123,6 +123,7 @@ jobs:
   verify-ydb:
     needs: [quality-checks, deploy-preflight]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: production-verify
     permissions:
       contents: read
