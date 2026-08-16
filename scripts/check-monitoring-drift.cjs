@@ -39,6 +39,7 @@ const ALERT_FIELDS = [
   'decomposeBy',
   'groupNotifications',
   'notificationChannelIds',
+  'notificationRepeatMinutes',
 ];
 
 function normalizeValue(value) {
@@ -82,9 +83,11 @@ function normalizeCollection(items, fields, name) {
 
 function normalizeMonitoringState(state) {
   const defaultChannelIds = state.notificationPolicy?.channelIds;
+  const defaultRepeatMinutes = state.notificationPolicy?.repeatMinutes;
   const alerts = state.alerts?.map(alert => ({
     ...alert,
     notificationChannelIds: alert.notificationChannelIds ?? defaultChannelIds,
+    notificationRepeatMinutes: alert.notificationRepeatMinutes ?? defaultRepeatMinutes,
   }));
 
   return {

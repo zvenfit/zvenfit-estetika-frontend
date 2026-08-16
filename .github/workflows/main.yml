@@ -168,8 +168,11 @@ jobs:
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
           YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
-          YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
-          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}
+          YDB_LEADS_TABLE: ${{ vars.YDB_LEADS_TABLE || 'leads' }}
+          YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE: ${{ vars.YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE || 'newsletter_subscriptions' }}
+          YDB_NEWSLETTER_CONSENT_EVENTS_TABLE: ${{ vars.YDB_NEWSLETTER_CONSENT_EVENTS_TABLE || 'newsletter_consent_events' }}
+          YDB_TELEGRAM_OUTBOX_TABLE: ${{ vars.YDB_TELEGRAM_OUTBOX_TABLE || 'telegram_outbox' }}
+          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'form_rate_limits' }}
           YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
         run: |
           unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
@@ -232,8 +235,11 @@ jobs:
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
           YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
-          YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
-          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}
+          YDB_LEADS_TABLE: ${{ vars.YDB_LEADS_TABLE || 'leads' }}
+          YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE: ${{ vars.YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE || 'newsletter_subscriptions' }}
+          YDB_NEWSLETTER_CONSENT_EVENTS_TABLE: ${{ vars.YDB_NEWSLETTER_CONSENT_EVENTS_TABLE || 'newsletter_consent_events' }}
+          YDB_TELEGRAM_OUTBOX_TABLE: ${{ vars.YDB_TELEGRAM_OUTBOX_TABLE || 'telegram_outbox' }}
+          YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'form_rate_limits' }}
           LEAD_RATE_LIMIT_MAX: ${{ vars.LEAD_RATE_LIMIT_MAX || '5' }}
           LEAD_RATE_LIMIT_WINDOW_SECONDS: ${{ vars.LEAD_RATE_LIMIT_WINDOW_SECONDS || '600' }}
           MAX_TELEGRAM_ATTEMPTS: ${{ vars.MAX_TELEGRAM_ATTEMPTS || '12' }}
@@ -241,7 +247,7 @@ jobs:
           TELEGRAM_TIMEOUT_MS: ${{ vars.TELEGRAM_TIMEOUT_MS || '15000' }}
           YC_LEAD_TIMEOUT: ${{ vars.YC_LEAD_TIMEOUT || '120s' }}
           YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
-          YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '1000' }}
+          YDB_SLOW_OPERATION_MS: ${{ vars.YDB_SLOW_OPERATION_MS || '3000' }}
           YDB_SESSION_POOL_SIZE: ${{ vars.YDB_SESSION_POOL_SIZE || '5' }}
           LOG_LEVEL: ${{ env.LOG_LEVEL }}
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}

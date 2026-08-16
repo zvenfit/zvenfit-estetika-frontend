@@ -2,21 +2,35 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  leadsTableName,
+  newsletterConsentEventsTableName,
+  newsletterSubscriptionsTableName,
   normalizeConnectionString,
   queryTimeoutMs,
   rateLimitsTableName,
   sessionPoolSize,
-  tableName,
+  telegramOutboxTableName,
 } from '../config';
 
-test('validates data and rate-limit table identifiers', () => {
-  process.env.YDB_SUBMISSIONS_TABLE = 'submissions_2026';
-  process.env.YDB_RATE_LIMITS_TABLE = 'submission_limits';
-  assert.equal(tableName(), 'submissions_2026');
-  assert.equal(rateLimitsTableName(), 'submission_limits');
-  process.env.YDB_SUBMISSIONS_TABLE = 'bad/table';
-  assert.throws(() => tableName(), /invalid_ydb_table_name/);
-  delete process.env.YDB_SUBMISSIONS_TABLE;
+test('validates every bounded-context table identifier', () => {
+  process.env.YDB_LEADS_TABLE = 'leads_2026';
+  process.env.YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE = 'newsletter_state';
+  process.env.YDB_NEWSLETTER_CONSENT_EVENTS_TABLE = 'newsletter_events';
+  process.env.YDB_TELEGRAM_OUTBOX_TABLE = 'notifications';
+  process.env.YDB_RATE_LIMITS_TABLE = 'form_limits';
+
+  assert.equal(leadsTableName(), 'leads_2026');
+  assert.equal(newsletterSubscriptionsTableName(), 'newsletter_state');
+  assert.equal(newsletterConsentEventsTableName(), 'newsletter_events');
+  assert.equal(telegramOutboxTableName(), 'notifications');
+  assert.equal(rateLimitsTableName(), 'form_limits');
+  process.env.YDB_LEADS_TABLE = 'bad/table';
+  assert.throws(() => leadsTableName(), /invalid_ydb_leads_table_name/);
+
+  delete process.env.YDB_LEADS_TABLE;
+  delete process.env.YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE;
+  delete process.env.YDB_NEWSLETTER_CONSENT_EVENTS_TABLE;
+  delete process.env.YDB_TELEGRAM_OUTBOX_TABLE;
   delete process.env.YDB_RATE_LIMITS_TABLE;
 });
 

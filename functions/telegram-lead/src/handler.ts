@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+import { intakeForm } from './application/intake-form';
+import {
+  retryPendingNotifications,
+  type RetrySummary,
+} from './application/retry-notifications';
 import {
   allowedOrigins,
   corsHeaders,
@@ -9,27 +14,41 @@ import {
   readBody,
   requestBodyBytes,
 } from './http';
+import { hasHoneypotValue, parseFormCommand } from './http/form-payload';
 import { createInvocationLogger } from './observability/logger';
 import { createInvocationMetrics } from './observability/metrics';
-import { createSubmission, hasHoneypotValue, validateSubmission } from './submission-payload';
+import { logDeliveryFailure } from './observability/delivery';
 import {
-  logDeliveryFailure,
   maxTelegramAttempts,
-  retryPendingSubmissions,
+  retryBatchSize,
   sendTelegram,
-  type RetrySummary,
 } from './telegram/delivery';
-import { consumeSubmissionRateLimit } from './ydb/rate-limit';
-import * as submissionStore from './ydb/submission-store';
+import { consumeFormRateLimit } from './ydb/rate-limit';
+import { leadRepository } from './ydb/lead-repository';
+import { newsletterRepository } from './ydb/newsletter-repository';
+import * as outbox from './ydb/telegram-outbox';
 
 import type {
+  LeadIntakeRepository,
+  NewsletterRepository,
+  NotificationDeliveryDependencies,
+} from './application/ports';
+import type {
+  ApplicationMetrics,
   FunctionContext,
-  HandlerDependencies,
   HttpEvent,
   HttpResponse,
   JsonObject,
   LoggerLike,
 } from './types';
+
+export interface HandlerDependencies extends NotificationDeliveryDependencies {
+  leadRepository: LeadIntakeRepository;
+  newsletterRepository: NewsletterRepository;
+  loggerFactory(context?: FunctionContext): LoggerLike;
+  metricsFactory(context: FunctionContext | undefined, logger: LoggerLike): ApplicationMetrics;
+  rateLimiter(args: { sourceIp: string; now: Date; logger?: LoggerLike }): Promise<boolean>;
+}
 
 const TIMER_EVENT_TYPE = 'yandex.cloud.events.serverless.triggers.TimerMessage';
 
@@ -49,12 +68,16 @@ function logBlockedSubmission(logger: LoggerLike, reason: string): void {
 
 function createDependencies(overrides: Partial<HandlerDependencies>): HandlerDependencies {
   return {
+    leadRepository,
+    newsletterRepository,
+    outbox,
     loggerFactory: createInvocationLogger,
     maxAttempts: maxTelegramAttempts,
     metricsFactory: createInvocationMetrics,
     now: () => new Date(),
-    rateLimiter: consumeSubmissionRateLimit,
-    store: submissionStore,
+    rateLimiter: consumeFormRateLimit,
+    reportDeliveryFailure: logDeliveryFailure,
+    retryBatchSize,
     telegramSender: sendTelegram,
     uuid: randomUUID,
     ...overrides,
@@ -69,17 +92,16 @@ function requestIp(event: HttpEvent): string {
   );
 }
 
-async function persistSubmission(
+async function persistForm(
   body: JsonObject,
   dependencies: HandlerDependencies,
   logger: LoggerLike,
   headers: Record<string, string>,
   sourceIp: string,
 ): Promise<HttpResponse> {
-  const submission = createSubmission(body, dependencies);
-  const validationError = validateSubmission(submission);
-  if (validationError || !submission) {
-    return jsonResponse(400, { ok: false, error: validationError || 'validation_failed' }, headers);
+  const parsed = parseFormCommand(body, dependencies);
+  if (!parsed.command) {
+    return jsonResponse(400, { ok: false, error: parsed.error }, headers);
   }
 
   if (sourceIp) {
@@ -97,15 +119,15 @@ async function persistSubmission(
   }
 
   try {
-    const saved = await dependencies.store.saveSubmission(submission, { logger });
+    const saved = await intakeForm(parsed.command, dependencies, logger);
     if (saved.created) {
       const event = 'submission_persisted';
-      logger.info?.({ event, form_type: submission.formType }, event);
+      logger.info?.({ event, form_type: saved.kind }, event);
     }
-    if (saved.telegramStatus === 'sent') {
+    if (saved.notificationStatus === 'sent') {
       return jsonResponse(
         200,
-        { ok: true, submission_id: submission.submissionId, notification: 'sent' },
+        { ok: true, submission_id: saved.requestId, notification: 'sent' },
         headers,
       );
     }
@@ -114,13 +136,17 @@ async function persistSubmission(
       202,
       {
         ok: true,
-        submission_id: submission.submissionId,
-        notification: saved.telegramStatus,
+        submission_id: saved.requestId,
+        notification: saved.notificationStatus,
       },
       headers,
     );
   } catch (error) {
-    logDeliveryFailure(logger, 'submission_storage_error', submission.submissionId, error, {
+    const requestId =
+      parsed.command.kind === 'lead'
+        ? parsed.command.lead.requestId
+        : parsed.command.optIn.requestId;
+    logDeliveryFailure(logger, 'submission_storage_error', requestId, error, {
       attempts: 0,
       fallbackCode: 'storage_error',
       retriable: true,
@@ -140,8 +166,8 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
 
     try {
       if (isTimerEvent(event)) {
-        const retrySummary = await retryPendingSubmissions(dependencies, logger);
-        const queueHealth = await dependencies.store.getTelegramQueueHealth({
+        const retrySummary = await retryPendingNotifications(dependencies, logger);
+        const queueHealth = await dependencies.outbox.getQueueHealth({
           now: dependencies.now(),
           logger,
         });
@@ -207,7 +233,7 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
         return jsonResponse(200, { ok: true }, headers);
       }
 
-      return persistSubmission(body, dependencies, logger, headers, requestIp(event));
+      return persistForm(body, dependencies, logger, headers, requestIp(event));
     } finally {
       await metrics.flush();
     }

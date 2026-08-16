@@ -1,17 +1,10 @@
-import { observeYdbOperation } from '../observability/ydb';
+import { prepareAndObserveYdbOperation } from '../observability/ydb';
+import type { ClaimedTelegramNotification } from '../domain/telegram-notification';
+import type { Utm } from '../domain/shared';
 import { createYdbClient } from './client';
 import { queryTimeoutMs } from './config';
 
-import type {
-  ClaimedSubmission,
-  FormType,
-  LoggerLike,
-  SqlRow,
-  TelegramStatus,
-  YdbClient,
-  YdbQuery,
-  YdbValue,
-} from '../types';
+import type { LoggerLike, SqlRow, YdbClient, YdbQuery, YdbValue } from '../types';
 
 let clientPromise: Promise<YdbClient> | null = null;
 let ydbValueTypes: YdbClient['types'] | null = null;
@@ -46,12 +39,15 @@ export function timed<T>(query: YdbQuery<T>): YdbQuery<T> {
   return query.timeout(queryTimeoutMs());
 }
 
-export function observed<T>(
+export async function observed<T>(
   operation: string,
   logger: LoggerLike | undefined,
   callback: () => Promise<T>,
 ): Promise<T> {
-  return observeYdbOperation(operation, logger, callback);
+  // Driver startup can take a couple of seconds in a fresh serverless
+  // container. It is infrastructure warm-up, not business-query latency, so
+  // complete it before starting the operation timer used by slow-YDB alerts.
+  return prepareAndObserveYdbOperation(operation, logger, getSql, callback);
 }
 
 export function firstResultSet(resultSets: unknown): SqlRow[] {
@@ -87,48 +83,49 @@ export function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-function dateValue(value: unknown): Date {
+export function dateValue(value: unknown): Date {
   return value instanceof Date ? value : new Date(String(value));
 }
 
-export function telegramStatus(value: unknown): TelegramStatus {
-  return value === 'sending' || value === 'sent' || value === 'failed' ? value : 'pending';
+export function jsonObject(value: unknown): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(stringValue(value) || '{}');
+
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
-export function rowToSubmission(row: SqlRow): ClaimedSubmission {
-  let utm = {};
-  let consentJson: Record<string, unknown> = {};
-  try {
-    utm = JSON.parse(stringValue(row.utm_json) || '{}') as Record<string, string>;
-  } catch {
-    utm = {};
+export function rowToClaimedNotification(row: SqlRow): ClaimedTelegramNotification {
+  const payload = jsonObject(row.payload_json);
+  const kind = stringValue(row.kind);
+  const common = {
+    notificationId: stringValue(row.notification_id),
+    aggregateId: stringValue(row.aggregate_id),
+    createdAt: dateValue(row.created_at),
+    phone: stringValue(payload.phone),
+    utm: jsonObject(payload.utm) as Utm,
+    attempts: Number(row.attempts || 0),
+  };
+  if (kind === 'lead_created') {
+    return {
+      ...common,
+      kind,
+      name: stringValue(payload.name),
+      contactMethod: stringValue(payload.contact_method),
+      telegramUsername: stringValue(payload.telegram_username),
+    };
   }
-  try {
-    consentJson = JSON.parse(stringValue(row.consent_json) || '{}') as Record<string, unknown>;
-  } catch {
-    consentJson = {};
+  if (kind === 'newsletter_opted_in') {
+    return { ...common, kind };
   }
 
-  return {
-    submissionId: stringValue(row.submission_id),
-    formType: (stringValue(row.form_type) || 'lead') as FormType,
-    createdAt: dateValue(row.created_at),
-    name: stringValue(row.name),
-    phone: stringValue(row.phone),
-    service: stringValue(row.service),
-    telegramUsername: stringValue(row.telegram_username),
-    utm,
-    consents: {
-      version: stringValue(consentJson.version),
-      personalData: consentJson.personal_data === true,
-      marketing: consentJson.marketing === true,
-    },
-    telegramAttempts: Number(row.telegram_attempts || 0),
-  };
+  throw new Error('invalid_telegram_notification_kind');
 }
 
 export function toEpoch(value: unknown): number {
   return dateValue(value).getTime();
 }
 
-export const _private = { firstResultSet };
+export const _private = { firstResultSet, rowToClaimedNotification };

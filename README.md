@@ -1,6 +1,6 @@
 # ZvenFit Estetika Frontend
 
-Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. HTTP-запрос сохраняет заявку или подписку вместе с версией согласия, выраженного отправкой формы, в YDB и сразу возвращает подтверждение; уведомления в Telegram асинхронно доставляет минутный timer с повторными попытками.
+Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. Лиды и рассылка реализованы как отдельные домены, а Telegram-доставка — как независимый transactional outbox. HTTP-запрос атомарно сохраняет бизнес-данные, доказательство согласия и уведомление, после чего сразу возвращает подтверждение; минутный timer доставляет outbox с повторными попытками.
 
 Продакшен: `https://estetika.zvenfit.ru`.
 
@@ -13,9 +13,12 @@
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
   │    изображения, шрифты, сторонние CSS, jQuery, IMask и webflow.js
-  └─ POST lead/newsletter → Cloud Function → YDB (источник истины)
-                                      └→ Telegram
-                                          ↑ retry timer
+  └─ POST lead/newsletter → Cloud Function → YDB
+                                      ├─ leads
+                                      ├─ newsletter_subscriptions
+                                      ├─ newsletter_consent_events
+                                      └─ telegram_outbox → Telegram
+                                                ↑ retry timer
 ```
 
 Ссылки на ассеты из CDN зафиксированы в HTML и CSS внутри `public/`. Сборка создаёт компактный `dist/`: изображения, шрифты, сторонние CSS и CDN-библиотеки удаляются, потому что отдаются из отдельного бакета с ассетами.
@@ -30,8 +33,10 @@
 | `public/form/` | Страница формы заявки |
 | `public/privacy/`, `public/personal-data-processing/` | Юридические страницы с чистыми URL без инъекций лендинга |
 | `functions/telegram-lead/src/index.ts` | Точка входа Cloud Function, реэкспорт обработчика |
-| `functions/telegram-lead/src/handler.ts` | HTTP, валидация, идемпотентность и retry timer |
-| `functions/telegram-lead/src/ydb/` | Миграции, бессрочные заявки/подписки, индексированная очередь и rate limit |
+| `functions/telegram-lead/src/domain/` | Чистые модели лидов, подписок, согласий и уведомлений |
+| `functions/telegram-lead/src/application/` | Use cases и порты репозиториев/outbox |
+| `functions/telegram-lead/src/handler.ts`, `src/http/` | HTTP-адаптер, валидация и timer adapter |
+| `functions/telegram-lead/src/ydb/` | YDB-адаптеры доменных репозиториев, outbox, схема и rate limit |
 | `functions/telegram-lead/src/observability/` | Structured logs, redaction, YDB telemetry и прямые OTLP-метрики Monium |
 | `functions/telegram-lead/src/**/__tests__/` | Unit, artifact и YDB integration-тесты функции |
 | `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
@@ -42,6 +47,14 @@
 | `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
 
 Основные маршруты: `/`, `/form/`, `/privacy/`, `/personal-data-processing/` и `/404.html`.
+
+### Доменные границы
+
+`leads` содержит только бизнес-заявки: каждая отправка формы — отдельный лид. `newsletter_subscriptions` содержит единственную текущую строку на нормализованный телефон, а `newsletter_consent_events` — неизменяемую историю opt-in и отписок. Поэтому повторная заявка не влияет на подписку, а повторный opt-in подтверждает или заново активирует только рассылку.
+
+`telegram_outbox` не является бизнес-доменом: он хранит снимок уведомления и технические состояния `pending`, `sending`, `sent`, `failed`. Запись домена и его outbox-сообщения выполняется в одной YDB-транзакции, поэтому успешный HTTP-ответ не может потерять уведомление.
+
+Отписка идемпотентна, фиксирует отдельное consent-событие, дату и причину и включает suppression. Публичного endpoint с одним только телефоном нет: такой запрос позволил бы отписывать других людей. Интеграция с провайдером должна использовать доверенный webhook либо подписанную одноразовую ссылку и проверять suppression перед отправкой.
 
 ## Требования
 
