@@ -362,9 +362,11 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `YC_LEAD_SERVICE_ACCOUNT_ID` | Обязательный ID отдельного runtime SA функции и таймера |
 | `YDB_DATABASE_ID` | Обязательный ID заранее созданной YDB; позволяет изолированному CI обращаться к базе без права перечислять ресурсы каталога |
 | `YDB_DATABASE_NAME` | Имя Serverless БД; по умолчанию `zvenfit-estetika-leads` |
-| `YDB_SUBMISSIONS_TABLE` | Неизменяемый журнал заявок, opt-in событий и очередь Telegram; по умолчанию `submissions` |
-| `YDB_SUBSCRIPTIONS_TABLE` | Текущее состояние подписчиков, одна строка на нормализованный телефон; по умолчанию `subscriptions` |
-| `YDB_RATE_LIMITS_TABLE` | TTL-таблица технических счётчиков; по умолчанию `submission_rate_limits` |
+| `YDB_LEADS_TABLE` | Независимые бизнес-заявки; по умолчанию `leads` |
+| `YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE` | Текущее состояние рассылки, одна строка на нормализованный телефон; по умолчанию `newsletter_subscriptions` |
+| `YDB_NEWSLETTER_CONSENT_EVENTS_TABLE` | Неизменяемая история opt-in и отписок; по умолчанию `newsletter_consent_events` |
+| `YDB_TELEGRAM_OUTBOX_TABLE` | Техническая очередь Telegram; по умолчанию `telegram_outbox` |
+| `YDB_RATE_LIMITS_TABLE` | TTL-таблица технических счётчиков; по умолчанию `form_rate_limits` |
 | `LEAD_RATE_LIMIT_MAX` | Допустимых отправок с одного HMAC-IP за окно; по умолчанию `5` |
 | `LEAD_RATE_LIMIT_WINDOW_SECONDS` | Размер окна rate limit; по умолчанию `600` |
 | `MAX_TELEGRAM_ATTEMPTS` | Максимум попыток Telegram; по умолчанию `12` |
@@ -447,49 +449,26 @@ export AWS_SESSION_TOKEN=...
 npm run deploy:yc
 ```
 
-Для пилотного запуска финальная схема создаётся один раз командой `bootstrap:schema`; production
-deploy только проверяет её командой `verify:schema` и ничего в структуре YDB не меняет. Изменения
-production-схемы выполняются отдельными явными миграциями до merge версии функции, которая от них
-зависит.
-
-Для уже созданной production-таблицы один раз перед деплоем версии с фиксацией согласий
-добавьте совместимую nullable-колонку `consent_json`:
+Greenfield-схема создаётся один раз до первого деплоя. Production deploy только проверяет её
+командой `verify:schema` и никогда не выполняет DDL:
 
 ```bash
 export YDB_CONNECTION_STRING="$(yc ydb database get --id="$YDB_DATABASE_ID" --format=json | jq -r '.endpoint')"
 export YDB_ACCESS_TOKEN_CREDENTIALS="$(yc iam create-token)"
-npm --prefix functions/telegram-lead run migrate:consent-evidence
+npm --prefix functions/telegram-lead run bootstrap:schema
 unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
 ```
 
-Миграция только добавляет колонку и не изменяет существующие строки. Повторно её не запускайте:
-YDB вернёт ошибку для уже существующей колонки. Новая функция принимает только актуальную версию
-согласия, выраженного отправкой формы, и записывает в `consent_json` его версию, согласие на ПД и
-рекламную рассылку; `created_at` фиксирует время принятия.
+`leads` бессрочно хранит независимые заявки. `newsletter_subscriptions` хранит текущее состояние
+`active`/`unsubscribed`, а `newsletter_consent_events` — бессрочную историю юридически значимых
+событий согласия. `telegram_outbox` содержит только доставку и использует синхронные индексы
+`idx_telegram_outbox_due` и `idx_telegram_outbox_status_created`. TTL применяется только к
+`form_rate_limits`.
 
-Перед первым деплоем subscription lifecycle создайте таблицу текущего состояния и перенесите
-существующие валидные opt-in события:
-
-```bash
-export YDB_CONNECTION_STRING="$(yc ydb database get --id="$YDB_DATABASE_ID" --format=json | jq -r '.endpoint')"
-export YDB_ACCESS_TOKEN_CREDENTIALS="$(yc iam create-token)"
-npm --prefix functions/telegram-lead run migrate:subscription-lifecycle
-unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
-```
-
-Эта миграция повторяемая: она создаёт `subscriptions`, если таблицы нет, объединяет события по
-нормализованному телефону и вставляет только отсутствующие строки. Уже существующие состояния не
-перезаписываются, поэтому повторный запуск не может случайно активировать отписанного пользователя.
-В выводе отдельно указаны вставленные, уже существующие, невалидные и объединённые записи.
-
-Таблица `submissions` бессрочно хранит неизменяемые события заявок, opt-in и доказательства
-согласий. Таблица `subscriptions` хранит текущее состояние рассылки: `active`/`unsubscribed`, даты
-первой и текущей подписки, последнего подтверждения и отписки, текущие согласия и причину отписки.
 Новый явный opt-in после отписки снова активирует подписку; отправитель рассылки обязан проверять
 suppression перед каждым сообщением. Публичная отписка по одному телефону запрещена — для неё нужен
-доверенный webhook провайдера или подписанная одноразовая ссылка. TTL используется только для
-технических счётчиков rate limit. Очередь Telegram использует синхронные индексы
-`idx_telegram_due` и `idx_telegram_status_created`. Статусы: `pending`, `sending`, `sent`, `failed`.
+доверенный webhook провайдера или подписанная одноразовая ссылка.
+
 Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"`
 означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и
 должен быть ограничен ответственными сотрудниками.

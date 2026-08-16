@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { _private } from '../handler';
 
-import type { SubmissionStore } from '../types';
+import type { TelegramOutbox } from '../application/ports';
 
 test('timer exports queue health and heartbeat after a retry pass', async () => {
   const gauges: Array<{ name: string; value: number }> = [];
@@ -25,22 +25,19 @@ test('timer exports queue health and heartbeat after a retry pass', async () => 
       },
     }),
     now: () => new Date('2026-08-12T12:00:00.000Z'),
-    store: {
-      async saveSubmission() {
-        throw new Error('not_used');
-      },
-      async claimForTelegram() {
+    outbox: {
+      async claim() {
         return null;
       },
-      async markTelegramDelivered() {},
-      async markTelegramFailed() {},
-      async listTelegramCandidates() {
+      async markDelivered() {},
+      async markFailed() {},
+      async listCandidates() {
         return [];
       },
-      async getTelegramQueueHealth() {
+      async getQueueHealth() {
         return { pendingCount: 2, oldestPendingAgeSeconds: 901 };
       },
-    } satisfies SubmissionStore,
+    } satisfies TelegramOutbox,
   });
 
   const result = await handler({
@@ -83,22 +80,19 @@ test('queue-health failure rejects the timer invocation and suppresses heartbeat
         flushCalls += 1;
       },
     }),
-    store: {
-      async saveSubmission() {
-        throw new Error('not_used');
-      },
-      async claimForTelegram() {
+    outbox: {
+      async claim() {
         return null;
       },
-      async markTelegramDelivered() {},
-      async markTelegramFailed() {},
-      async listTelegramCandidates() {
+      async markDelivered() {},
+      async markFailed() {},
+      async listCandidates() {
         return [];
       },
-      async getTelegramQueueHealth() {
+      async getQueueHealth() {
         throw Object.assign(new Error('offline'), { code: 'queue_offline' });
       },
-    } satisfies SubmissionStore,
+    } satisfies TelegramOutbox,
   });
 
   await assert.rejects(

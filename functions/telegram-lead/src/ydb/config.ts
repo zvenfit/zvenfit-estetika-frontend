@@ -1,6 +1,8 @@
-const DEFAULT_TABLE_NAME = 'submissions';
-const DEFAULT_SUBSCRIPTIONS_TABLE_NAME = 'subscriptions';
-const DEFAULT_RATE_LIMITS_TABLE_NAME = 'submission_rate_limits';
+const DEFAULT_LEADS_TABLE_NAME = 'leads';
+const DEFAULT_NEWSLETTER_SUBSCRIPTIONS_TABLE_NAME = 'newsletter_subscriptions';
+const DEFAULT_NEWSLETTER_CONSENT_EVENTS_TABLE_NAME = 'newsletter_consent_events';
+const DEFAULT_TELEGRAM_OUTBOX_TABLE_NAME = 'telegram_outbox';
+const DEFAULT_RATE_LIMITS_TABLE_NAME = 'form_rate_limits';
 const DEFAULT_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_SLOW_OPERATION_MS = 3000;
 const DEFAULT_SESSION_POOL_SIZE = 5;
@@ -19,10 +21,10 @@ export function validateIdentifier(value: string, errorCode: string): string {
   return value;
 }
 
-export function tableName(): string {
+export function leadsTableName(): string {
   return validateIdentifier(
-    (process.env.YDB_SUBMISSIONS_TABLE || DEFAULT_TABLE_NAME).trim(),
-    'invalid_ydb_table_name',
+    (process.env.YDB_LEADS_TABLE || DEFAULT_LEADS_TABLE_NAME).trim(),
+    'invalid_ydb_leads_table_name',
   );
 }
 
@@ -33,19 +35,39 @@ export function rateLimitsTableName(): string {
   );
 }
 
-export function subscriptionsTableName(): string {
+export function newsletterSubscriptionsTableName(): string {
   return validateIdentifier(
-    (process.env.YDB_SUBSCRIPTIONS_TABLE || DEFAULT_SUBSCRIPTIONS_TABLE_NAME).trim(),
-    'invalid_ydb_subscriptions_table_name',
+    (
+      process.env.YDB_NEWSLETTER_SUBSCRIPTIONS_TABLE ||
+      DEFAULT_NEWSLETTER_SUBSCRIPTIONS_TABLE_NAME
+    ).trim(),
+    'invalid_ydb_newsletter_subscriptions_table_name',
+  );
+}
+
+export function newsletterConsentEventsTableName(): string {
+  return validateIdentifier(
+    (
+      process.env.YDB_NEWSLETTER_CONSENT_EVENTS_TABLE ||
+      DEFAULT_NEWSLETTER_CONSENT_EVENTS_TABLE_NAME
+    ).trim(),
+    'invalid_ydb_newsletter_consent_events_table_name',
+  );
+}
+
+export function telegramOutboxTableName(): string {
+  return validateIdentifier(
+    (process.env.YDB_TELEGRAM_OUTBOX_TABLE || DEFAULT_TELEGRAM_OUTBOX_TABLE_NAME).trim(),
+    'invalid_ydb_telegram_outbox_table_name',
   );
 }
 
 export function dueIndexName(): string {
-  return 'idx_telegram_due';
+  return 'idx_telegram_outbox_due';
 }
 
 export function queueHealthIndexName(): string {
-  return 'idx_telegram_status_created';
+  return 'idx_telegram_outbox_status_created';
 }
 
 export function normalizeConnectionString(value: string | undefined): string {

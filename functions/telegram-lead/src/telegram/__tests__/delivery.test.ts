@@ -5,38 +5,50 @@ import { Readable } from 'node:stream';
 import test from 'node:test';
 
 import { buildMessage, retryBatchSize, sendTelegram, telegramTimeoutMs } from '../delivery';
+import type {
+  ClaimedTelegramNotification,
+  LeadTelegramNotification,
+} from '../../domain/telegram-notification';
+
+function leadNotification(
+  overrides: Partial<LeadTelegramNotification & { attempts: number }> = {},
+): ClaimedTelegramNotification {
+  return {
+    notificationId: 'notification-1',
+    kind: 'lead_created',
+    aggregateId: 'lead-1',
+    createdAt: new Date('2026-08-09T00:00:00.000Z'),
+    name: 'Анна',
+    phone: '+79990000000',
+    contactMethod: 'Telegram',
+    telegramUsername: '@username',
+    utm: { utm_source: 'test' },
+    attempts: 1,
+    ...overrides,
+  };
+}
+
+function newsletterNotification(): ClaimedTelegramNotification {
+  return {
+    notificationId: 'notification-2',
+    kind: 'newsletter_opted_in',
+    aggregateId: '+79990000000',
+    createdAt: new Date('2026-08-09T00:00:00.000Z'),
+    phone: '+79990000000',
+    utm: {},
+    attempts: 1,
+  };
+}
 
 test('Telegram networking prefers IPv4 for Yandex Cloud Functions', () => {
   assert.equal(getDefaultResultOrder(), 'ipv4first');
 });
 
 test('message supports lead and newsletter payloads without leaking delivery state', () => {
-  const lead = buildMessage({
-    submissionId: 'submission-1',
-    formType: 'lead',
-    createdAt: new Date('2026-08-09T00:00:00.000Z'),
-    name: 'Анна',
-    phone: '+79990000000',
-    service: 'Telegram',
-    telegramUsername: '@username',
-    utm: { utm_source: 'test' },
-    consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
-    telegramAttempts: 2,
-  });
-  const newsletter = buildMessage({
-    submissionId: 'submission-2',
-    formType: 'newsletter',
-    createdAt: new Date('2026-08-09T00:00:00.000Z'),
-    name: '',
-    phone: '+79990000000',
-    service: 'Рассылка',
-    telegramUsername: '',
-    utm: {},
-    consents: { version: '2026-08-14-v2', personalData: true, marketing: true },
-    telegramAttempts: 1,
-  });
+  const lead = buildMessage(leadNotification({ notificationId: 'notification-1', attempts: 2 }));
+  const newsletter = buildMessage(newsletterNotification());
 
-  assert.match(lead, /ID: submission-1/);
+  assert.match(lead, /ID: notification-1/);
   assert.match(lead, /source: test/);
   assert.match(newsletter, /Подписка на рассылку/);
   assert.doesNotMatch(newsletter, /Имя:/);
@@ -107,18 +119,12 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
   try {
     await assert.rejects(
       sendTelegram(
-        {
-          submissionId: 'submission-network-test',
-          formType: 'lead',
-          createdAt: new Date('2026-08-09T00:00:00.000Z'),
-          name: 'Анна',
-          phone: '+79990000000',
-          service: 'Позвонить',
+        leadNotification({
+          notificationId: 'notification-network-test',
+          contactMethod: 'Позвонить',
           telegramUsername: '',
           utm: {},
-          consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
-          telegramAttempts: 1,
-        },
+        }),
         requestFactory,
       ),
       (error: unknown) =>
@@ -165,18 +171,7 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
 
   try {
     await sendTelegram(
-      {
-        submissionId: 'submission-success-test',
-        formType: 'newsletter',
-        createdAt: new Date('2026-08-09T00:00:00.000Z'),
-        name: '',
-        phone: '+79990000000',
-        service: 'Рассылка',
-        telegramUsername: '',
-        utm: {},
-        consents: { version: '2026-08-14-v2', personalData: true, marketing: true },
-        telegramAttempts: 1,
-      },
+      newsletterNotification(),
       requestFactory,
     );
     assert.equal(JSON.parse(requestBody).chat_id, '-1001234567890');
@@ -216,18 +211,12 @@ test('Telegram HTTP failures preserve a safe type and upstream status', async ()
   try {
     await assert.rejects(
       sendTelegram(
-        {
-          submissionId: 'submission-http-error-test',
-          formType: 'lead',
-          createdAt: new Date('2026-08-09T00:00:00.000Z'),
-          name: 'Анна',
-          phone: '+79990000000',
-          service: 'Позвонить',
+        leadNotification({
+          notificationId: 'notification-http-error-test',
+          contactMethod: 'Позвонить',
           telegramUsername: '',
           utm: {},
-          consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
-          telegramAttempts: 1,
-        },
+        }),
         requestFactory,
       ),
       (error: unknown) =>

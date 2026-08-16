@@ -4,17 +4,18 @@ import test from 'node:test';
 import { _private } from '../handler';
 
 import type {
-  ClaimedSubmission,
-  HandlerDependencies,
-  HttpEvent,
-  HttpResponse,
-  LoggerLike,
-  Submission,
-  SubmissionStore,
-} from '../types';
+  LeadIntakeRepository,
+  NewsletterRepository,
+  TelegramOutbox,
+} from '../application/ports';
+import type { HandlerDependencies } from '../handler';
+import type { Lead } from '../domain/lead';
+import type { NewsletterOptIn } from '../domain/newsletter';
+import type { ClaimedTelegramNotification } from '../domain/telegram-notification';
+import type { HttpEvent, HttpResponse, LoggerLike } from '../types';
 
 const ORIGIN = 'https://estetika.zvenfit.ru';
-const SUBMISSION_ID = '1cc32f4f-8f06-4dc8-915f-92955c829523';
+const REQUEST_ID = '1cc32f4f-8f06-4dc8-915f-92955c829523';
 const DELIVERY_ID = '927c6260-678d-42d1-9293-a0ed5061c184';
 const NOW = new Date('2026-08-09T00:00:00.000Z');
 const logger: LoggerLike = { error() {}, info() {}, warn() {} };
@@ -25,7 +26,7 @@ function postEvent(overrides: Record<string, unknown> = {}, ip = '198.51.100.10'
     headers: { Origin: ORIGIN, 'Content-Type': 'application/json' },
     requestContext: { identity: { sourceIp: ip } },
     body: JSON.stringify({
-      submission_id: SUBMISSION_ID,
+      submission_id: REQUEST_ID,
       form_type: 'lead',
       name: 'Анна Смирнова',
       phone: '+7 (968) 844-00-88',
@@ -38,38 +39,75 @@ function postEvent(overrides: Record<string, unknown> = {}, ip = '198.51.100.10'
   };
 }
 
-function claimedSubmission(overrides: Partial<ClaimedSubmission> = {}): ClaimedSubmission {
+function claimedNotification(
+  overrides: Partial<ClaimedTelegramNotification> = {},
+): ClaimedTelegramNotification {
   return {
-    submissionId: SUBMISSION_ID,
-    formType: 'lead',
+    notificationId: REQUEST_ID,
+    kind: 'lead_created',
+    aggregateId: REQUEST_ID,
     createdAt: NOW,
     name: 'Анна Смирнова',
     phone: '+7 (968) 844-00-88',
-    service: 'WhatsApp',
+    contactMethod: 'WhatsApp',
     telegramUsername: '',
     utm: { utm_source: 'test' },
-    consents: { version: '2026-08-14-v2', personalData: true, marketing: false },
-    telegramAttempts: 1,
+    attempts: 1,
     ...overrides,
-  };
+  } as ClaimedTelegramNotification;
+}
+
+interface RepositoryOverrides {
+  lead?: Partial<LeadIntakeRepository>;
+  newsletter?: Partial<NewsletterRepository>;
+  outbox?: Partial<TelegramOutbox>;
 }
 
 function dependencies(
-  store: Partial<SubmissionStore>,
+  repositories: RepositoryOverrides = {},
   overrides: Partial<HandlerDependencies> = {},
 ): Partial<HandlerDependencies> {
   return {
+    leadRepository: {
+      async recordLead() {
+        throw new Error('not_used');
+      },
+      ...repositories.lead,
+    },
+    newsletterRepository: {
+      async recordOptIn() {
+        throw new Error('not_used');
+      },
+      async getSubscription() {
+        return null;
+      },
+      async unsubscribe() {
+        return { found: false, changed: false };
+      },
+      async isSuppressed() {
+        return true;
+      },
+      ...repositories.newsletter,
+    },
+    outbox: {
+      async claim() {
+        return null;
+      },
+      async markDelivered() {},
+      async markFailed() {},
+      async listCandidates() {
+        return [];
+      },
+      async getQueueHealth() {
+        return { pendingCount: 0, oldestPendingAgeSeconds: 0 };
+      },
+      ...repositories.outbox,
+    },
     loggerFactory: () => logger,
     maxAttempts: () => 12,
     metricsFactory: () => ({ recordGauge() {}, async flush() {} }),
     now: () => NOW,
     rateLimiter: async () => true,
-    store: {
-      async getTelegramQueueHealth() {
-        return { pendingCount: 0, oldestPendingAgeSeconds: 0 };
-      },
-      ...store,
-    } as SubmissionStore,
     telegramSender: async () => {},
     uuid: () => DELIVERY_ID,
     ...overrides,
@@ -84,15 +122,17 @@ test.beforeEach(() => {
   process.env.ALLOWED_ORIGINS = ORIGIN;
 });
 
-test('POST persists a pending lead and returns before Telegram delivery', async () => {
-  const calls: Array<[string, unknown?]> = [];
+test('POST persists a lead through the lead repository and returns before Telegram delivery', async () => {
+  let saved: Lead | undefined;
   let telegramCalled = false;
   const handler = _private.createHandler(
     dependencies(
       {
-        async saveSubmission(submission) {
-          calls.push(['save', submission]);
-          return { created: true, telegramStatus: 'pending' };
+        lead: {
+          async recordLead(lead) {
+            saved = lead;
+            return { created: true, notificationStatus: 'pending' };
+          },
         },
       },
       {
@@ -108,38 +148,30 @@ test('POST persists a pending lead and returns before Telegram delivery', async 
   assert.equal(response.statusCode, 202);
   assert.deepEqual(JSON.parse(response.body), {
     ok: true,
-    submission_id: SUBMISSION_ID,
+    submission_id: REQUEST_ID,
     notification: 'pending',
   });
-  assert.deepEqual(calls.map(call => call[0]), ['save']);
-  assert.equal(telegramCalled, false);
-  const saved = calls[0]?.[1] as Submission;
-  assert.deepEqual(saved.utm, { utm_source: 'test' });
-  assert.deepEqual(saved.consents, {
+  assert.equal(saved?.contactMethod, 'WhatsApp');
+  assert.deepEqual(saved?.utm, { utm_source: 'test' });
+  assert.deepEqual(saved?.consents, {
     version: '2026-08-14-v2',
     personalData: true,
     marketing: false,
   });
-  assert.equal('extra' in saved, false);
+  assert.equal(telegramCalled, false);
 });
 
-test('POST stores a newsletter subscription for asynchronous delivery', async () => {
-  let saved: Submission | undefined;
-  let telegramCalled = false;
+test('POST records a newsletter opt-in through its own repository', async () => {
+  let saved: NewsletterOptIn | undefined;
   const handler = _private.createHandler(
-    dependencies(
-      {
-        async saveSubmission(submission) {
-          saved = submission;
-          return { created: true, telegramStatus: 'pending' };
+    dependencies({
+      newsletter: {
+        async recordOptIn(optIn) {
+          saved = optIn;
+          return { created: true, notificationStatus: 'pending' };
         },
       },
-      {
-        async telegramSender() {
-          telegramCalled = true;
-        },
-      },
-    ),
+    }),
   );
 
   const response = httpResponse(
@@ -154,26 +186,25 @@ test('POST stores a newsletter subscription for asynchronous delivery', async ()
   );
 
   assert.equal(response.statusCode, 202);
-  assert.equal(saved?.formType, 'newsletter');
-  assert.equal(saved?.name, '');
-  assert.equal(saved?.service, 'Рассылка');
+  assert.equal(saved?.phoneNormalized, '+79688440088');
   assert.equal(saved?.consents.marketing, true);
-  assert.equal(telegramCalled, false);
 });
 
-test('timer keeps persisted data pending when Telegram is unavailable', async () => {
+test('timer keeps an outbox notification pending when Telegram is unavailable', async () => {
   let failedDelivery: { terminal: boolean; errorCode: string; failedAt: Date } | undefined;
   const handler = _private.createHandler(
     dependencies(
       {
-        async listTelegramCandidates() {
-          return [SUBMISSION_ID];
-        },
-        async claimForTelegram() {
-          return claimedSubmission();
-        },
-        async markTelegramFailed(args) {
-          failedDelivery = args;
+        outbox: {
+          async listCandidates() {
+            return [REQUEST_ID];
+          },
+          async claim() {
+            return claimedNotification();
+          },
+          async markFailed(args) {
+            failedDelivery = args;
+          },
         },
       },
       {
@@ -196,33 +227,32 @@ test('timer keeps persisted data pending when Telegram is unavailable', async ()
   assert.equal(failedDelivery?.failedAt.toISOString(), '2026-08-09T00:01:00.000Z');
 });
 
-test('POST does not resend a submission already marked as sent', async () => {
-  let claimed = false;
+test('POST returns the existing outbox delivery status for an idempotent request', async () => {
   const handler = _private.createHandler(
     dependencies({
-      async saveSubmission() {
-        return { created: false, telegramStatus: 'sent' };
-      },
-      async claimForTelegram() {
-        claimed = true;
-        return null;
+      lead: {
+        async recordLead() {
+          return { created: false, notificationStatus: 'sent' };
+        },
       },
     }),
   );
 
   const response = httpResponse(await handler(postEvent()));
 
+  assert.equal(response.statusCode, 200);
   assert.equal(JSON.parse(response.body).notification, 'sent');
-  assert.equal(claimed, false);
 });
 
-test('POST returns 503 without Telegram when YDB is unavailable', async () => {
+test('POST returns 503 without attempting Telegram when YDB is unavailable', async () => {
   let telegramCalled = false;
   const handler = _private.createHandler(
     dependencies(
       {
-        async saveSubmission() {
-          throw new Error('database offline');
+        lead: {
+          async recordLead() {
+            throw new Error('database offline');
+          },
         },
       },
       {
@@ -240,35 +270,36 @@ test('POST returns 503 without Telegram when YDB is unavailable', async () => {
   assert.equal(telegramCalled, false);
 });
 
-test('timer retries persisted pending submissions', async () => {
+test('timer claims and delivers pending outbox notifications', async () => {
   const delivered: string[] = [];
   const handler = _private.createHandler(
     dependencies({
-      async listTelegramCandidates() {
-        return [SUBMISSION_ID];
-      },
-      async claimForTelegram() {
-        return claimedSubmission({ telegramAttempts: 2 });
-      },
-      async markTelegramDelivered(args) {
-        delivered.push(args.submissionId);
+      outbox: {
+        async listCandidates() {
+          return [REQUEST_ID];
+        },
+        async claim() {
+          return claimedNotification({ attempts: 2 });
+        },
+        async markDelivered(args) {
+          delivered.push(args.notificationId);
+        },
       },
     }),
   );
-  const event = {
+
+  const result = await handler({
     messages: [
       { event_metadata: { event_type: 'yandex.cloud.events.serverless.triggers.TimerMessage' } },
     ],
-  };
-
-  const result = await handler(event);
+  });
 
   assert.deepEqual(result, { processed: 1, sent: 1, pending: 0, failed: 0, skipped: 0 });
-  assert.deepEqual(delivered, [SUBMISSION_ID]);
+  assert.deepEqual(delivered, [REQUEST_ID]);
 });
 
 test('rejects origin, honeypot, malformed values and oversized bodies', async () => {
-  const handler = _private.createHandler(dependencies({}));
+  const handler = _private.createHandler(dependencies());
   const forbidden = httpResponse(
     await handler({ httpMethod: 'POST', headers: { Origin: 'https://evil.example' } }),
   );
@@ -304,47 +335,35 @@ test('rejects origin, honeypot, malformed values and oversized bodies', async ()
 });
 
 test('rate-limits trusted request-context IP and fails open without exposing it', async () => {
-  let rateLimitCalls = 0;
   let saved = 0;
+  const repository = {
+    lead: {
+      async recordLead() {
+        saved += 1;
+        return { created: false, notificationStatus: 'sent' as const };
+      },
+    },
+  };
   const handler = _private.createHandler(
-    dependencies(
-      {
-        async saveSubmission() {
-          saved += 1;
-          return { created: false, telegramStatus: 'sent' };
-        },
+    dependencies(repository, {
+      async rateLimiter({ sourceIp }) {
+        assert.equal(sourceIp, '198.51.100.42');
+        return false;
       },
-      {
-        async rateLimiter({ sourceIp }) {
-          rateLimitCalls += 1;
-          assert.equal(sourceIp, '198.51.100.42');
-          return false;
-        },
-      },
-    ),
+    }),
   );
   const event = postEvent({}, '198.51.100.42');
   event.headers = { ...event.headers, 'X-Forwarded-For': '203.0.113.99' };
 
-  const limited = httpResponse(await handler(event));
-
-  assert.equal(limited.statusCode, 429);
-  assert.equal(rateLimitCalls, 1);
+  assert.equal(httpResponse(await handler(event)).statusCode, 429);
   assert.equal(saved, 0);
 
   const failOpen = _private.createHandler(
-    dependencies(
-      {
-        async saveSubmission() {
-          return { created: false, telegramStatus: 'sent' };
-        },
+    dependencies(repository, {
+      async rateLimiter() {
+        throw new Error('unavailable');
       },
-      {
-        async rateLimiter() {
-          throw new Error('unavailable');
-        },
-      },
-    ),
+    }),
   );
   assert.equal(httpResponse(await failOpen(postEvent())).statusCode, 200);
 });

@@ -12,8 +12,6 @@
     "test:artifact": "npm run build && node --test src/__tests__/deployment.test.cjs",
     "test:integration": "npm run typecheck && node --import tsx --test src/ydb/__tests__/integration/*.test.ts",
     "bootstrap:schema": "npm run build && node build/cli/bootstrap-schema.js",
-    "migrate:consent-evidence": "npm run build && node build/cli/migrate-consent-evidence.js",
-    "migrate:subscription-lifecycle": "npm run build && node build/cli/migrate-subscription-lifecycle.js",
     "verify:schema": "npm run build && node build/cli/verify-schema.js"
   },
   "dependencies": {

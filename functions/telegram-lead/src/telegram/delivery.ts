@@ -3,20 +3,13 @@ import { request as httpsRequest } from 'node:https';
 
 import type { ClientRequest, IncomingMessage, RequestOptions } from 'node:http';
 
-import { sanitize, TRACKED_UTM_PARAMS } from '../submission-payload';
-import { safeErrorFields } from '../observability/errors';
+import { TRACKED_UTM_PARAMS } from '../domain/shared';
 
-import type {
-  ClaimedSubmission,
-  HandlerDependencies,
-  JsonObject,
-  LoggerLike,
-  UtmKey,
-} from '../types';
+import type { ClaimedTelegramNotification } from '../domain/telegram-notification';
+import type { UtmKey } from '../domain/shared';
 
 const DEFAULT_TELEGRAM_TIMEOUT_MS = 15_000;
 const MAX_TELEGRAM_TIMEOUT_MS = 25_000;
-const TELEGRAM_LEASE_MS = 2 * 60 * 1000;
 const DEFAULT_RETRY_BATCH_SIZE = 5;
 const MAX_RETRY_BATCH_SIZE = 25;
 const DEFAULT_MAX_TELEGRAM_ATTEMPTS = 12;
@@ -42,37 +35,29 @@ const UTM_LABELS: Record<UtmKey, string> = {
   fbclid: 'fbclid',
 };
 
-export interface RetrySummary extends JsonObject {
-  processed: number;
-  sent: number;
-  pending: number;
-  failed: number;
-  skipped: number;
-}
-
-export function buildMessage(submission: ClaimedSubmission): string {
+export function buildMessage(notification: ClaimedTelegramNotification): string {
   const lines =
-    submission.formType === 'newsletter'
+    notification.kind === 'newsletter_opted_in'
       ? [
           'Подписка на рассылку (Косметология)',
-          `ID: ${submission.submissionId}`,
-          `Телефон: ${submission.phone}`,
+          `ID: ${notification.notificationId}`,
+          `Телефон: ${notification.phone}`,
         ]
       : [
           'Новая заявка (Косметология)',
-          `ID: ${submission.submissionId}`,
-          `Имя: ${submission.name}`,
-          `Телефон: ${submission.phone}`,
-          `Способ связи: ${submission.service}`,
+          `ID: ${notification.notificationId}`,
+          `Имя: ${notification.name}`,
+          `Телефон: ${notification.phone}`,
+          `Способ связи: ${notification.contactMethod}`,
         ];
 
-  if (submission.telegramUsername) {
-    lines.push(`Телеграм: ${submission.telegramUsername}`);
+  if (notification.kind === 'lead_created' && notification.telegramUsername) {
+    lines.push(`Телеграм: ${notification.telegramUsername}`);
   }
-  if (Object.keys(submission.utm).length > 0) {
+  if (Object.keys(notification.utm).length > 0) {
     lines.push('---', 'Маркировка:');
     for (const key of TRACKED_UTM_PARAMS) {
-      const value = submission.utm[key];
+      const value = notification.utm[key];
       if (value) {
         lines.push(`${UTM_LABELS[key]}: ${value}`);
       }
@@ -80,35 +65,6 @@ export function buildMessage(submission: ClaimedSubmission): string {
   }
 
   return lines.join('\n');
-}
-
-export function errorCode(error: unknown, fallback = 'internal_error'): string {
-  if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') {
-    return sanitize(error.code, 64) || fallback;
-  }
-
-  return fallback;
-}
-
-export function logDeliveryFailure(
-  logger: LoggerLike,
-  event: string,
-  submissionId: string,
-  error: unknown,
-  options: { attempts: number; fallbackCode: string; retriable: boolean },
-): void {
-  logger.error(
-    {
-      event,
-      submission_id: submissionId,
-      attempts: options.attempts,
-      ...safeErrorFields(error, {
-        fallbackCode: options.fallbackCode,
-        retriable: options.retriable,
-      }),
-    },
-    event,
-  );
 }
 
 export function maxTelegramAttempts(): number {
@@ -131,12 +87,6 @@ export function retryBatchSize(): number {
   return Number.isInteger(value) && value > 0
     ? Math.min(value, MAX_RETRY_BATCH_SIZE)
     : DEFAULT_RETRY_BATCH_SIZE;
-}
-
-function nextRetryAt(now: Date, attempts: number): Date {
-  const delayMinutes = [1, 5, 15, 60, 6 * 60][Math.min(Math.max(attempts - 1, 0), 4)] ?? 1;
-
-  return new Date(now.getTime() + delayMinutes * 60 * 1000);
 }
 
 function telegramError(
@@ -174,7 +124,7 @@ function telegramNetworkErrorCode(error: unknown): string {
 }
 
 export async function sendTelegram(
-  submission: ClaimedSubmission,
+  notification: ClaimedTelegramNotification,
   requestFactory: RequestFactory = httpsRequest,
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -183,7 +133,7 @@ export async function sendTelegram(
     throw telegramError('Telegram is not configured', 'telegram_misconfigured');
   }
 
-  const body = JSON.stringify({ chat_id: chatId, text: buildMessage(submission) });
+  const body = JSON.stringify({ chat_id: chatId, text: buildMessage(notification) });
   let response: { body: string; statusCode: number };
   try {
     response = await new Promise((resolve, reject) => {
@@ -235,94 +185,4 @@ export async function sendTelegram(
   }
 }
 
-export async function deliverSubmission(
-  submissionId: string,
-  dependencies: HandlerDependencies,
-  logger: LoggerLike,
-): Promise<'sent' | 'pending' | 'failed' | 'skipped'> {
-  const now = dependencies.now();
-  const deliveryToken = dependencies.uuid();
-  const claimed = await dependencies.store.claimForTelegram({
-    submissionId,
-    now,
-    leaseUntil: new Date(now.getTime() + TELEGRAM_LEASE_MS),
-    deliveryToken,
-    logger,
-  });
-  if (!claimed) {
-    return 'skipped';
-  }
-
-  try {
-    await dependencies.telegramSender(claimed);
-    await dependencies.store.markTelegramDelivered({
-      submissionId,
-      deliveryToken,
-      notifiedAt: dependencies.now(),
-      logger,
-    });
-
-    return 'sent';
-  } catch (error) {
-    const code = errorCode(error, 'telegram_error');
-    const terminal = claimed.telegramAttempts >= dependencies.maxAttempts();
-    await dependencies.store.markTelegramFailed({
-      submissionId,
-      deliveryToken,
-      failedAt: terminal ? dependencies.now() : nextRetryAt(dependencies.now(), claimed.telegramAttempts),
-      errorCode: code,
-      terminal,
-      logger,
-    });
-    logDeliveryFailure(
-      logger,
-      terminal ? 'telegram_delivery_failed_permanently' : 'telegram_delivery_retry_scheduled',
-      submissionId,
-      error,
-      {
-        attempts: claimed.telegramAttempts,
-        fallbackCode: code,
-        retriable: !terminal,
-      },
-    );
-
-    return terminal ? 'failed' : 'pending';
-  }
-}
-
-export async function retryPendingSubmissions(
-  dependencies: HandlerDependencies,
-  logger: LoggerLike,
-): Promise<RetrySummary> {
-  const submissionIds = await dependencies.store.listTelegramCandidates({
-    now: dependencies.now(),
-    limit: retryBatchSize(),
-    logger,
-  });
-  const summary: RetrySummary = {
-    processed: submissionIds.length,
-    sent: 0,
-    pending: 0,
-    failed: 0,
-    skipped: 0,
-  };
-
-  for (const submissionId of submissionIds) {
-    try {
-      summary[await deliverSubmission(submissionId, dependencies, logger)] += 1;
-    } catch (error) {
-      summary.pending += 1;
-      logDeliveryFailure(
-        logger,
-        'telegram_delivery_retry_error',
-        submissionId,
-        error,
-        { attempts: 0, fallbackCode: 'storage_error', retriable: true },
-      );
-    }
-  }
-
-  return summary;
-}
-
-export const _private = { nextRetryAt, telegramNetworkErrorCode };
+export const _private = { telegramNetworkErrorCode };

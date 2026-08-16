@@ -12,6 +12,7 @@ const docs = fs.readFileSync(path.join(ROOT, 'docs/monitoring.md'), 'utf8');
 const smokeScript = fs.readFileSync(path.join(ROOT, 'scripts/test-monitoring-alerts.sh'), 'utf8');
 const source = [
   'functions/telegram-lead/src/handler.ts',
+  'functions/telegram-lead/src/application/retry-notifications.ts',
   'functions/telegram-lead/src/telegram/delivery.ts',
   'functions/telegram-lead/src/observability/ydb.ts',
 ]

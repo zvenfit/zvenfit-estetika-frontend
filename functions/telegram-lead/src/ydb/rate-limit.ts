@@ -53,7 +53,7 @@ function isOccupiedSlotError(error: unknown): boolean {
   );
 }
 
-export async function consumeSubmissionRateLimit({
+export async function consumeFormRateLimit({
   sourceIp,
   now,
   logger,
