@@ -70,7 +70,7 @@ try {
 } catch {
   process.exit(1);
 }
-if (typeof response.error !== "string" || !/^[a-z][a-z0-9_]{0,63}$/.test(response.error)) process.exit(1);
+if (response.error !== "invalid_client") process.exit(1);
 if (Object.hasOwn(response, "access_token")) process.exit(1);
 process.stdout.write(response.error);
 ' "${FORBIDDEN_BODY}")"; then

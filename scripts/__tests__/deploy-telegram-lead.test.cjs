@@ -149,7 +149,7 @@ test('deploy jobs use OIDC, scoped identities and bucket-scoped ephemeral creden
   assert.match(workloadIdentityAuth, /FAILED; OIDC subject can target the forbidden service account/);
   assert.match(workloadIdentityAuth, /FORBIDDEN_HTTP_STATUS.*'401'/s);
   assert.match(workloadIdentityAuth, /Object\.hasOwn\(response, "access_token"\)/);
-  assert.match(workloadIdentityAuth, /\^\[a-z\]\[a-z0-9_\]/);
+  assert.match(workloadIdentityAuth, /response\.error !== "invalid_client"/);
   assert.match(workloadIdentityAuth, /unexpected forbidden exchange response/);
   assert.doesNotMatch(workloadIdentityAuth, /config set service-account-key/);
 
