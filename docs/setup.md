@@ -110,7 +110,10 @@ yc iam workload-identity federated-credential create \
 ```
 
 Workflow получает GitHub OIDC JWT и выбирает audience конкретной identity. Перед положительным
-обменом verifier JWT CI обязан доказать, что тот же token отклоняется для `DEPLOY_SA_ID`.
+обменом verifier JWT CI обязан доказать, что тот же token отклоняется для `DEPLOY_SA_ID`. Forbidden
+ID передаётся output-ом из `production` preflight, а не дублируется переменной
+`production-verify`; тест принимает только ожидаемый `HTTP 400 invalid_grant`, а любой другой
+4xx/5xx/network response завершает job ошибкой.
 После обмена OIDC request variables удаляются из окружения шага, исполняющего verifier artifact.
 `VERIFY_SA_ID` имеет доступ только к Estetika YDB; `DEPLOY_SA_ID` создаёт версию только
 Estetika-функции и выпускает одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA
@@ -381,8 +384,9 @@ repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к content
 workflow использует стандартный `GITHUB_TOKEN`.
 
 GitHub Environments `production` и `production-verify` используют custom deployment branch policy
-только для `main`. В `production-verify` находятся только несекретные YDB/verifier variables и ID
-deploy SA для обязательного негативного cross-SA теста; application/runtime secrets туда не
+только для `main`. В `production-verify` находятся только несекретные YDB/verifier variables;
+deploy SA ID для негативного cross-SA теста приходит из проверенного `production` preflight
+output, application/runtime secrets туда не
 копируются. Не снимайте branch restriction: иначе ручной `workflow_dispatch` сможет получить WIF
 token из feature-ветки.
 

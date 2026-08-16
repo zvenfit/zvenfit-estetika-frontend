@@ -52,7 +52,16 @@ test('separate YDB identity integration-tests and verifies schema before functio
   assert.match(verifyScript, /schema verification failed after/);
   assert.doesNotMatch(deployScript, /test:integration|verify:schema|npm ci/);
   assert.match(workflow, /YC_DEPLOY_SERVICE_ACCOUNT_ID: \$\{\{ vars\.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID \}\}/);
-  assert.match(workflow, /YC_FORBIDDEN_SERVICE_ACCOUNT_ID: \$\{\{ vars\.YC_DEPLOY_SERVICE_ACCOUNT_ID \}\}/);
+  assert.match(
+    workflow,
+    /deploy_service_account_id: \$\{\{ steps\.validate\.outputs\.deploy_service_account_id \}\}/,
+  );
+  assert.match(workflow, /printf 'deploy_service_account_id=%s\\n'.*YC_DEPLOY_SERVICE_ACCOUNT_ID.*GITHUB_OUTPUT/);
+  assert.match(
+    workflow,
+    /YC_FORBIDDEN_SERVICE_ACCOUNT_ID: \$\{\{ needs\.deploy-preflight\.outputs\.deploy_service_account_id \}\}/,
+  );
+  assert.match(workflow, /YC_REQUIRE_FORBIDDEN_SERVICE_ACCOUNT_TEST: 'true'/);
   assert.match(
     workflow,
     /unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN\s+bash scripts\/verify-telegram-lead-ydb\.sh/,
@@ -135,8 +144,12 @@ test('deploy jobs use OIDC, scoped identities and bucket-scoped ephemeral creden
   assert.match(workloadIdentityAuth, /requested_token_type=urn:ietf:params:oauth:token-type:access_token/);
   assert.match(workloadIdentityAuth, /YC_IAM_TOKEN/);
   assert.match(workloadIdentityAuth, /YC_FORBIDDEN_SERVICE_ACCOUNT_ID/);
+  assert.match(workloadIdentityAuth, /YC_REQUIRE_FORBIDDEN_SERVICE_ACCOUNT_TEST/);
   assert.match(workloadIdentityAuth, /forbidden cross-service-account exchange rejected/);
   assert.match(workloadIdentityAuth, /FAILED; OIDC subject can target the forbidden service account/);
+  assert.match(workloadIdentityAuth, /FORBIDDEN_HTTP_STATUS.*'400'/s);
+  assert.match(workloadIdentityAuth, /response\.error !== "invalid_grant"/);
+  assert.match(workloadIdentityAuth, /unexpected forbidden exchange response/);
   assert.doesNotMatch(workloadIdentityAuth, /config set service-account-key/);
 
   assert.match(ephemeralStorageKey, /duration: "3600s"/);

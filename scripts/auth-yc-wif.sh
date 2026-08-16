@@ -31,6 +31,11 @@ const value = key => typeof claims[key] === "string" ? claims[key] : JSON.string
 process.stdout.write(`iss=${value("iss")} aud=${value("aud")} sub=${value("sub")}`);
 ' "${OIDC_TOKEN}")"
 
+if [[ "${YC_REQUIRE_FORBIDDEN_SERVICE_ACCOUNT_TEST:-false}" == 'true' && -z "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
+  echo 'auth-yc-wif: YC_FORBIDDEN_SERVICE_ACCOUNT_ID is required for this identity' >&2
+  exit 1
+fi
+
 if [[ -n "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
   if [[ "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID}" == "${YC_DEPLOY_SERVICE_ACCOUNT_ID}" ]]; then
     echo 'auth-yc-wif: forbidden and target service accounts must differ' >&2
@@ -38,9 +43,8 @@ if [[ -n "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
   fi
 
   echo 'auth-yc-wif: proving the OIDC subject cannot target the forbidden service account'
-  if ! FORBIDDEN_HTTP_STATUS="$(curl --silent --show-error --location --retry 5 \
-    --output /dev/null \
-    --write-out '%{http_code}' \
+  if ! FORBIDDEN_RESPONSE="$(curl --silent --show-error --location --retry 5 \
+    --write-out $'\n%{http_code}' \
     --request POST \
     --header 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:token-exchange' \
@@ -53,12 +57,26 @@ if [[ -n "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
     exit 1
   fi
 
+  FORBIDDEN_HTTP_STATUS="${FORBIDDEN_RESPONSE##*$'\n'}"
+  FORBIDDEN_BODY="${FORBIDDEN_RESPONSE%$'\n'*}"
   if [[ "${FORBIDDEN_HTTP_STATUS}" == 2* ]]; then
     echo 'auth-yc-wif: FAILED; OIDC subject can target the forbidden service account' >&2
     exit 1
   fi
-  echo 'auth-yc-wif: forbidden cross-service-account exchange rejected'
-  unset FORBIDDEN_HTTP_STATUS
+  if [[ "${FORBIDDEN_HTTP_STATUS}" != '400' ]] || ! node -e '
+let response;
+try {
+  response = JSON.parse(process.argv[1]);
+} catch {
+  process.exit(1);
+}
+if (response.error !== "invalid_grant") process.exit(1);
+' "${FORBIDDEN_BODY}"; then
+    echo "auth-yc-wif: unexpected forbidden exchange response (HTTP ${FORBIDDEN_HTTP_STATUS})" >&2
+    exit 1
+  fi
+  echo 'auth-yc-wif: forbidden cross-service-account exchange rejected (HTTP 400 invalid_grant)'
+  unset FORBIDDEN_RESPONSE FORBIDDEN_HTTP_STATUS FORBIDDEN_BODY
 fi
 
 echo 'auth-yc-wif: exchanging the GitHub OIDC token for a Yandex Cloud IAM token'

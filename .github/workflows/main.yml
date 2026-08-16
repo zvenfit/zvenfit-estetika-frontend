@@ -86,12 +86,15 @@ jobs:
     needs: quality-checks
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      deploy_service_account_id: ${{ steps.validate.outputs.deploy_service_account_id }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Validate deploy configuration
+        id: validate
         env:
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
           YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
@@ -109,7 +112,9 @@ jobs:
           FUNCTION_NAME: ${{ env.FUNCTION_NAME }}
           YDB_DATABASE_NAME: ${{ vars.YDB_DATABASE_NAME || 'zvenfit-estetika-leads' }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
-        run: node scripts/check-deploy-config.cjs
+        run: |
+          node scripts/check-deploy-config.cjs
+          printf 'deploy_service_account_id=%s\n' "${YC_DEPLOY_SERVICE_ACCOUNT_ID}" >> "${GITHUB_OUTPUT}"
 
   verify-ydb:
     needs: [quality-checks, deploy-preflight]
@@ -148,7 +153,8 @@ jobs:
         env:
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
           YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID }}
-          YC_FORBIDDEN_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
+          YC_FORBIDDEN_SERVICE_ACCOUNT_ID: ${{ needs.deploy-preflight.outputs.deploy_service_account_id }}
+          YC_REQUIRE_FORBIDDEN_SERVICE_ACCOUNT_TEST: 'true'
           YC_WIF_AUDIENCE: https://github.com/zvenfit
         run: bash scripts/auth-yc-wif.sh
 
