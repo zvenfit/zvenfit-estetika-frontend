@@ -36,19 +36,19 @@ export async function intakeForm(
     return { ...result, requestId: lead.requestId, kind: command.kind };
   }
 
-  const { optIn } = command;
-  const result = await dependencies.newsletterRepository.recordOptIn(
-    optIn,
+  const { optInRequest } = command;
+  const result = await dependencies.newsletterRepository.recordOptInRequest(
+    optInRequest,
     {
-      notificationId: optIn.requestId,
-      kind: 'newsletter_opted_in',
-      aggregateId: optIn.phoneNormalized,
-      createdAt: optIn.occurredAt,
-      phone: optIn.phone,
-      utm: optIn.utm,
+      notificationId: optInRequest.requestId,
+      kind: 'newsletter_subscription_requested',
+      aggregateId: optInRequest.requestId,
+      createdAt: optInRequest.occurredAt,
+      phone: optInRequest.phone,
+      utm: optInRequest.utm,
     },
     { logger },
   );
 
-  return { ...result, requestId: optIn.requestId, kind: command.kind };
+  return { ...result, requestId: optInRequest.requestId, kind: command.kind };
 }

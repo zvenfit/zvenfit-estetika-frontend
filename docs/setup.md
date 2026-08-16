@@ -459,19 +459,23 @@ npm --prefix functions/telegram-lead run bootstrap:schema
 unset YDB_ACCESS_TOKEN_CREDENTIALS YDB_CONNECTION_STRING
 ```
 
-`leads` бессрочно хранит независимые заявки. `newsletter_subscriptions` хранит текущее состояние
-`active`/`unsubscribed`, а `newsletter_consent_events` — бессрочную историю юридически значимых
-событий согласия. `telegram_outbox` содержит только доставку и использует синхронные индексы
+`leads` бессрочно хранит независимые заявки. `newsletter_subscriptions` хранит подтверждённое
+текущее состояние `active`/`unsubscribed`, а `newsletter_consent_events` — бессрочную историю
+`opt_in_requested`, `opt_in_confirmed` и `unsubscribe`. `telegram_outbox` содержит только доставку и использует синхронные индексы
 `idx_telegram_outbox_due` и `idx_telegram_outbox_status_created`. TTL применяется только к
-`form_rate_limits`.
+`form_rate_limits`; PII в outbox очищается сразу после `sent` или terminal `failed`.
 
-Новый явный opt-in после отписки снова активирует подписку; отправитель рассылки обязан проверять
-suppression перед каждым сообщением. Публичная отписка по одному телефону запрещена — для неё нужен
-доверенный webhook провайдера или подписанная одноразовая ссылка.
+Публичный opt-in только записывает запрос и не активирует подписку. Доверенная интеграция должна
+подтвердить владение номером (OTP/double opt-in или подписанный одноразовый токен) и лишь затем
+вызвать confirmation-операцию. До этого номер остаётся suppressed; публичный повторный opt-in не
+может снять отписку. Отправитель рассылки обязан проверять suppression перед каждым сообщением.
+Публичная отписка по одному телефону запрещена — для неё нужен доверенный webhook провайдера или
+подписанная одноразовая ссылка.
 
 Ответ `{ "ok": true }` означает, что запись уже сохранена в YDB; `notification: "pending"`
-означает, что Telegram будет повторён таймером. Доступ к таблице содержит персональные данные и
-должен быть ограничен ответственными сотрудниками.
+означает, что Telegram будет повторён таймером. Для newsletter ответ также содержит
+`confirmation_required: true`; это не подтверждение активной подписки. Доступ к таблице содержит
+персональные данные и должен быть ограничен ответственными сотрудниками.
 
 Для запуска настоящего handler локально передайте endpoint существующей БД и короткоживущий IAM-токен через `YDB_CONNECTION_STRING` и `YDB_ACCESS_TOKEN_CREDENTIALS`. Без них mock-сервер не пишет персональные данные в YDB и возвращает безопасный mock-ответ.
 
@@ -516,12 +520,12 @@ URL="$(yc serverless function get \
 curl -X POST "$URL" \
   -H "Content-Type: application/json" \
   -H "Origin: https://estetika.zvenfit.ru" \
-  -d '{"form_type":"lead","name":"Тест","phone":"+79991234567","service":"Позвонить"}'
+  -d '{"form_type":"lead","name":"Тест","phone":"+79991234567","service":"Позвонить","consents":{"version":"2026-08-14-v2","personal_data":true,"marketing":false}}'
 
 curl -X POST "$URL" \
   -H "Content-Type: application/json" \
   -H "Origin: https://estetika.zvenfit.ru" \
-  -d '{"form_type":"newsletter","phone":"+79991234567"}'
+  -d '{"form_type":"newsletter","phone":"+79991234567","consents":{"version":"2026-08-14-v2","personal_data":true,"marketing":true}}'
 ```
 
 Функция проверяет Origin, тип и размер JSON, валидирует поля, использует honeypot,

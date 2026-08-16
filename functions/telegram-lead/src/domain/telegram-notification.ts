@@ -1,7 +1,7 @@
 import type { Utm } from './shared';
 
 export type TelegramNotificationStatus = 'pending' | 'sending' | 'sent' | 'failed';
-export type TelegramNotificationKind = 'lead_created' | 'newsletter_opted_in';
+export type TelegramNotificationKind = 'lead_created' | 'newsletter_subscription_requested';
 
 interface TelegramNotificationBase {
   notificationId: string;
@@ -20,7 +20,7 @@ export interface LeadTelegramNotification extends TelegramNotificationBase {
 }
 
 export interface NewsletterTelegramNotification extends TelegramNotificationBase {
-  kind: 'newsletter_opted_in';
+  kind: 'newsletter_subscription_requested';
 }
 
 export type TelegramNotification =

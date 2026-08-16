@@ -1,6 +1,6 @@
 import type { Lead } from '../domain/lead';
-import type { NewsletterOptIn } from '../domain/newsletter';
+import type { NewsletterOptInRequest } from '../domain/newsletter';
 
 export type FormCommand =
   | { kind: 'lead'; lead: Lead }
-  | { kind: 'newsletter'; optIn: NewsletterOptIn };
+  | { kind: 'newsletter'; optInRequest: NewsletterOptInRequest };

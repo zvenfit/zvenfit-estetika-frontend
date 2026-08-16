@@ -1,11 +1,21 @@
 import type { RequestEvidence, Utm } from './shared';
 
 export type NewsletterSubscriptionStatus = 'active' | 'unsubscribed';
-export type NewsletterConsentEventType = 'opt_in' | 'unsubscribe';
+export type NewsletterConsentEventType =
+  | 'opt_in_requested'
+  | 'opt_in_confirmed'
+  | 'unsubscribe';
 
-export interface NewsletterOptIn extends RequestEvidence {
+export interface NewsletterOptInRequest extends RequestEvidence {
   phone: string;
   phoneNormalized: string;
+}
+
+export interface NewsletterOptInConfirmation {
+  eventId: string;
+  requestEventId: string;
+  occurredAt: Date;
+  proofReference: string;
 }
 
 export interface NewsletterSubscription {
@@ -32,9 +42,19 @@ export interface NewsletterUnsubscribe {
   reason: string;
 }
 
-export interface SubscriptionMutationResult {
-  found: boolean;
-  changed: boolean;
+export interface ConsentMutationResult {
+  eventCreated: boolean;
+  stateChanged: boolean;
+}
+
+export function canApplyConsentEvent(
+  candidateAt: Date,
+  currentUpdatedAt: Date,
+  eventType: 'opt_in_confirmed' | 'unsubscribe',
+): boolean {
+  const difference = candidateAt.getTime() - currentUpdatedAt.getTime();
+
+  return difference > 0 || (difference === 0 && eventType === 'unsubscribe');
 }
 
 export function normalizeSubscriberPhone(phone: string): string {

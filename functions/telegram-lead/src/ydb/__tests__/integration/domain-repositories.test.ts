@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import type { Lead } from '../../../domain/lead';
-import { normalizeSubscriberPhone, type NewsletterOptIn } from '../../../domain/newsletter';
+import {
+  normalizeSubscriberPhone,
+  type NewsletterOptInRequest,
+} from '../../../domain/newsletter';
 import type {
   LeadTelegramNotification,
   NewsletterTelegramNotification,
@@ -54,7 +57,11 @@ function leadNotification(value: Lead): LeadTelegramNotification {
   };
 }
 
-function optIn(requestId: string, occurredAt: Date, phone = '+7 (999) 123-45-67'): NewsletterOptIn {
+function optInRequest(
+  requestId: string,
+  occurredAt: Date,
+  phone = '+7 (999) 123-45-67',
+): NewsletterOptInRequest {
   return {
     requestId,
     occurredAt,
@@ -65,11 +72,11 @@ function optIn(requestId: string, occurredAt: Date, phone = '+7 (999) 123-45-67'
   };
 }
 
-function newsletterNotification(value: NewsletterOptIn): NewsletterTelegramNotification {
+function newsletterNotification(value: NewsletterOptInRequest): NewsletterTelegramNotification {
   return {
     notificationId: value.requestId,
-    kind: 'newsletter_opted_in',
-    aggregateId: value.phoneNormalized,
+    kind: 'newsletter_subscription_requested',
+    aggregateId: value.requestId,
     createdAt: value.occurredAt,
     phone: value.phone,
     utm: value.utm,
@@ -152,55 +159,223 @@ test(
         notificationStatus: 'sent',
       });
 
-      const firstOptIn = optIn(randomUUID(), new Date(now.getTime() + 60_000));
+      const firstRequest = optInRequest(randomUUID(), new Date(now.getTime() + 60_000));
       const firstResults = await Promise.all([
-        newsletterRepository.recordOptIn(firstOptIn, newsletterNotification(firstOptIn)),
-        newsletterRepository.recordOptIn(firstOptIn, newsletterNotification(firstOptIn)),
+        newsletterRepository.recordOptInRequest(
+          firstRequest,
+          newsletterNotification(firstRequest),
+        ),
+        newsletterRepository.recordOptInRequest(
+          firstRequest,
+          newsletterNotification(firstRequest),
+        ),
       ]);
       assert.deepEqual(firstResults.map(result => result.created).sort(), [false, true]);
+      assert.equal(
+        await newsletterRepository.getSubscription({ phone: '8 999 123 45 67' }),
+        null,
+      );
+      assert.equal(await newsletterRepository.isSuppressed({ phone: firstRequest.phone }), true);
+
+      const firstConfirmationId = randomUUID();
+      const firstConfirmedAt = new Date(now.getTime() + 90_000);
+      assert.deepEqual(
+        await newsletterRepository.confirmOptIn({
+          eventId: firstConfirmationId,
+          requestEventId: firstRequest.requestId,
+          occurredAt: firstConfirmedAt,
+          proofReference: 'provider-proof-first',
+        }),
+        { eventCreated: true, stateChanged: true },
+      );
+      assert.deepEqual(
+        await newsletterRepository.confirmOptIn({
+          eventId: firstConfirmationId,
+          requestEventId: firstRequest.requestId,
+          occurredAt: firstConfirmedAt,
+          proofReference: 'provider-proof-first',
+        }),
+        { eventCreated: false, stateChanged: false },
+      );
       const firstSubscription = await newsletterRepository.getSubscription({
-        phone: '8 999 123 45 67',
+        phone: firstRequest.phone,
       });
       assert.equal(firstSubscription?.status, 'active');
-      assert.equal(firstSubscription?.lastConsentEventId, firstOptIn.requestId);
-      assert.equal(await newsletterRepository.isSuppressed({ phone: firstOptIn.phone }), false);
+      assert.equal(firstSubscription?.firstSubscribedAt.getTime(), firstRequest.occurredAt.getTime());
+      assert.equal(firstSubscription?.subscribedAt.getTime(), firstConfirmedAt.getTime());
+      assert.equal(firstSubscription?.lastConsentEventId, firstConfirmationId);
+      assert.equal(await newsletterRepository.isSuppressed({ phone: firstRequest.phone }), false);
 
-      const reconfirmed = optIn(randomUUID(), new Date(now.getTime() + 120_000));
-      await newsletterRepository.recordOptIn(reconfirmed, newsletterNotification(reconfirmed));
-      const afterReconfirm = await newsletterRepository.getSubscription({ phone: reconfirmed.phone });
-      assert.equal(afterReconfirm?.firstSubscribedAt.getTime(), firstOptIn.occurredAt.getTime());
-      assert.equal(afterReconfirm?.subscribedAt.getTime(), firstOptIn.occurredAt.getTime());
-      assert.equal(afterReconfirm?.lastConfirmedAt.getTime(), reconfirmed.occurredAt.getTime());
+      const secondRequest = optInRequest(randomUUID(), new Date(now.getTime() + 120_000));
+      await newsletterRepository.recordOptInRequest(
+        secondRequest,
+        newsletterNotification(secondRequest),
+      );
+      const afterPublicRequest = await newsletterRepository.getSubscription({
+        phone: secondRequest.phone,
+      });
+      assert.equal(afterPublicRequest?.lastConfirmedAt.getTime(), firstConfirmedAt.getTime());
+
+      const secondConfirmationId = randomUUID();
+      const secondConfirmedAt = new Date(now.getTime() + 150_000);
+      await assert.rejects(
+        newsletterRepository.confirmOptIn({
+          eventId: secondConfirmationId,
+          requestEventId: secondRequest.requestId,
+          occurredAt: secondConfirmedAt,
+          proofReference: '   ',
+        }),
+        /newsletter_confirmation_proof_missing/,
+      );
+      await newsletterRepository.confirmOptIn({
+        eventId: secondConfirmationId,
+        requestEventId: secondRequest.requestId,
+        occurredAt: secondConfirmedAt,
+        proofReference: 'provider-proof-second',
+      });
+      const afterReconfirm = await newsletterRepository.getSubscription({
+        phone: secondRequest.phone,
+      });
+      assert.equal(afterReconfirm?.firstSubscribedAt.getTime(), firstRequest.occurredAt.getTime());
+      assert.equal(afterReconfirm?.subscribedAt.getTime(), firstConfirmedAt.getTime());
+      assert.equal(afterReconfirm?.lastConfirmedAt.getTime(), secondConfirmedAt.getTime());
 
       const unsubscribeEventId = randomUUID();
       const unsubscribedAt = new Date(now.getTime() + 180_000);
       assert.deepEqual(
         await newsletterRepository.unsubscribe({
           eventId: unsubscribeEventId,
-          phone: reconfirmed.phone,
+          phone: secondRequest.phone,
           occurredAt: unsubscribedAt,
           reason: 'subscriber_request',
         }),
-        { found: true, changed: true },
+        { eventCreated: true, stateChanged: true },
       );
-      assert.equal(await newsletterRepository.isSuppressed({ phone: reconfirmed.phone }), true);
+      assert.equal(await newsletterRepository.isSuppressed({ phone: secondRequest.phone }), true);
       assert.deepEqual(
         await newsletterRepository.unsubscribe({
           eventId: unsubscribeEventId,
-          phone: reconfirmed.phone,
+          phone: secondRequest.phone,
           occurredAt: unsubscribedAt,
           reason: 'subscriber_request',
         }),
-        { found: true, changed: false },
+        { eventCreated: false, stateChanged: false },
       );
 
-      const resubscribed = optIn(randomUUID(), new Date(now.getTime() + 240_000));
-      await newsletterRepository.recordOptIn(resubscribed, newsletterNotification(resubscribed));
-      const current = await newsletterRepository.getSubscription({ phone: resubscribed.phone });
-      assert.equal(current?.status, 'active');
-      assert.equal(current?.subscribedAt.getTime(), resubscribed.occurredAt.getTime());
-      assert.equal(current?.unsubscribedAt, null);
+      const resubscribeRequest = optInRequest(randomUUID(), new Date(now.getTime() + 240_000));
+      await newsletterRepository.recordOptInRequest(
+        resubscribeRequest,
+        newsletterNotification(resubscribeRequest),
+      );
+      const stillUnsubscribed = await newsletterRepository.getSubscription({
+        phone: resubscribeRequest.phone,
+      });
+      assert.equal(stillUnsubscribed?.status, 'unsubscribed');
+      assert.equal(stillUnsubscribed?.lastConsentEventId, unsubscribeEventId);
+      assert.equal(await newsletterRepository.isSuppressed({ phone: resubscribeRequest.phone }), true);
+
+      const delayedUnsubscribeId = randomUUID();
+      assert.deepEqual(
+        await newsletterRepository.unsubscribe({
+          eventId: delayedUnsubscribeId,
+          phone: resubscribeRequest.phone,
+          occurredAt: new Date(now.getTime() + 170_000),
+          reason: 'delayed_provider_event',
+        }),
+        { eventCreated: true, stateChanged: false },
+      );
+
+      const resubscribeConfirmationId = randomUUID();
+      const resubscribedAt = new Date(now.getTime() + 300_000);
+      await newsletterRepository.confirmOptIn({
+        eventId: resubscribeConfirmationId,
+        requestEventId: resubscribeRequest.requestId,
+        occurredAt: resubscribedAt,
+        proofReference: 'provider-proof-resubscribe',
+      });
+      const resubscribed = await newsletterRepository.getSubscription({
+        phone: resubscribeRequest.phone,
+      });
+      assert.equal(resubscribed?.status, 'active');
+      assert.equal(resubscribed?.subscribedAt.getTime(), resubscribedAt.getTime());
+      assert.equal(resubscribed?.unsubscribedAt, null);
+
+      assert.deepEqual(
+        await newsletterRepository.unsubscribe({
+          eventId: randomUUID(),
+          phone: resubscribeRequest.phone,
+          occurredAt: new Date(now.getTime() + 250_000),
+          reason: 'late_old_unsubscribe',
+        }),
+        { eventCreated: true, stateChanged: false },
+      );
+      assert.equal(
+        (await newsletterRepository.getSubscription({ phone: resubscribeRequest.phone }))?.status,
+        'active',
+      );
+
+      const tombstonePhone = '+7 (999) 765-43-21';
+      const tombstoneEventId = randomUUID();
+      assert.deepEqual(
+        await newsletterRepository.unsubscribe({
+          eventId: tombstoneEventId,
+          phone: tombstonePhone,
+          occurredAt: new Date(now.getTime() + 400_000),
+          reason: 'provider_suppression',
+        }),
+        { eventCreated: true, stateChanged: true },
+      );
+      const tombstoneRequest = optInRequest(
+        randomUUID(),
+        new Date(now.getTime() + 410_000),
+        tombstonePhone,
+      );
+      await newsletterRepository.recordOptInRequest(
+        tombstoneRequest,
+        newsletterNotification(tombstoneRequest),
+      );
+      assert.equal(
+        (await newsletterRepository.getSubscription({ phone: tombstonePhone }))?.status,
+        'unsubscribed',
+      );
+      const tombstoneConfirmationId = randomUUID();
+      await newsletterRepository.confirmOptIn({
+        eventId: tombstoneConfirmationId,
+        requestEventId: tombstoneRequest.requestId,
+        occurredAt: new Date(now.getTime() + 420_000),
+        proofReference: 'provider-proof-tombstone',
+      });
+      assert.deepEqual(
+        await newsletterRepository.unsubscribe({
+          eventId: tombstoneEventId,
+          phone: tombstonePhone,
+          occurredAt: new Date(now.getTime() + 400_000),
+          reason: 'provider_suppression',
+        }),
+        { eventCreated: false, stateChanged: false },
+      );
+      assert.equal(
+        (await newsletterRepository.getSubscription({ phone: tombstonePhone }))?.status,
+        'active',
+      );
       assert.equal(await newsletterRepository.isSuppressed({ phone: 'invalid' }), true);
+
+      const terminalDeliveryToken = randomUUID();
+      const terminalClaimedAt = new Date(now.getTime() + 500_000);
+      const terminalNotification = await outbox.claim({
+        notificationId: tombstoneRequest.requestId,
+        now: terminalClaimedAt,
+        leaseUntil: new Date(terminalClaimedAt.getTime() + 60_000),
+        deliveryToken: terminalDeliveryToken,
+      });
+      assert.equal(terminalNotification?.kind, 'newsletter_subscription_requested');
+      await outbox.markFailed({
+        notificationId: tombstoneRequest.requestId,
+        deliveryToken: terminalDeliveryToken,
+        failedAt: terminalClaimedAt,
+        errorCode: 'terminal_test_failure',
+        terminal: true,
+      });
 
       const client = await createYdbClient();
       try {
@@ -216,8 +391,53 @@ test(
             .idempotent(true)
             .isolation('snapshotReadOnly'),
         );
+        const deliveredOutboxRows = firstResultSet(
+          await client.sql`
+            SELECT aggregate_id, payload_json, status
+            FROM ${client.sql.identifier(telegramOutboxTableName())}
+            WHERE notification_id = ${newLead.requestId};
+          `
+            .timeout(queryTimeoutMs())
+            .idempotent(true)
+            .isolation('snapshotReadOnly'),
+        );
+        const failedOutboxRows = firstResultSet(
+          await client.sql`
+            SELECT aggregate_id, payload_json, status
+            FROM ${client.sql.identifier(telegramOutboxTableName())}
+            WHERE notification_id = ${tombstoneRequest.requestId};
+          `
+            .timeout(queryTimeoutMs())
+            .idempotent(true)
+            .isolation('snapshotReadOnly'),
+        );
+        const confirmationRows = firstResultSet(
+          await client.sql`
+            SELECT reason
+            FROM ${client.sql.identifier(newsletterConsentEventsTableName())}
+            WHERE event_id = ${firstConfirmationId};
+          `
+            .timeout(queryTimeoutMs())
+            .idempotent(true)
+            .isolation('snapshotReadOnly'),
+        );
         assert.equal(Number(leadRows[0]?.row_count), 1);
-        assert.equal(Number(consentRows[0]?.row_count), 4);
+        assert.equal(Number(consentRows[0]?.row_count), 12);
+        assert.deepEqual(deliveredOutboxRows[0], {
+          aggregate_id: newLead.requestId,
+          payload_json: '{}',
+          status: 'sent',
+        });
+        assert.deepEqual(failedOutboxRows[0], {
+          aggregate_id: tombstoneRequest.requestId,
+          payload_json: '{}',
+          status: 'failed',
+        });
+        assert.match(
+          String(confirmationRows[0]?.reason),
+          new RegExp(`^confirmed:${firstRequest.requestId}:[a-f0-9]{64}$`),
+        );
+        assert.doesNotMatch(String(confirmationRows[0]?.reason), /provider-proof-first/);
       } finally {
         await client.close();
       }

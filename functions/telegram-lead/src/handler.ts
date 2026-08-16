@@ -124,10 +124,17 @@ async function persistForm(
       const event = 'submission_persisted';
       logger.info?.({ event, form_type: saved.kind }, event);
     }
+    const newsletterState =
+      saved.kind === 'newsletter' ? { confirmation_required: true } : {};
     if (saved.notificationStatus === 'sent') {
       return jsonResponse(
         200,
-        { ok: true, submission_id: saved.requestId, notification: 'sent' },
+        {
+          ok: true,
+          submission_id: saved.requestId,
+          notification: 'sent',
+          ...newsletterState,
+        },
         headers,
       );
     }
@@ -138,6 +145,7 @@ async function persistForm(
         ok: true,
         submission_id: saved.requestId,
         notification: saved.notificationStatus,
+        ...newsletterState,
       },
       headers,
     );
@@ -145,7 +153,7 @@ async function persistForm(
     const requestId =
       parsed.command.kind === 'lead'
         ? parsed.command.lead.requestId
-        : parsed.command.optIn.requestId;
+        : parsed.command.optInRequest.requestId;
     logDeliveryFailure(logger, 'submission_storage_error', requestId, error, {
       attempts: 0,
       fallbackCode: 'storage_error',
