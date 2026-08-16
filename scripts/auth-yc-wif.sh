@@ -31,6 +31,36 @@ const value = key => typeof claims[key] === "string" ? claims[key] : JSON.string
 process.stdout.write(`iss=${value("iss")} aud=${value("aud")} sub=${value("sub")}`);
 ' "${OIDC_TOKEN}")"
 
+if [[ -n "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID:-}" ]]; then
+  if [[ "${YC_FORBIDDEN_SERVICE_ACCOUNT_ID}" == "${YC_DEPLOY_SERVICE_ACCOUNT_ID}" ]]; then
+    echo 'auth-yc-wif: forbidden and target service accounts must differ' >&2
+    exit 1
+  fi
+
+  echo 'auth-yc-wif: proving the OIDC subject cannot target the forbidden service account'
+  if ! FORBIDDEN_HTTP_STATUS="$(curl --silent --show-error --location --retry 5 \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    --request POST \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:token-exchange' \
+    --data-urlencode 'requested_token_type=urn:ietf:params:oauth:token-type:access_token' \
+    --data-urlencode "audience=${YC_FORBIDDEN_SERVICE_ACCOUNT_ID}" \
+    --data-urlencode "subject_token=${OIDC_TOKEN}" \
+    --data-urlencode 'subject_token_type=urn:ietf:params:oauth:token-type:id_token' \
+    'https://auth.yandex.cloud/oauth/token')"; then
+    echo 'auth-yc-wif: forbidden cross-service-account exchange could not be tested' >&2
+    exit 1
+  fi
+
+  if [[ "${FORBIDDEN_HTTP_STATUS}" == 2* ]]; then
+    echo 'auth-yc-wif: FAILED; OIDC subject can target the forbidden service account' >&2
+    exit 1
+  fi
+  echo 'auth-yc-wif: forbidden cross-service-account exchange rejected'
+  unset FORBIDDEN_HTTP_STATUS
+fi
+
 echo 'auth-yc-wif: exchanging the GitHub OIDC token for a Yandex Cloud IAM token'
 if ! IAM_RESPONSE="$(curl --fail-with-body --silent --show-error --location --retry 5 \
   --request POST \

@@ -114,7 +114,7 @@ jobs:
   verify-ydb:
     needs: [quality-checks, deploy-preflight]
     runs-on: ubuntu-latest
-    environment: production
+    environment: production-verify
     permissions:
       contents: read
       id-token: write
@@ -148,6 +148,7 @@ jobs:
         env:
           YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
           YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID }}
+          YC_FORBIDDEN_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
           YC_WIF_AUDIENCE: https://github.com/zvenfit
         run: bash scripts/auth-yc-wif.sh
 
@@ -160,7 +161,9 @@ jobs:
           YDB_SUBMISSIONS_TABLE: ${{ vars.YDB_SUBMISSIONS_TABLE || 'submissions' }}
           YDB_RATE_LIMITS_TABLE: ${{ vars.YDB_RATE_LIMITS_TABLE || 'submission_rate_limits' }}
           YDB_QUERY_TIMEOUT_MS: ${{ vars.YDB_QUERY_TIMEOUT_MS || '10000' }}
-        run: bash scripts/verify-telegram-lead-ydb.sh "${RUNNER_TEMP}/lead-verifier"
+        run: |
+          unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
+          bash scripts/verify-telegram-lead-ydb.sh "${RUNNER_TEMP}/lead-verifier"
 
   deploy-function:
     needs: [verify-ydb]

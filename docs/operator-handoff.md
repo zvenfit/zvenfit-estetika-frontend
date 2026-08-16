@@ -4,10 +4,12 @@
 секретов, юридических решений или проверки реального сообщения. Значения секретов не присылайте в
 чат и не коммитьте.
 
-## 1. GitHub Environment `production` переведён на WIF
+## 1. GitHub Environments переведены на WIF
 
-Cloud-side identities, resource bindings, Estetika federation и две federated credentials созданы
-2026-08-16. В GitHub Environment `production` настроены следующие Variables:
+Cloud-side identities, resource bindings, Estetika federation и разные exact-subject federated
+credentials созданы 2026-08-16. Deploy использует GitHub Environment `production`, а YDB verifier
+— отдельный `production-verify`; оба разрешают только ветку `main`. В `production` настроены
+следующие Variables:
 
 - `YC_FOLDER_ID=b1ge1e4iopttj79hfdfm`;
 - `YC_DEPLOY_SERVICE_ACCOUNT_ID=ajeousto2q45k6b9as32`;
@@ -23,9 +25,13 @@ Cloud-side identities, resource bindings, Estetika federation и две federate
 - `LEAD_RATE_LIMIT_SECRET` — минимум 32 символа;
 - `MONIUM_API_KEY`.
 
-Federation `zvenfit-estetika-production-github` связана с deploy/verifier SA точным subject
-`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`. WIF deploy
-прошёл успешно; `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
+Federation `zvenfit-estetika-production-github` связана с deploy SA subject
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production` и verifier SA
+subject
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify`.
+Verifier job негативно проверяет запрет обмена своего JWT на deploy SA, а затем удаляет GitHub OIDC
+request variables перед запуском verifier artifact. В `production-verify` нет runtime/application
+secrets. `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
 соответствующие ключи отозваны в Yandex Cloud. Bucket ACL оставляет public read и read/write только
 storage SA; legacy deploy-SA grant удалён. Значения секретов в чат не присылайте.
 
@@ -37,7 +43,8 @@ resource-level роли YDB/Function, а CI получил ACL только ба
 Бакеты, YDB, функция и service accounts основного `zvenfit-frontend` не используются.
 
 CI не выдаёт себе административные роли и остановится, если одноразовая инфраструктура или binding
-отсутствуют. Deploy SA, YDB verifier, storage SA и runtime SA различаются. Verifier имеет
+отсутствуют. Deploy SA, YDB verifier, storage SA и runtime SA различаются; deploy и verifier также
+имеют разные OIDC subjects. Verifier имеет
 `ydb.editor` только на Estetika YDB; deploy SA меняет только Estetika-функцию и может выпускать
 ephemeral keys только для storage SA; storage SA имеет ACL только на `zvenfit-estetika-frontend`.
 Перед upload CI негативно проверяет запрет выпуска ключа для runtime SA и запрет чтения

@@ -23,9 +23,10 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
 ## Блокеры запуска
 
 - [x] **Завершить переход GitHub Actions на OIDC/WIF** — production variables настроены, deploy прошёл без постоянных cloud credentials, legacy GitHub Secrets удалены, соответствующие ключи отозваны
-  - [x] В Yandex Cloud созданы отдельные verifier/storage SA, Estetika federation и две federated credentials; deploy SA лишён YDB-доступа и не имеет folder-level ролей (проверено 2026-08-16)
+  - [x] В Yandex Cloud созданы отдельные verifier/storage SA, Estetika federation и разные `production`/`production-verify` exact-subject credentials; deploy SA лишён YDB-доступа и не имеет folder-level ролей (проверено 2026-08-16)
   - [x] `npm ci` и build jobs не имеют OIDC; credentialed jobs получают только заранее собранные artifacts
   - [x] Live YDB probe использует отдельный verifier SA, а function/storage deploy — отдельный deploy SA
+  - [x] Verifier JWT негативно проверяется против deploy SA, а OIDC request variables удаляются до исполнения verifier artifact
   - [x] Object Storage получает одночасовой session key с policy только для `zvenfit-estetika-frontend`; `zvenfit-estetika` и бакеты основного сайта исключены
   - [x] CI негативно проверяет запрет выпуска ключа для runtime SA и запрет доступа session к соседним бакетам
   - [x] Обязательные production secrets/variables прошли preflight; `ASSET_VERSION` остаётся необязательным

@@ -30,7 +30,9 @@ test('production deploy jobs wait for quality checks', () => {
   const functionJob = workflow.slice(functionDeploy, siteBuild);
   assert.match(functionJob, /needs: \[verify-ydb\]/);
   assert.match(functionJob, /environment: production/);
-  assert.match(workflow.slice(verifyYdb, functionDeploy), /needs: \[quality-checks, deploy-preflight\]/);
+  const verifyJob = workflow.slice(verifyYdb, functionDeploy);
+  assert.match(verifyJob, /needs: \[quality-checks, deploy-preflight\]/);
+  assert.match(verifyJob, /environment: production-verify/);
   assert.match(workflow.slice(siteDeploy, smoke), /needs: \[deploy-function, build-site\]/);
 });
 
@@ -50,6 +52,11 @@ test('separate YDB identity integration-tests and verifies schema before functio
   assert.match(verifyScript, /schema verification failed after/);
   assert.doesNotMatch(deployScript, /test:integration|verify:schema|npm ci/);
   assert.match(workflow, /YC_DEPLOY_SERVICE_ACCOUNT_ID: \$\{\{ vars\.YC_YDB_VERIFY_SERVICE_ACCOUNT_ID \}\}/);
+  assert.match(workflow, /YC_FORBIDDEN_SERVICE_ACCOUNT_ID: \$\{\{ vars\.YC_DEPLOY_SERVICE_ACCOUNT_ID \}\}/);
+  assert.match(
+    workflow,
+    /unset ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN\s+bash scripts\/verify-telegram-lead-ydb\.sh/,
+  );
   assert.match(workflow, /YDB_CONNECTION_STRING: \$\{\{ needs\.verify-ydb\.outputs\.connection_string \}\}/);
 });
 
@@ -127,6 +134,9 @@ test('deploy jobs use OIDC, scoped identities and bucket-scoped ephemeral creden
 
   assert.match(workloadIdentityAuth, /requested_token_type=urn:ietf:params:oauth:token-type:access_token/);
   assert.match(workloadIdentityAuth, /YC_IAM_TOKEN/);
+  assert.match(workloadIdentityAuth, /YC_FORBIDDEN_SERVICE_ACCOUNT_ID/);
+  assert.match(workloadIdentityAuth, /forbidden cross-service-account exchange rejected/);
+  assert.match(workloadIdentityAuth, /FAILED; OIDC subject can target the forbidden service account/);
   assert.doesNotMatch(workloadIdentityAuth, /config set service-account-key/);
 
   assert.match(ephemeralStorageKey, /duration: "3600s"/);

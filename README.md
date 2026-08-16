@@ -112,7 +112,7 @@ npm run check:upstream-parity # есть ли новые неразобранн�
 
 1. независимо от облака запускает линтер, strict typecheck, unit/artifact-тесты функции, мониторинговый контракт и проверку сайта, затем публикует неизменяемые function/verifier artifacts;
 2. fail-fast проверяет точную карту Estetika resources и обязательные production secrets/variables без вывода значений;
-3. под отдельным YDB verifier SA прогоняет integration-тесты на временных таблицах и read-only проверку готовой схемы;
+3. в отдельном `production-verify` OIDC subject доказывает запрет обмена JWT на deploy SA, затем под отдельным YDB verifier SA прогоняет integration-тесты на временных таблицах и read-only проверку готовой схемы;
 4. под deploy SA разворачивает готовый CommonJS artifact функции и использует заранее созданный минутный retry timer;
 5. в job без OIDC собирает сайт с URL функции, проверяет `dist/` и performance-budget;
 6. под deploy SA доказывает запрет выпуска ephemeral key для runtime SA, выпускает одночасовой key для отдельного storage SA и проверяет доступ только к `zvenfit-estetika-frontend`;

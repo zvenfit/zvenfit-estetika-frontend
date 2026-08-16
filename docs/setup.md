@@ -73,12 +73,15 @@ RUNTIME_SA_ID="$(yc iam service-account get \
 
 ### GitHub OIDC / Workload Identity Federation
 
-Создайте отдельную federation для Estetika production и свяжите её только с subject GitHub
-Environment этого репозитория:
+Создайте отдельную federation для Estetika и свяжите deploy и verifier identities с разными
+GitHub Environment subjects этого репозитория. Deploy использует `production`, а YDB verifier —
+`production-verify`; оба Environment разрешают только ветку `main`.
 
 В организации `zvenfit` OIDC subject использует numeric owner/repository IDs. Для этого
-репозитория production subject равен
-`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`.
+репозитория deploy subject равен
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`, а verifier
+subject —
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify`.
 Стандартная форма без numeric IDs здесь не совпадает с JWT и не должна добавляться как
 альтернативный credential.
 
@@ -93,19 +96,25 @@ yc iam workload-identity oidc federation create \
 FEDERATION_ID="$(yc iam workload-identity oidc federation get \
   --name zvenfit-estetika-production-github --format json | jq -r '.id')"
 
-for WIF_SA_ID in "$DEPLOY_SA_ID" "$VERIFY_SA_ID"; do
-  yc iam workload-identity federated-credential create \
-    --service-account-id "$WIF_SA_ID" \
-    --federation-id "$FEDERATION_ID" \
-    --external-subject-id \
-    'repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production'
-done
+yc iam workload-identity federated-credential create \
+  --service-account-id "$DEPLOY_SA_ID" \
+  --federation-id "$FEDERATION_ID" \
+  --external-subject-id \
+  'repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production'
+
+yc iam workload-identity federated-credential create \
+  --service-account-id "$VERIFY_SA_ID" \
+  --federation-id "$FEDERATION_ID" \
+  --external-subject-id \
+  'repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify'
 ```
 
-Workflow получает GitHub OIDC JWT и выбирает audience конкретной identity. `VERIFY_SA_ID` имеет
-доступ только к Estetika YDB; `DEPLOY_SA_ID` создаёт версию только Estetika-функции и выпускает
-одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA имеет READ/WRITE только на
-`zvenfit-estetika-frontend`.
+Workflow получает GitHub OIDC JWT и выбирает audience конкретной identity. Перед положительным
+обменом verifier JWT CI обязан доказать, что тот же token отклоняется для `DEPLOY_SA_ID`.
+После обмена OIDC request variables удаляются из окружения шага, исполняющего verifier artifact.
+`VERIFY_SA_ID` имеет доступ только к Estetika YDB; `DEPLOY_SA_ID` создаёт версию только
+Estetika-функции и выпускает одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA
+имеет READ/WRITE только на `zvenfit-estetika-frontend`.
 
 Роль выпуска ephemeral keys назначается на ресурс storage SA, а не на общую folder:
 
@@ -216,7 +225,7 @@ binding, не изменяет timer и останавливает deploy с и�
 | deploy SA | `zvenfit-estetika-telegram-lead` | `functions.editor` | создавать версии своей функции |
 | deploy SA | runtime SA | `iam.serviceAccounts.user` | назначать runtime identity версии функции |
 | deploy SA | storage SA | `iam.serviceAccounts.ephemeralAccessKeyAdmin` | выпускать ephemeral key только для storage SA |
-| verifier SA | federation credential | тот же точный GitHub Environment subject | отдельная WIF identity для live YDB probe |
+| verifier SA | federation credential | точный subject `repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify` | отдельная WIF identity для live YDB probe |
 | verifier SA | `zvenfit-estetika-leads` | `ydb.editor` | integration probe и schema verification |
 | storage SA | `zvenfit-estetika-frontend` | bucket READ/WRITE ACL | загружать только артефакт сайта |
 | runtime SA | `zvenfit-estetika-leads` | `ydb.editor` | хранить заявки, rate limit и retry state |
@@ -366,8 +375,11 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents. Для публичного upstream
 workflow использует стандартный `GITHUB_TOKEN`.
 
-GitHub Environment `production` использует custom deployment branch policy только для `main`.
-Не снимайте это ограничение: иначе ручной `workflow_dispatch` сможет развернуть feature-ветку.
+GitHub Environments `production` и `production-verify` используют custom deployment branch policy
+только для `main`. В `production-verify` находятся только несекретные YDB/verifier variables и ID
+deploy SA для обязательного негативного cross-SA теста; application/runtime secrets туда не
+копируются. Не снимайте branch restriction: иначе ручной `workflow_dispatch` сможет получить WIF
+token из feature-ветки.
 
 Продакшен-список разрешённых CORS-доменов находится в переменной `ALLOWED_ORIGINS` внутри workflow. Единственный production-домен проекта — `https://estetika.zvenfit.ru`. Вариант `www.estetika.zvenfit.ru` намеренно не поддерживается и не должен добавляться в DNS, TLS, CORS или CI. При добавлении или удалении другого домена обновите значение в `.github/workflows/main.yml` и заново разверните функцию.
 
@@ -388,7 +400,7 @@ rate limit и Monium к WIF не относятся.
 Порядок шагов workflow:
 
 ```text
-quality checks + immutable artifacts → deploy preflight → verifier OIDC/WIF → integration test →
+quality checks + immutable artifacts → deploy preflight → verifier OIDC/WIF → negative cross-SA exchange → integration test →
 проверка схемы → function deploy OIDC/WIF → версия функции → получение URL → сборка сайта без OIDC →
 storage deploy OIDC/WIF → negative issuer test → bucket-scoped ephemeral key → negative bucket test →
 immutable-ассеты → robots/sitemap → HTML → production smoke без cloud credentials
