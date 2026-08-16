@@ -1,6 +1,12 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-16**: отдельная инфраструктура Estetika создана, а первый технический deploy через прежние статические credentials прошёл в [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673). Код переведён на OIDC/WIF, разделённые build/deploy jobs, отдельные deploy/verifier/storage/runtime identities, bucket-scoped ephemeral credentials и полный observability desired state; перед следующим production deploy нужно применить новые bindings/variables и затем отозвать прежние ключи. До приёма реальных заявок также остаются юридические решения, live monitoring resources и проверка цикла форма → YDB → Telegram. Руководство для агентов: [`AGENTS.md`](AGENTS.md).
+Состояние проверено **2026-08-16**: отдельная инфраструктура Estetika создана и развёрнута через
+OIDC/WIF в [run #31944899719](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31944899719).
+Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
+bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. В Monium созданы 8
+log metrics, 2 notification channels, 13 alerts и production dashboard. До приёма реальных заявок
+остаются юридические решения, synthetic delivery smoke и проверка цикла форма → YDB → Telegram.
+Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
 
@@ -8,7 +14,7 @@
 
 1. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
 2. **Провести release smoke-test с реальными данными** — одна маркированная заявка, одна подписка, Telegram, YDB и визит Метрики; read-only smoke страниц уже проходит в CI.
-3. **Довести monitoring live state** — создать 8 log metrics, Telegram/email channels, 13 alerts и dashboard, затем проверить synthetic notifications и drift.
+3. **Проверить monitoring delivery** — выполнить подтверждённый synthetic smoke, проверить оба канала уведомлений и read-only drift.
 4. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
 5. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
 
@@ -16,14 +22,14 @@
 
 ## Блокеры запуска
 
-- [ ] **Завершить переход GitHub Actions на OIDC/WIF** — код больше не читает постоянные cloud credentials; Estetika federation/credentials уже созданы, осталось добавить Variables `YC_FOLDER_ID`, `YC_DEPLOY_SERVICE_ACCOUNT_ID`, `YC_YDB_VERIFY_SERVICE_ACCOUNT_ID`, `YC_STORAGE_SERVICE_ACCOUNT_ID`, выполнить deploy, затем удалить GitHub Secrets `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` и отозвать соответствующие ключи
+- [x] **Завершить переход GitHub Actions на OIDC/WIF** — production variables настроены, deploy прошёл без постоянных cloud credentials, legacy GitHub Secrets удалены, соответствующие ключи отозваны
   - [x] В Yandex Cloud созданы отдельные verifier/storage SA, Estetika federation и две federated credentials; deploy SA лишён YDB-доступа и не имеет folder-level ролей (проверено 2026-08-16)
   - [x] `npm ci` и build jobs не имеют OIDC; credentialed jobs получают только заранее собранные artifacts
   - [x] Live YDB probe использует отдельный verifier SA, а function/storage deploy — отдельный deploy SA
   - [x] Object Storage получает одночасовой session key с policy только для `zvenfit-estetika-frontend`; `zvenfit-estetika` и бакеты основного сайта исключены
   - [x] CI негативно проверяет запрет выпуска ключа для runtime SA и запрет доступа session к соседним бакетам
   - [x] Обязательные production secrets/variables прошли preflight; `ASSET_VERSION` остаётся необязательным
-  - [ ] Добавить новые SA IDs в GitHub Environment, выполнить первый WIF deploy, затем отозвать legacy keys и убрать временный deploy-SA grant из ACL site bucket
+  - [x] Первый WIF deploy прошёл; legacy keys отозваны, а ACL site bucket оставляет доступ на запись только storage SA
 - [x] **JS-библиотеки в CDN** — обязательные Webflow-зависимости перенесены в `storage.yandexcloud.net/zvenfit-estetika/js/`
   - [x] Зафиксировать `jquery@3.5.1`; ранее загруженные GSAP и ScrollTrigger удалены из runtime и зависимостей после motion-cleanup 2026-08-13
   - [x] Напрямую загрузить jQuery и `webflow.js` в Object Storage без staging и `sync --delete`; URL отвечают HTTP 200, хеши совпадают (2026-08-07)
@@ -36,7 +42,8 @@
   - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
   - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
-- [ ] **Создать monitoring live state в Monium** — по `docs/monitoring.md` и `scripts/monitoring.config.json` создать 8 log metrics, Telegram/email channels, 13 alerts и dashboard; выполнить безопасный smoke и read-only drift check
+- [x] **Создать monitoring live state в Monium** — созданы 8 log metrics, Telegram/email channels, 13 alerts и dashboard по `scripts/monitoring.config.json`; retry/heartbeat alerts и production logs проверены live
+- [ ] **Проверить synthetic monitoring delivery** — выполнить `bash scripts/test-monitoring-alerts.sh --confirm`, проверить уведомления в обоих каналах, возврат alert statuses в `OK` и read-only drift snapshot
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - [ ] **Юридическая проверка форм до приёма заявок** — по решению владельца согласие выражается отправкой формы без отдельных чекбоксов и сохраняется с версией в YDB; остаётся подтвердить такой способ и формулировки с юристом
 - [x] **Проверить владельца данных в документах** — ИП, ИНН, адрес и телефон подтверждены владельцем проекта 2026-08-14

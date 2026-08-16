@@ -4,10 +4,10 @@
 секретов, юридических решений или проверки реального сообщения. Значения секретов не присылайте в
 чат и не коммитьте.
 
-## 1. Перевести GitHub Environment `production` на WIF
+## 1. GitHub Environment `production` переведён на WIF
 
 Cloud-side identities, resource bindings, Estetika federation и две federated credentials созданы
-2026-08-16. Добавьте в GitHub Environment `production` следующие Variables:
+2026-08-16. В GitHub Environment `production` настроены следующие Variables:
 
 - `YC_FOLDER_ID=b1ge1e4iopttj79hfdfm`;
 - `YC_DEPLOY_SERVICE_ACCOUNT_ID=ajeousto2q45k6b9as32`;
@@ -23,12 +23,11 @@ Cloud-side identities, resource bindings, Estetika federation и две federate
 - `LEAD_RATE_LIMIT_SECRET` — минимум 32 символа;
 - `MONIUM_API_KEY`.
 
-Federation `zvenfit-estetika-production-github` уже связана с deploy/verifier SA точным subject
-`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`. После успешного WIF deploy удалите
-`YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` из GitHub, отзовите их в Yandex Cloud и
-повторно запустите `npm run setup:storage` администраторской сессией: он оставит bucket ACL только
-storage SA и уберёт временно сохранённый legacy deploy-SA grant. Значения секретов в чат не
-присылайте.
+Federation `zvenfit-estetika-production-github` связана с deploy/verifier SA точным subject
+`repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production`. WIF deploy
+прошёл успешно; `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
+соответствующие ключи отозваны в Yandex Cloud. Bucket ACL оставляет public read и read/write только
+storage SA; legacy deploy-SA grant удалён. Значения секретов в чат не присылайте.
 
 ## 2. Yandex Cloud подготовлен
 
@@ -55,22 +54,21 @@ credential broker.
 - считать `estetika.zvenfit.ru` единственным production-доменом; `www.estetika.zvenfit.ru` не поддерживать;
 - отозвать Telegram token, если он когда-либо попадал в экспорт или HTML.
 
-## 4. Первый deploy выполнен
+## 4. WIF deploy и observability выполнены
 
-Workflow [run #31722995673](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31722995673)
-выполнил preflight, integration-тест YDB, проверку готовой схемы, создание версии функции, сборку,
-загрузку сайта и безопасный smoke-test без реальной заявки. Кеш CDN после первого deploy очищен.
-Это был старый deploy; новый WIF-контур дополнительно разделяет build/deploy jobs и identities и
-должен пройти отдельный первый запуск перед отзывом прежних keys.
+Workflow [run #31944899719](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31944899719)
+выполнил preflight, integration-тест YDB, проверку готовой схемы, WIF deploy функции, отдельную
+сборку и bucket-scoped загрузку сайта с негативными access-boundary тестами, затем безопасный
+read-only production smoke без реальной заявки. В Monium созданы 8 log metrics, Telegram/email
+channels, 13 alerts и dashboard из 7 operational widgets; live retry/heartbeat и production logs
+проверены.
 
-После успеха:
+Осталось:
 
 1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 2. включать HSTS только после стабильной проверки HTTPS;
-3. создать или проверить в Monium 8 log metrics, оба notification channel, 13 alerts и dashboard строго по
-   `scripts/monitoring.config.json` / `docs/monitoring.md`;
-4. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
+3. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
    в `OK`.
 
 ## 5. Единственная проверка с реальными данными
