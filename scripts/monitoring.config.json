@@ -122,61 +122,75 @@
       "id": "zvenfit_estetika_storage_errors_1m",
       "displayName": "ZvenFit Estetika · Заявки: ошибки сохранения",
       "events": ["submission_storage_error", "telegram_delivery_retry_error"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_storage_error|telegram_delivery_retry_error\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "1m"
+      "window": "1m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_telegram_failed_1m",
       "displayName": "ZvenFit Estetika · Telegram: окончательные сбои",
       "events": ["telegram_delivery_failed_permanently"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"telegram_delivery_failed_permanently\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "1m"
+      "window": "1m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_ydb_retries_5m",
       "displayName": "ZvenFit Estetika · YDB: повторы",
       "events": ["ydb_retry"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"ydb_retry\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "5m"
+      "window": "5m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_ydb_slow_5m",
       "displayName": "ZvenFit Estetika · YDB: медленные операции",
       "events": ["ydb_slow_operation"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"ydb_slow_operation\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "5m"
+      "window": "5m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_rate_limit_errors_5m",
       "displayName": "ZvenFit Estetika · Rate limiter: ошибки",
       "events": ["submission_rate_limit_error"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_rate_limit_error\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "5m"
+      "window": "5m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_rate_limited_5m",
       "displayName": "ZvenFit Estetika · Обращения: блокировки rate limit",
       "events": ["submission_blocked"],
       "filters": { "meta.reason": "rate_limit" },
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_blocked\", meta.reason=\"rate_limit\", resource_id=\"*\"}",
       "aggregation": "count",
-      "window": "5m"
+      "window": "5m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_submissions_5m",
       "displayName": "ZvenFit Estetika · Сохранённые обращения",
       "events": ["submission_persisted"],
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_persisted\", meta.form_type=\"*\", resource_id=\"*\"}",
       "aggregation": "count",
       "window": "5m",
-      "grouping": ["meta.form_type"]
+      "groupBy": ["meta.form_type", "meta.application", "meta.environment", "meta.service", "resource_id"]
     },
     {
       "id": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
       "displayName": "ZvenFit Estetika · Retry-worker: поставка логов",
       "events": ["retry_worker_completed"],
       "filters": { "resource_id": "*" },
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"retry_worker_completed\", resource_id=\"*\"}",
       "aggregation": "count",
       "window": "1m",
-      "grouping": ["meta.application", "meta.environment", "meta.service", "resource_id"],
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"],
       "synthetic": false
     }
   ],

@@ -86,6 +86,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
 
   for (const [alertId, metricId] of expected) {
     const alert = config.alerts.find(item => item.id === alertId);
+    const metric = config.logMetrics.find(item => item.id === metricId);
     assert.equal(alert.metricId, metricId);
     assert.match(alert.metricSelector, /service="logging_aggregates"/);
     assert.match(alert.metricSelector, new RegExp(`name="${metricId}"`));
@@ -93,6 +94,14 @@ test('count-sensitive and caught events use true log aggregates', () => {
     assert.match(alert.metricSelector, /meta\.environment="production"/);
     assert.match(alert.metricSelector, /meta\.service="zvenfit-estetika-telegram-lead"/);
     assert.equal(alert.delay, '3m');
+    assert.match(metric.selector, /meta\.application="zvenfit-estetika-frontend"/);
+    assert.match(metric.selector, /meta\.environment="production"/);
+    assert.match(metric.selector, /meta\.service="zvenfit-estetika-telegram-lead"/);
+    assert.match(metric.selector, /resource_id="\*"/);
+    assert.deepEqual(
+      metric.groupBy.slice(-4),
+      ['meta.application', 'meta.environment', 'meta.service', 'resource_id'],
+    );
   }
 });
 
@@ -145,9 +154,10 @@ test('retry health covers direct heartbeat, queue age, trigger and log-pipeline 
     displayName: 'ZvenFit Estetika · Retry-worker: поставка логов',
     events: ['retry_worker_completed'],
     filters: { resource_id: '*' },
+    selector: '{project="folder__b1ge1e4iopttj79hfdfm", cluster="default", service="default", meta.application="zvenfit-estetika-frontend", meta.environment="production", meta.service="zvenfit-estetika-telegram-lead", meta.event="retry_worker_completed", resource_id="*"}',
     aggregation: 'count',
     window: '1m',
-    grouping: ['meta.application', 'meta.environment', 'meta.service', 'resource_id'],
+    groupBy: ['meta.application', 'meta.environment', 'meta.service', 'resource_id'],
     synthetic: false,
   });
 });
