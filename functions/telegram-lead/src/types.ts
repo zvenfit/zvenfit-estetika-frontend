@@ -39,6 +39,7 @@ export interface ApplicationMetrics {
 }
 
 export type FormType = 'lead' | 'newsletter';
+export type NewsletterSubscriptionStatus = 'active' | 'unsubscribed';
 export type UtmKey =
   | 'utm_source'
   | 'utm_medium'
@@ -67,6 +68,28 @@ export interface Submission {
   telegramUsername: string;
   utm: Utm;
   consents: ConsentEvidence;
+}
+
+export interface NewsletterSubscription {
+  phoneNormalized: string;
+  phone: string;
+  status: NewsletterSubscriptionStatus;
+  firstSubscribedAt: Date;
+  subscribedAt: Date;
+  lastConfirmedAt: Date;
+  unsubscribedAt: Date | null;
+  updatedAt: Date;
+  consentVersion: string;
+  personalDataConsent: boolean;
+  marketingConsent: boolean;
+  lastSubmissionId: string;
+  utm: Utm;
+  unsubscribeReason: string;
+}
+
+export interface SubscriptionMutationResult {
+  found: boolean;
+  changed: boolean;
 }
 
 export interface ClaimedSubmission extends Submission {

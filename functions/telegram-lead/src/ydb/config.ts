@@ -1,4 +1,5 @@
 const DEFAULT_TABLE_NAME = 'submissions';
+const DEFAULT_SUBSCRIPTIONS_TABLE_NAME = 'subscriptions';
 const DEFAULT_RATE_LIMITS_TABLE_NAME = 'submission_rate_limits';
 const DEFAULT_QUERY_TIMEOUT_MS = 10000;
 const DEFAULT_SLOW_OPERATION_MS = 1000;
@@ -29,6 +30,13 @@ export function rateLimitsTableName(): string {
   return validateIdentifier(
     (process.env.YDB_RATE_LIMITS_TABLE || DEFAULT_RATE_LIMITS_TABLE_NAME).trim(),
     'invalid_ydb_rate_limits_table_name',
+  );
+}
+
+export function subscriptionsTableName(): string {
+  return validateIdentifier(
+    (process.env.YDB_SUBSCRIPTIONS_TABLE || DEFAULT_SUBSCRIPTIONS_TABLE_NAME).trim(),
+    'invalid_ydb_subscriptions_table_name',
   );
 }
 

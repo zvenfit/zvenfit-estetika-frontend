@@ -99,6 +99,10 @@ test('Telegram retry settings fit inside the Cloud Function timeout', () => {
 
 test('production runtime defaults match the proven upstream settings', () => {
   assert.match(deployScript, /YDB_QUERY_TIMEOUT_MS="\$\{YDB_QUERY_TIMEOUT_MS:-10000\}"/);
+  assert.match(deployScript, /YDB_SUBSCRIPTIONS_TABLE="\$\{YDB_SUBSCRIPTIONS_TABLE:-subscriptions\}"/);
+  assert.match(deployScript, /--environment YDB_SUBSCRIPTIONS_TABLE=/);
+  assert.match(verifyScript, /YDB_SUBSCRIPTIONS_TABLE="\$\{YDB_SUBSCRIPTIONS_TABLE:-subscriptions\}"/);
+  assert.match(workflow, /YDB_SUBSCRIPTIONS_TABLE:.*'subscriptions'/);
   assert.match(workflow, /YDB_QUERY_TIMEOUT_MS:.*'10000'/);
   assert.match(workflow, /ALLOWED_ORIGINS: 'https:\/\/estetika\.zvenfit\.ru'/);
   assert.doesNotMatch(workflow, /www\.estetika\.zvenfit\.ru/);

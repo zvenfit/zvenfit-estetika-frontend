@@ -6,18 +6,22 @@ import {
   queryTimeoutMs,
   rateLimitsTableName,
   sessionPoolSize,
+  subscriptionsTableName,
   tableName,
 } from '../config';
 
 test('validates data and rate-limit table identifiers', () => {
   process.env.YDB_SUBMISSIONS_TABLE = 'submissions_2026';
   process.env.YDB_RATE_LIMITS_TABLE = 'submission_limits';
+  process.env.YDB_SUBSCRIPTIONS_TABLE = 'newsletter_subscriptions';
   assert.equal(tableName(), 'submissions_2026');
   assert.equal(rateLimitsTableName(), 'submission_limits');
+  assert.equal(subscriptionsTableName(), 'newsletter_subscriptions');
   process.env.YDB_SUBMISSIONS_TABLE = 'bad/table';
   assert.throws(() => tableName(), /invalid_ydb_table_name/);
   delete process.env.YDB_SUBMISSIONS_TABLE;
   delete process.env.YDB_RATE_LIMITS_TABLE;
+  delete process.env.YDB_SUBSCRIPTIONS_TABLE;
 });
 
 test('normalizes Cloud API connection strings and bounds YDB settings', () => {

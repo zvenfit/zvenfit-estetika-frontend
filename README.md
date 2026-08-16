@@ -1,6 +1,6 @@
 # ZvenFit Estetika Frontend
 
-Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. HTTP-запрос сохраняет заявку или подписку вместе с версией согласия, выраженного отправкой формы, в YDB и сразу возвращает подтверждение; уведомления в Telegram асинхронно доставляет минутный timer с повторными попытками.
+Статический лендинг из Webflow, клиентский код на чистом JavaScript и одна облачная функция Yandex Cloud. HTTP-запрос сохраняет событие заявки или подписки вместе с версией согласия в YDB и сразу возвращает подтверждение; для рассылки отдельно поддерживается текущее состояние подписчика. Уведомления в Telegram асинхронно доставляет минутный timer с повторными попытками.
 
 Продакшен: `https://estetika.zvenfit.ru`.
 
@@ -13,7 +13,9 @@
   │    robots.txt и sitemap.xml
   ├─ storage.yandexcloud.net/zvenfit-estetika
   │    изображения, шрифты, сторонние CSS, jQuery, IMask и webflow.js
-  └─ POST lead/newsletter → Cloud Function → YDB (источник истины)
+  └─ POST lead/newsletter → Cloud Function → YDB
+                                      ├─ submissions: события и очередь Telegram
+                                      ├─ subscriptions: текущее состояние рассылки
                                       └→ Telegram
                                           ↑ retry timer
 ```
@@ -31,7 +33,7 @@
 | `public/privacy/`, `public/personal-data-processing/` | Юридические страницы с чистыми URL без инъекций лендинга |
 | `functions/telegram-lead/src/index.ts` | Точка входа Cloud Function, реэкспорт обработчика |
 | `functions/telegram-lead/src/handler.ts` | HTTP, валидация, идемпотентность и retry timer |
-| `functions/telegram-lead/src/ydb/` | Миграции, бессрочные заявки/подписки, индексированная очередь и rate limit |
+| `functions/telegram-lead/src/ydb/` | Миграции, журнал заявок/подписок, состояние рассылки, очередь и rate limit |
 | `functions/telegram-lead/src/observability/` | Structured logs, redaction, YDB telemetry и прямые OTLP-метрики Monium |
 | `functions/telegram-lead/src/**/__tests__/` | Unit, artifact и YDB integration-тесты функции |
 | `scripts/build-static.cjs` | Сборка `public/` в `dist/` |
@@ -42,6 +44,12 @@
 | `dist/` | Сгенерированный артефакт для деплоя, исключён из Git |
 
 Основные маршруты: `/`, `/form/`, `/privacy/`, `/personal-data-processing/` и `/404.html`.
+
+### Модель подписок
+
+`submissions` — неизменяемый журнал отправок форм и доказательств согласия. Повторная отправка формы с новым `submission_id` намеренно создаёт новое событие. `subscriptions` — проекция текущего состояния с единственной строкой на нормализованный телефон и статусом `active` или `unsubscribed`.
+
+Повторное явное согласие обновляет `last_confirmed_at`; после отписки оно начинает новый период подписки и снимает suppression. Отписка идемпотентна, фиксирует дату и причину и запрещает маркетинговую отправку. Публичного endpoint с одним только телефоном нет: такой запрос позволил бы отписывать других людей. Интеграция с провайдером рассылок должна вызывать операцию отписки через доверенный webhook либо подписанную одноразовую ссылку и всегда проверять suppression перед отправкой.
 
 ## Требования
 

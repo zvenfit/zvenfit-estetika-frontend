@@ -1,4 +1,4 @@
-import { tableName } from './config';
+import { subscriptionsTableName, tableName } from './config';
 import {
   firstResultSet,
   getSql,
@@ -8,6 +8,7 @@ import {
   ydbTimestamp,
   ydbUint32,
 } from './context';
+import { activateNewsletterSubscriptionInTransaction } from './subscriptions';
 
 import type { LoggerLike, Submission, TelegramStatus } from '../types';
 
@@ -18,6 +19,7 @@ export async function saveSubmission(
   return observed('save_submission', logger, async () => {
     const sql = await getSql();
     const submissionsTable = sql.identifier(tableName());
+    const subscriptionsTable = sql.identifier(subscriptionsTableName());
 
     return sql.begin(transactionOptions(), async transaction => {
       const existing = firstResultSet(
@@ -66,6 +68,14 @@ export async function saveSubmission(
           ${createdAt}
         );
       `;
+
+      if (submission.formType === 'newsletter') {
+        await activateNewsletterSubscriptionInTransaction({
+          transaction,
+          subscriptionsTable,
+          submission,
+        });
+      }
 
       return { created: true, telegramStatus: 'pending' };
     });

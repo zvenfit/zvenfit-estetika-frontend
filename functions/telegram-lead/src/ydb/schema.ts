@@ -4,16 +4,44 @@ import {
   queryTimeoutMs,
   queueHealthIndexName,
   rateLimitsTableName,
+  subscriptionsTableName,
   tableName,
 } from './config';
+import { backfillNewsletterSubscriptions } from './subscriptions';
 
+import type { SubscriptionBackfillResult } from './subscriptions';
 import type { YdbClient, YdbQuery } from '../types';
 
 interface SchemaContext extends YdbClient {
   submissionsTable: unknown;
+  subscriptionsTable: unknown;
   rateLimitsTable: unknown;
   dueIndex: unknown;
   queueHealthIndex: unknown;
+}
+
+async function createSubscriptionsTable({ sql, subscriptionsTable }: SchemaContext): Promise<void> {
+  await timed(
+    sql`
+      CREATE TABLE IF NOT EXISTS ${subscriptionsTable} (
+        phone_normalized Utf8 NOT NULL,
+        phone Utf8 NOT NULL,
+        status Utf8 NOT NULL,
+        first_subscribed_at Timestamp NOT NULL,
+        subscribed_at Timestamp NOT NULL,
+        last_confirmed_at Timestamp NOT NULL,
+        unsubscribed_at Timestamp,
+        updated_at Timestamp NOT NULL,
+        consent_version Utf8 NOT NULL,
+        personal_data_consent Bool NOT NULL,
+        marketing_consent Bool NOT NULL,
+        last_submission_id Utf8 NOT NULL,
+        utm_json Utf8 NOT NULL,
+        unsubscribe_reason Utf8 NOT NULL,
+        PRIMARY KEY (phone_normalized)
+      );
+    `.idempotent(true),
+  );
 }
 
 function timed<T>(query: YdbQuery<T>): YdbQuery<T> {
@@ -104,6 +132,32 @@ async function verifyRateLimitsSchema({ sql, rateLimitsTable }: SchemaContext): 
   );
 }
 
+async function verifySubscriptionsSchema({ sql, subscriptionsTable }: SchemaContext): Promise<void> {
+  await timed(
+    sql`
+      SELECT
+        phone_normalized,
+        phone,
+        status,
+        first_subscribed_at,
+        subscribed_at,
+        last_confirmed_at,
+        unsubscribed_at,
+        updated_at,
+        consent_version,
+        personal_data_consent,
+        marketing_consent,
+        last_submission_id,
+        utm_json,
+        unsubscribe_reason
+      FROM ${subscriptionsTable}
+      LIMIT ${0};
+    `
+      .idempotent(true)
+      .isolation('snapshotReadOnly'),
+  );
+}
+
 async function verifyDueIndex({ sql, submissionsTable, dueIndex, types }: SchemaContext): Promise<void> {
   await timed(
     sql`
@@ -142,6 +196,7 @@ async function verifySchemaContext(context: SchemaContext): Promise<void> {
   await verifySubmissionColumns(context);
   await verifyDueIndex(context);
   await verifyQueueHealthIndex(context);
+  await verifySubscriptionsSchema(context);
   await verifyRateLimitsSchema(context);
 }
 
@@ -165,6 +220,7 @@ function schemaContext(client: YdbClient): SchemaContext {
   return {
     ...client,
     submissionsTable: client.sql.identifier(tableName()),
+    subscriptionsTable: client.sql.identifier(subscriptionsTableName()),
     rateLimitsTable: client.sql.identifier(rateLimitsTableName()),
     dueIndex: client.sql.identifier(dueIndexName()),
     queueHealthIndex: client.sql.identifier(queueHealthIndexName()),
@@ -177,8 +233,24 @@ export async function bootstrapSchema(): Promise<void> {
   try {
     const context = schemaContext(client);
     await createSubmissionsTable(context);
+    await createSubscriptionsTable(context);
     await createRateLimitsTable(context);
     await verifySchemaContext(context);
+  } finally {
+    await client.close();
+  }
+}
+
+export async function migrateSubscriptionLifecycleSchema(): Promise<SubscriptionBackfillResult> {
+  const client = await createYdbClient();
+
+  try {
+    const context = schemaContext(client);
+    await createSubscriptionsTable(context);
+    const result = await backfillNewsletterSubscriptions(client);
+    await verifySchemaContext(context);
+
+    return result;
   } finally {
     await client.close();
   }
@@ -213,12 +285,14 @@ export async function migrateConsentEvidenceSchema(): Promise<void> {
 export const _private = {
   createRateLimitsTable,
   createSubmissionsTable,
+  createSubscriptionsTable,
   migrateConsentEvidenceSchema,
   schemaContext,
   timed,
   verifyDueIndex,
   verifyQueueHealthIndex,
   verifyRateLimitsSchema,
+  verifySubscriptionsSchema,
   verifySchemaContext,
   verifySchemaWithRetry,
   verifySubmissionColumns,
