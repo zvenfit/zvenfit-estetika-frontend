@@ -95,8 +95,10 @@ Timer после успешного retry pass и чтения YDB экспор�
 - `zvenfit_estetika_telegram_alerts` — **ZvenFit Estetika · production · Telegram**, со screenshot;
 - `zvenfit_estetika_email_alerts` — **ZvenFit Estetika · production · Email**.
 
-Оба канала подключаются ко всем alerts. Уведомления отправляются при переходах `ALARM`, `WARNING`
-и `OK`, повтор активного состояния — каждые 30 минут.
+По умолчанию оба канала подключаются к alerts доступности и доставки. Уведомления отправляются
+при переходах `ALARM`, `WARNING` и `OK`, повтор активного состояния — каждые 30 минут.
+Диагностический `zvenfit_estetika_slow_ydb` не пейджит в Telegram: для него остаётся только email
+с повтором раз в сутки. Ошибки YDB, retry и backlog продолжают использовать обычную paging-политику.
 
 ## Alerts
 
@@ -121,8 +123,9 @@ Timer после успешного retry pass и чтения YDB экспор�
 таксономия `zvenfit-estetika-*` при этом не сокращаются.
 
 Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов. Direct gauges и
-platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` единичное превышение даёт
-`Warning`, а `Alarm` требует минимум три превышения за 10 минут. Backlog предупреждает после 10
+platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` учитываются бизнес-операции
+дольше 3 секунд; инициализация YDB-клиента в холодном контейнере исключена из измерения.
+Единичное превышение даёт `Warning`, а `Alarm` требует минимум три превышения за 10 минут. Backlog предупреждает после 10
 минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие
 storage metrics считается `Warning`, остальные no-data состояния — `OK`.
 

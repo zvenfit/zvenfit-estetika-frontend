@@ -89,4 +89,15 @@ export async function observeYdbOperation<T>(
   }
 }
 
+export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
+  operationName: string,
+  logger: LoggerLike | undefined,
+  prepare: () => Promise<TPrepared>,
+  callback: () => Promise<TResult>,
+): Promise<TResult> {
+  await prepare();
+
+  return observeYdbOperation(operationName, logger, callback);
+}
+
 export const _private = { subscribeToRetries, writeLog };

@@ -1,4 +1,4 @@
-import { observeYdbOperation } from '../observability/ydb';
+import { prepareAndObserveYdbOperation } from '../observability/ydb';
 import { createYdbClient } from './client';
 import { queryTimeoutMs } from './config';
 
@@ -46,12 +46,15 @@ export function timed<T>(query: YdbQuery<T>): YdbQuery<T> {
   return query.timeout(queryTimeoutMs());
 }
 
-export function observed<T>(
+export async function observed<T>(
   operation: string,
   logger: LoggerLike | undefined,
   callback: () => Promise<T>,
 ): Promise<T> {
-  return observeYdbOperation(operation, logger, callback);
+  // Driver startup can take a couple of seconds in a fresh serverless
+  // container. It is infrastructure warm-up, not business-query latency, so
+  // complete it before starting the operation timer used by slow-YDB alerts.
+  return prepareAndObserveYdbOperation(operation, logger, getSql, callback);
 }
 
 export function firstResultSet(resultSets: unknown): SqlRow[] {
