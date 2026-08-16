@@ -31,7 +31,8 @@ subject
 `repo:zvenfit@192599359/zvenfit-estetika-frontend@1324132200:environment:production-verify`.
 Verifier job негативно проверяет запрет обмена своего JWT на deploy SA, а затем удаляет GitHub OIDC
 request variables перед запуском verifier artifact. В `production-verify` нет runtime/application
-secrets. `YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
+secrets; прежний verifier credential с `production` subject отозван после успешной проверки.
+`YC_SA_JSON_KEY`, `YC_ACCESS_KEY_ID`, `YC_SECRET_ACCESS_KEY` удалены из GitHub,
 соответствующие ключи отозваны в Yandex Cloud. Bucket ACL оставляет public read и read/write только
 storage SA; legacy deploy-SA grant удалён. Значения секретов в чат не присылайте.
 
@@ -63,11 +64,12 @@ credential broker.
 
 ## 4. WIF deploy и observability выполнены
 
-Workflow [run #31944899719](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31944899719)
+Workflow [run #31947477061](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31947477061)
 выполнил preflight, integration-тест YDB, проверку готовой схемы, WIF deploy функции, отдельную
 сборку и bucket-scoped загрузку сайта с негативными access-boundary тестами, затем безопасный
 read-only production smoke без реальной заявки. В Monium созданы 8 log metrics, Telegram/email
-channels, 13 alerts и dashboard из 7 operational widgets; live retry/heartbeat и production logs
+channels, 13 alerts и dashboard из 7 operational charts плюс полноширинные INFO/ERROR log
+shortcuts; нативный dashboard JSON хранится в Git, live retry/heartbeat и production logs
 проверены.
 
 Осталось:

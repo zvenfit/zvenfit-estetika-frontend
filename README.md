@@ -118,6 +118,10 @@ npm run check:upstream-parity # есть ли новые неразобранн�
 6. под deploy SA доказывает запрет выпуска ephemeral key для runtime SA, выпускает одночасовой key для отдельного storage SA и проверяет доступ только к `zvenfit-estetika-frontend`;
 7. синхронизирует готовый site artifact и отдельным job без cloud credentials выполняет безопасный production smoke без создания реальной заявки.
 
+Production dashboard восстанавливается через нативный Monium JSON artifact
+`scripts/monitoring.dashboard.json`; semantic selectors, alerts и read-only drift contract остаются
+в `scripts/monitoring.config.json`.
+
 Ручной деплой:
 
 ```bash

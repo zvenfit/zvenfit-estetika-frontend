@@ -5,9 +5,12 @@
 metrics, тринадцать alerts, два notification channels и компактный production dashboard. Эти
 ресурсы относятся только к Estetika и не используют функции, YDB или бакеты `zvenfit-frontend`.
 
-Log metrics, alert rules, channels и dashboard остаются console-managed: публичные `yc` CLI и
-Terraform provider не покрывают полный жизненный цикл этих ресурсов Monium. Git хранит точную
-проверенную конфигурацию, а read-only drift check сравнивает её с экспортированным live snapshot.
+Log metrics, alert rules и channels остаются console-managed: публичные `yc` CLI и Terraform
+provider не покрывают полный жизненный цикл этих ресурсов Monium. Dashboard переносится через
+нативный JSON settings export/import из
+[`scripts/monitoring.dashboard.json`](../scripts/monitoring.dashboard.json). Git хранит точную
+проверенную конфигурацию, а read-only drift check сравнивает семантический desired state с
+экспортированным live snapshot.
 
 ## Taxonomy и источники
 
@@ -134,13 +137,15 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/dashboards/zve
 
 Он содержит:
 
-1. ошибки единственной Cloud Function;
-2. p95 длительности функции;
-3. tile прямого retry heartbeat;
-4. размер и возраст Telegram-очереди;
-5. сохранённые обращения с разложением `lead` / `newsletter`;
-6. диагностический log-pipeline heartbeat;
-7. заполнение отдельной YDB `zvenfit-estetika-leads`.
+1. полноширинную строку **Быстрый доступ к логам**: канонические `INFO за час` и `ERROR за час`
+   links с готовой Estetika taxonomy и диапазоном `now-1h` → `now`;
+2. ошибки единственной Cloud Function;
+3. p95 длительности функции;
+4. tile прямого retry heartbeat;
+5. размер и возраст Telegram-очереди;
+6. сохранённые обращения с разложением `lead` / `newsletter`;
+7. диагностический log-pipeline heartbeat;
+8. полноширинный график заполнения отдельной YDB `zvenfit-estetika-leads`.
 
 Dashboard намеренно не содержит Fitbase, расписание, traffic-function, CDN основного сайта или
 бакеты `zvenfit-frontend`. Точные queries и selectors хранятся в конфиге.
@@ -152,7 +157,12 @@ Dashboard намеренно не содержит Fitbase, расписание
 1. восемь log metrics;
 2. Telegram и email channels;
 3. тринадцать alerts и общую notification policy;
-4. dashboard из семи operational widgets.
+4. импортировать `scripts/monitoring.dashboard.json` через Dashboard → Settings → JSON → Apply.
+
+Нативный JSON содержит восемь widgets: одну строку быстрых ссылок и семь operational charts. После
+ручной правки live dashboard экспортируйте его тем же экраном обратно в этот файл и запустите
+`npm run test:monitoring`. Artifact предназначен только для dashboard import/export: log metrics,
+alerts, channels и read-only drift snapshot у него отдельные контракты.
 
 Затем экспортируйте live metadata в JSON с массивами `logMetrics`, `alerts`,
 `notificationChannels`, объектами `notificationPolicy` и `dashboard`. Сравнение read-only и ничего

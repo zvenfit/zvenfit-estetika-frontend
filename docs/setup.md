@@ -116,6 +116,11 @@ Workflow получает GitHub OIDC JWT и выбирает audience конк�
 Estetika-функции и выпускает одночасовой ephemeral key только для `STORAGE_SA_ID`. Сам storage SA
 имеет READ/WRITE только на `zvenfit-estetika-frontend`.
 
+При миграции сначала создайте новый verifier credential, дождитесь зелёного workflow с успешным
+negative cross-SA exchange и только затем удалите прежний verifier credential с `production`
+subject. Не оставляйте оба subjects как fallback: это снова объединит verifier и deploy trust
+boundaries.
+
 Роль выпуска ephemeral keys назначается на ресурс storage SA, а не на общую folder:
 
 ```bash

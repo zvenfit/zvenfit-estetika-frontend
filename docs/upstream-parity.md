@@ -5,15 +5,25 @@ Estetika остаётся статическим Webflow-сайтом, а кос
 не копируются автоматически.
 
 Текущий аудит выполнен 2026-08-16 до опубликованного commit
-`782cff989a9723191311fe888d8bad8082853689`. Перенесены архитектурные изменения production
+`184556357a237d4541ec2f8dcc37f3e70bc9da4e`. Перенесены архитектурные изменения production
 observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
 direct gauges, log-pipeline heartbeat, throttling alert, dashboard desired state, read-only drift
 check, GitHub OIDC/WIF и bucket-scoped ephemeral Object Storage credentials.
 
+Из диапазона `782cff989a9723191311fe888d8bad8082853689..184556357a237d4541ec2f8dcc37f3e70bc9da4e`
+перенесены быстрые INFO/ERROR log shortcuts за последний час, нативный Monium dashboard JSON как
+восстанавливаемый artifact и правило 36-column layout для непарного финального графика. В
+Estetika сохранены семь её operational charts, сверху добавлена полноширинная строка shortcuts, а
+непарный YDB-график остаётся полноширинным. Upstream traffic/FitBase widgets, traffic analytics,
+FitBase future roadmaps и project-local knowledge base не применимы к этому статическому
+lead/newsletter-проекту и не переносились.
+
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а
 ephemeral issuer ограничен storage SA и подтверждается негативными live-проверками. На audited
-commit upstream те же WIF/ephemeral сущности используются в jobs с более широкой trust boundary;
+commit deploy и verifier дополнительно разделены разными GitHub Environment exact subjects, а
+verifier JWT негативно проверяется против deploy SA до положительного обмена. В upstream те же
+WIF/ephemeral сущности используются в jobs с более широкой trust boundary;
 это сознательное security hardening, которое следует предложить обратно в `zvenfit-frontend`, а не
 считать продуктовым расхождением.
 

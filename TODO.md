@@ -1,7 +1,7 @@
 # ZvenFit Estetika — список задач
 
 Состояние проверено **2026-08-16**: отдельная инфраструктура Estetika создана и развёрнута через
-OIDC/WIF в [run #31944899719](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31944899719).
+разделённые deploy/verifier OIDC subjects в [run #31947477061](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31947477061).
 Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
 bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. В Monium созданы 8
 log metrics, 2 notification channels, 13 alerts и production dashboard. До приёма реальных заявок
@@ -43,7 +43,7 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
   - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
   - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
-- [x] **Создать monitoring live state в Monium** — созданы 8 log metrics, Telegram/email channels, 13 alerts и dashboard по `scripts/monitoring.config.json`; retry/heartbeat alerts и production logs проверены live
+- [x] **Создать monitoring live state в Monium** — созданы 8 log metrics, Telegram/email channels, 13 alerts и dashboard с быстрыми INFO/ERROR log shortcuts и нативным JSON artifact; retry/heartbeat alerts и production logs проверены live
 - [ ] **Проверить synthetic monitoring delivery** — выполнить `bash scripts/test-monitoring-alerts.sh --confirm`, проверить уведомления в обоих каналах, возврат alert statuses в `OK` и read-only drift snapshot
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - [ ] **Юридическая проверка форм до приёма заявок** — по решению владельца согласие выражается отправкой формы без отдельных чекбоксов и сохраняется с версией в YDB; остаётся подтвердить такой способ и формулировки с юристом
@@ -188,7 +188,7 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
 
 ## Чек-лист перед релизом
 
-- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 36 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
+- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 38 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
 - [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
 - [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)

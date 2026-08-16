@@ -7,6 +7,7 @@ const test = require('node:test');
 
 const ROOT = path.resolve(__dirname, '../..');
 const config = require('../monitoring.config.json');
+const dashboard = require('../monitoring.dashboard.json');
 const docs = fs.readFileSync(path.join(ROOT, 'docs/monitoring.md'), 'utf8');
 const smokeScript = fs.readFileSync(path.join(ROOT, 'scripts/test-monitoring-alerts.sh'), 'utf8');
 const source = [
@@ -200,9 +201,85 @@ test('dashboard contains the compact Estetika operational view', () => {
     'zvenfit_estetika_retry_worker_log_heartbeat_1m',
   );
   assert.match(config.dashboard.ydbStorage.queries.join('\n'), /zvenfit-estetika-leads/);
+  assert.deepEqual(config.dashboard.nativeJson, {
+    artifact: 'scripts/monitoring.dashboard.json',
+    scope: 'dashboard-only',
+    workflow: 'settings-json-export-import',
+  });
+  assert.deepEqual(config.dashboard.ydbStorage.layout, {
+    widthColumns: 36,
+    heightRows: 8,
+  });
 });
 
-test('production log source, metric output and manual provisioning boundary are explicit', () => {
+test('dashboard quick links open canonical INFO and ERROR logs for the last hour', () => {
+  assert.equal(config.dashboard.quickLogAccess.title, 'Быстрый доступ к логам');
+  assert.equal(config.dashboard.quickLogAccess.position, 'top');
+  assert.deepEqual(config.dashboard.quickLogAccess.layout, {
+    widthColumns: 36,
+    heightRows: 2,
+  });
+  assert.deepEqual(
+    config.dashboard.quickLogAccess.links.map(link => [link.label, link.level]),
+    [
+      ['INFO за час', 'INFO'],
+      ['ERROR за час', 'ERROR'],
+    ],
+  );
+
+  const queryTokens = new Set();
+  for (const link of config.dashboard.quickLogAccess.links) {
+    assert.equal(link.window, '1h');
+    const url = new URL(link.url);
+    assert.equal(url.hostname, 'monium.yandex.cloud');
+    assert.equal(url.pathname, `/projects/${config.project}/logs`);
+    assert.equal(url.searchParams.get('from'), 'now-1h');
+    assert.equal(url.searchParams.get('to'), 'now');
+    assert.equal(url.searchParams.get('tab'), 'logs');
+    assert.ok(url.searchParams.get('queries'));
+    queryTokens.add(url.searchParams.get('queries'));
+    assert.match(docs, new RegExp(link.label));
+  }
+  assert.equal(queryTokens.size, 2, 'INFO and ERROR must use different encoded selectors');
+});
+
+test('native Monium JSON mirrors the reviewed live dashboard layout', () => {
+  assert.equal(dashboard.title, config.dashboard.title);
+  assert.equal(dashboard.name, config.dashboard.id);
+  assert.equal(dashboard.widgets.length, 8);
+
+  const quickWidget = dashboard.widgets[0];
+  assert.equal(quickWidget.widget, 'text');
+  assert.deepEqual(quickWidget.position, { x: '0', y: '0', w: '36', h: '2' });
+  for (const link of config.dashboard.quickLogAccess.links) {
+    assert.match(quickWidget.text.text, new RegExp(link.label));
+    assert.ok(quickWidget.text.text.includes(link.url));
+  }
+
+  const chartQueries = dashboard.widgets
+    .filter(widget => widget.widget === 'multiSourceChart')
+    .flatMap(widget => widget.multiSourceChart.targets.map(target => target.query));
+  for (const query of [
+    config.dashboard.runtimeErrors.metricSelector,
+    config.dashboard.functionDurationP95.query,
+    config.dashboard.retryWorkerHeartbeat.metricSelector,
+    ...config.dashboard.telegramQueue.metricSelectors,
+    config.dashboard.submissionVolume.query,
+    config.dashboard.logPipelineHeartbeat.query,
+    ...config.dashboard.ydbStorage.queries,
+  ]) {
+    assert.ok(chartQueries.includes(query), `native dashboard is missing query: ${query}`);
+  }
+
+  const finalWidget = dashboard.widgets.at(-1);
+  assert.equal(finalWidget.multiSourceChart.title, config.dashboard.ydbStorage.title);
+  assert.deepEqual(finalWidget.position, { x: '0', y: '26', w: '36', h: '8' });
+  const serialized = JSON.stringify(dashboard);
+  assert.doesNotMatch(serialized, /TELEGRAM_BOT_TOKEN|MONIUM_API_KEY|YC_SA_JSON_KEY/);
+  assert.doesNotMatch(serialized, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+});
+
+test('production log source, metric output and provisioning boundary are explicit', () => {
   assert.deepEqual(config.source, {
     cluster: 'default',
     service: 'default',
@@ -229,7 +306,7 @@ test('production log source, metric output and manual provisioning boundary are 
       logMetrics: 'manual-console',
       alerts: 'manual-console',
       channels: 'manual-console',
-      dashboard: 'manual-console',
+      dashboard: 'native-json-import',
     },
   );
 });

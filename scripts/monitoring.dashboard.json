@@ -1,0 +1,707 @@
+{
+  "title": "ZvenFit Estetika · production",
+  "name": "zvenfit-estetika-production-monitoring",
+  "description": "Операционный дашборд Estetika: обращения, Telegram, retry-worker, Cloud Function и YDB.",
+  "parametrization": null,
+  "eventSources": {
+    "infra": []
+  },
+  "widgets": [
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "0",
+        "w": "36",
+        "h": "2"
+      },
+      "text": {
+        "text": "**Быстрый доступ к логам:** [INFO за час](https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs?tab=logs&queries=NobwRAdghgtgpmAXGAgmANGAblANgVwWRAAcAnAewCs4BjAFwAIBeRgHTADMLcATOMgH1BAIwCMAczhi4AFgCWFEvXpUA7AE4AFp16cYHdIwDOArPNpwW7MP05R8ueocbx6UAHRQSJXBaj0ihDWHABeWHAQnPL0ALRwxvRwgQDWULGclBBJELwubp6R5lnw2SFg5BS8%2BAxB%2BcmepmTmluXhkdFxCUmp6Um4cBJksLEDUHkYjAMRuOUAkgByAGIA8hwAvhhgWvK8-BBI9rimmLzyxlAiA7yHeCdgSQAe9ACyVUT0ZITrALpAA&from=now-1h&to=now&columns=level%2Ctime%2Cmessage%2Chost&groupByField=level&chartType=column&linesMode=single&refresh=off) · [ERROR за час](https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs?tab=logs&queries=NobwRAdghgtgpmAXGAgmANGAblANgVwWRAAcAnAewCs4BjAFwAIBeRgHTADMLcATOMgH1BAIwCMAczhi4AFgCWFEvXpUA7AE4AFp16cYHdIwDOArPNpwW7MP05R8ueocbx6UAHRQSJXBaj0ihDWHABeWHAQnPL0ALRwxvRwgQDWULGclBBJELwubp6R5lnw2SFg5BS8%2BAxB%2BcmepmTmluXhkdFxCUmp6Um4cBJksLEDUHkYjAMRuOUAogBKCwDyCxwAvhhgWvK8-BBI9rimmLzyxlAiA7yHeCdgSQAe9ACyVUT0ZITrALpAA&from=now-1h&to=now&columns=level%2Ctime%2Cmessage%2Chost&groupByField=level&chartType=column&linesMode=single&refresh=off)"
+      },
+      "widget": "text"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "2",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "0b2ce281-6534-45ad-8269-6ab061e1dae5",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "0b2ce281-6534-45ad-8269-6ab061e1dae5",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "26552572-3a78-41ae-b9c3-3505154eab45",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Ошибок",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": true,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Ошибки Cloud Function",
+        "displayLegend": true,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "de3ec534-4ca1-4169-b0ff-66576cc74aa3"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "18",
+        "y": "2",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "15ca00be-fad1-4c72-95dc-fc8b07dc3f80",
+            "query": "histogram_percentile(95, {project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"duration_ms_histogram\", resource_id=\"zvenfit-estetika-telegram-lead\"})",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "15ca00be-fad1-4c72-95dc-fc8b07dc3f80",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "1b97a28c-1345-4ac5-8bb7-d53df0b38e10",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "мс",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": true,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Cloud Function: длительность p95",
+        "displayLegend": true,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "9b17604c-b2b6-436f-9719-2b55ba1d774d"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "10",
+        "w": "12",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "a99956a2-6ca7-4750-a6b7-4c7686c96560",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "a99956a2-6ca7-4750-a6b7-4c7686c96560",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "f3350fca-c46b-47b9-a66a-7b00bc1a146c",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_TILES",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_LAST",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": {
+            "sortOrder": "ASC",
+            "sortField": "VALUE",
+            "showTitle": false,
+            "showValue": true,
+            "showSparkline": false
+          },
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Retry-worker: heartbeat",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "a16146a8-ed0a-4cac-926a-2ce29afa6c0e"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "12",
+        "y": "10",
+        "w": "24",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "5369d7c3-d83c-4e55-896d-b760a056c7ea",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_submissions\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          },
+          {
+            "dataSourceId": "5369d7c3-d83c-4e55-896d-b760a056c7ea",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "B",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "5369d7c3-d83c-4e55-896d-b760a056c7ea",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "5b7c4732-4eae-4d66-9834-48a286781bfc",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Telegram: очередь и возраст",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "96a39dfc-b93e-4388-a74c-875f73f52bfc"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "18",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
+            "query": "series_sum(\"meta.form_type\", {project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_submissions_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "9327e5ca-0929-4217-95d7-68d2d7dbe8cf",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Заявок / 5 мин",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Сохранённые обращения",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "5a92be09-9cf4-402d-be83-1585c798abf4"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "18",
+        "y": "18",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "53c99022-5cdd-45c8-945a-b38ad4555803",
+            "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\"})",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "53c99022-5cdd-45c8-945a-b38ad4555803",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "696075ff-d1ae-43f7-830d-a03904859524",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Поставка логов: heartbeat retry-worker",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "6278f61f-0148-491e-96f8-b7d4964f0f1a"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "26",
+        "w": "36",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "1344e701-9831-48cd-9f73-7923a59f5c89",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          },
+          {
+            "dataSourceId": "1344e701-9831-48cd-9f73-7923a59f5c89",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}",
+            "textMode": false,
+            "hidden": false,
+            "name": "B",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "1344e701-9831-48cd-9f73-7923a59f5c89",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "6bc56656-e066-4eea-abff-bae93a1ed8db",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "YDB: заполнение хранилища",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "22dd5ddf-0eff-45d8-bae2-2ae7ef82fcfb"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    }
+  ],
+  "links": [],
+  "overlays": [],
+  "presetItems": []
+}

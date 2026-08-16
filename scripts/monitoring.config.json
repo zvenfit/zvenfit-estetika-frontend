@@ -35,6 +35,33 @@
   "dashboard": {
     "id": "zvenfit-estetika-production-monitoring",
     "title": "ZvenFit Estetika · production",
+    "nativeJson": {
+      "artifact": "scripts/monitoring.dashboard.json",
+      "scope": "dashboard-only",
+      "workflow": "settings-json-export-import"
+    },
+    "quickLogAccess": {
+      "title": "Быстрый доступ к логам",
+      "position": "top",
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 2
+      },
+      "links": [
+        {
+          "label": "INFO за час",
+          "level": "INFO",
+          "window": "1h",
+          "url": "https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs?tab=logs&queries=NobwRAdghgtgpmAXGAgmANGAblANgVwWRAAcAnAewCs4BjAFwAIBeRgHTADMLcATOMgH1BAIwCMAczhi4AFgCWFEvXpUA7AE4AFp16cYHdIwDOArPNpwW7MP05R8ueocbx6UAHRQSJXBaj0ihDWHABeWHAQnPL0ALRwxvRwgQDWULGclBBJELwubp6R5lnw2SFg5BS8%2BAxB%2BcmepmTmluXhkdFxCUmp6Um4cBJksLEDUHkYjAMRuOUAkgByAGIA8hwAvhhgWvK8-BBI9rimmLzyxlAiA7yHeCdgSQAe9ACyVUT0ZITrALpAA&from=now-1h&to=now&columns=level%2Ctime%2Cmessage%2Chost&groupByField=level&chartType=column&linesMode=single&refresh=off"
+        },
+        {
+          "label": "ERROR за час",
+          "level": "ERROR",
+          "window": "1h",
+          "url": "https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs?tab=logs&queries=NobwRAdghgtgpmAXGAgmANGAblANgVwWRAAcAnAewCs4BjAFwAIBeRgHTADMLcATOMgH1BAIwCMAczhi4AFgCWFEvXpUA7AE4AFp16cYHdIwDOArPNpwW7MP05R8ueocbx6UAHRQSJXBaj0ihDWHABeWHAQnPL0ALRwxvRwgQDWULGclBBJELwubp6R5lnw2SFg5BS8%2BAxB%2BcmepmTmluXhkdFxCUmp6Um4cBJksLEDUHkYjAMRuOUAogBKCwDyCxwAvhhgWvK8-BBI9rimmLzyxlAiA7yHeCdgSQAe9ACyVUT0ZITrALpAA&from=now-1h&to=now&columns=level%2Ctime%2Cmessage%2Chost&groupByField=level&chartType=column&linesMode=single&refresh=off"
+        }
+      ]
+    },
     "runtimeErrors": {
       "title": "Ошибки Cloud Function",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
@@ -84,15 +111,19 @@
         "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
       ],
       "visualization": "chart",
-      "pagingAlert": true
+      "pagingAlert": true,
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 8
+      }
     }
   },
   "provisioning": {
     "logMetrics": "manual-console",
     "notificationChannels": "manual-console",
     "alerts": "manual-console",
-    "dashboard": "manual-console",
-    "reason": "Monium log metrics, alert rules, notification channels and dashboards are console-managed; Git stores the reviewed desired state and validates read-only snapshots"
+    "dashboard": "native-json-import",
+    "reason": "Monium log metrics, alert rules and notification channels are console-managed; dashboard layout is imported/exported through the native JSON artifact, while Git stores the reviewed desired state and validates read-only snapshots"
   },
   "notificationChannels": [
     {
