@@ -139,6 +139,7 @@ export async function claim({
         UPDATE ${outboxTable}
         SET
           status = ${'sending'},
+          aggregate_id = notification_id,
           attempts = ${ydbUint32(attempts)},
           due_at = ${ydbTimestamp(leaseUntil)},
           delivery_token = ${deliveryToken}
@@ -169,6 +170,8 @@ export async function markDelivered({
         UPDATE ${outboxTable}
         SET
           status = ${'sent'},
+          aggregate_id = notification_id,
+          payload_json = ${'{}'},
           due_at = NULL,
           delivery_token = NULL,
           last_error = NULL,
@@ -202,12 +205,15 @@ export async function markFailed({
     const outboxTable = sql.identifier(telegramOutboxTableName());
     const status = terminal ? 'failed' : 'pending';
     const dueAt = terminal ? sql.fragment`NULL` : sql.fragment`${ydbTimestamp(failedAt)}`;
+    const payloadJson = terminal ? sql.fragment`${'{}'}` : sql.fragment`payload_json`;
 
     await timed(
       sql`
         UPDATE ${outboxTable}
         SET
           status = ${status},
+          aggregate_id = notification_id,
+          payload_json = ${payloadJson},
           due_at = ${dueAt},
           delivery_token = NULL,
           last_error = ${errorCode}

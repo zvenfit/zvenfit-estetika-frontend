@@ -93,7 +93,7 @@ export function parseFormCommand(
     return {
       command: {
         kind: 'newsletter',
-        optIn: { ...evidence, phone, phoneNormalized: normalizeSubscriberPhone(phone) },
+        optInRequest: { ...evidence, phone, phoneNormalized: normalizeSubscriberPhone(phone) },
       },
       error: null,
     };

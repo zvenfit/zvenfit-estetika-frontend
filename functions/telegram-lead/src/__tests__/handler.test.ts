@@ -10,7 +10,7 @@ import type {
 } from '../application/ports';
 import type { HandlerDependencies } from '../handler';
 import type { Lead } from '../domain/lead';
-import type { NewsletterOptIn } from '../domain/newsletter';
+import type { NewsletterOptInRequest } from '../domain/newsletter';
 import type { ClaimedTelegramNotification } from '../domain/telegram-notification';
 import type { HttpEvent, HttpResponse, LoggerLike } from '../types';
 
@@ -75,14 +75,17 @@ function dependencies(
       ...repositories.lead,
     },
     newsletterRepository: {
-      async recordOptIn() {
+      async recordOptInRequest() {
         throw new Error('not_used');
+      },
+      async confirmOptIn() {
+        return { eventCreated: false, stateChanged: false };
       },
       async getSubscription() {
         return null;
       },
       async unsubscribe() {
-        return { found: false, changed: false };
+        return { eventCreated: false, stateChanged: false };
       },
       async isSuppressed() {
         return true;
@@ -161,13 +164,13 @@ test('POST persists a lead through the lead repository and returns before Telegr
   assert.equal(telegramCalled, false);
 });
 
-test('POST records a newsletter opt-in through its own repository', async () => {
-  let saved: NewsletterOptIn | undefined;
+test('POST records a newsletter opt-in request without claiming it is active', async () => {
+  let saved: NewsletterOptInRequest | undefined;
   const handler = _private.createHandler(
     dependencies({
       newsletter: {
-        async recordOptIn(optIn) {
-          saved = optIn;
+        async recordOptInRequest(request) {
+          saved = request;
           return { created: true, notificationStatus: 'pending' };
         },
       },
@@ -186,6 +189,7 @@ test('POST records a newsletter opt-in through its own repository', async () => 
   );
 
   assert.equal(response.statusCode, 202);
+  assert.equal(JSON.parse(response.body).confirmation_required, true);
   assert.equal(saved?.phoneNormalized, '+79688440088');
   assert.equal(saved?.consents.marketing, true);
 });

@@ -117,8 +117,8 @@ export function rowToClaimedNotification(row: SqlRow): ClaimedTelegramNotificati
       telegramUsername: stringValue(payload.telegram_username),
     };
   }
-  if (kind === 'newsletter_opted_in') {
-    return { ...common, kind };
+  if (kind === 'newsletter_subscription_requested' || kind === 'newsletter_opted_in') {
+    return { ...common, kind: 'newsletter_subscription_requested' };
   }
 
   throw new Error('invalid_telegram_notification_kind');

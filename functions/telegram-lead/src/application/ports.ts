@@ -1,9 +1,10 @@
 import type { Lead } from '../domain/lead';
 import type {
-  NewsletterOptIn,
+  ConsentMutationResult,
+  NewsletterOptInConfirmation,
+  NewsletterOptInRequest,
   NewsletterSubscription,
   NewsletterUnsubscribe,
-  SubscriptionMutationResult,
 } from '../domain/newsletter';
 import type {
   ClaimedTelegramNotification,
@@ -28,16 +29,21 @@ export interface LeadIntakeRepository {
 }
 
 export interface NewsletterRepository {
-  recordOptIn(
-    optIn: NewsletterOptIn,
+  recordOptInRequest(
+    request: NewsletterOptInRequest,
     notification: NewsletterTelegramNotification,
     options?: { logger?: LoggerLike },
   ): Promise<IntakeResult>;
+  confirmOptIn(
+    confirmation: NewsletterOptInConfirmation & { logger?: LoggerLike },
+  ): Promise<ConsentMutationResult>;
   getSubscription(args: {
     phone: string;
     logger?: LoggerLike;
   }): Promise<NewsletterSubscription | null>;
-  unsubscribe(args: NewsletterUnsubscribe & { logger?: LoggerLike }): Promise<SubscriptionMutationResult>;
+  unsubscribe(
+    args: NewsletterUnsubscribe & { logger?: LoggerLike },
+  ): Promise<ConsentMutationResult>;
   isSuppressed(args: { phone: string; logger?: LoggerLike }): Promise<boolean>;
 }
 

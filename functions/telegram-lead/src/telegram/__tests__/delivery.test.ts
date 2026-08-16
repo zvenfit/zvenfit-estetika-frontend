@@ -31,8 +31,8 @@ function leadNotification(
 function newsletterNotification(): ClaimedTelegramNotification {
   return {
     notificationId: 'notification-2',
-    kind: 'newsletter_opted_in',
-    aggregateId: '+79990000000',
+    kind: 'newsletter_subscription_requested',
+    aggregateId: 'notification-2',
     createdAt: new Date('2026-08-09T00:00:00.000Z'),
     phone: '+79990000000',
     utm: {},
@@ -50,7 +50,7 @@ test('message supports lead and newsletter payloads without leaking delivery sta
 
   assert.match(lead, /ID: notification-1/);
   assert.match(lead, /source: test/);
-  assert.match(newsletter, /Подписка на рассылку/);
+  assert.match(newsletter, /Запрос на подписку/);
   assert.doesNotMatch(newsletter, /Имя:/);
   assert.doesNotMatch(lead, /attempt/i);
 });

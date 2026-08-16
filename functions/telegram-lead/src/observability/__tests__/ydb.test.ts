@@ -45,6 +45,31 @@ test('excludes client preparation from the observed business operation', async (
   assert.equal(records[0]?.fields.operation, 'list_telegram_candidates');
 });
 
+test('logs client preparation failures without treating cold-start time as slow query latency', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  const error = Object.assign(new Error('private initialization details'), {
+    code: 'UNAVAILABLE',
+  });
+
+  await assert.rejects(
+    prepareAndObserveYdbOperation(
+      'record_lead',
+      recordingLogger(records),
+      async () => {
+        throw error;
+      },
+      async () => 42,
+    ),
+  );
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.fields.event, 'ydb_operation_failed');
+  assert.equal(records[0]?.fields.operation, 'record_lead');
+  assert.equal(records[0]?.fields.phase, 'client_preparation');
+  assert.equal(records[0]?.fields.error_code, 'UNAVAILABLE');
+  assert.doesNotMatch(JSON.stringify(records), /private initialization details/);
+});
+
 test('logs a safe error code without the database error message', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   const error = Object.assign(new Error('contains private row data'), { code: 'OVERLOADED' });

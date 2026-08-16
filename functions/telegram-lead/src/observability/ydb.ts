@@ -95,7 +95,20 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
   prepare: () => Promise<TPrepared>,
   callback: () => Promise<TResult>,
 ): Promise<TResult> {
-  await prepare();
+  const startedAt = Date.now();
+  try {
+    await prepare();
+  } catch (error) {
+    writeLog(logger, 'error', {
+      event: 'ydb_operation_failed',
+      operation: operationName,
+      phase: 'client_preparation',
+      duration_ms: Date.now() - startedAt,
+      retry_attempts: 0,
+      ...safeErrorFields(error, { fallbackCode: 'ydb_initialization_error' }),
+    });
+    throw error;
+  }
 
   return observeYdbOperation(operationName, logger, callback);
 }

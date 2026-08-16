@@ -119,6 +119,7 @@ http
             ok: true,
             submission_id: payload.submission_id || null,
             notification: 'mock',
+            ...(payload.form_type === 'newsletter' ? { confirmation_required: true } : {}),
           }),
         );
       });

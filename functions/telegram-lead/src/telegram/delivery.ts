@@ -37,9 +37,9 @@ const UTM_LABELS: Record<UtmKey, string> = {
 
 export function buildMessage(notification: ClaimedTelegramNotification): string {
   const lines =
-    notification.kind === 'newsletter_opted_in'
+    notification.kind === 'newsletter_subscription_requested'
       ? [
-          'Подписка на рассылку (Косметология)',
+          'Запрос на подписку (Косметология)',
           `ID: ${notification.notificationId}`,
           `Телефон: ${notification.phone}`,
         ]
