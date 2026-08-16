@@ -37,7 +37,7 @@ test('reports taxonomy, channel and dashboard drift in addition to thresholds', 
   snapshot.notificationPolicy.repeatMinutes = 15;
   snapshot.dashboard.runtimeErrors.metricSelector = '{name="legacy_runtime_errors"}';
   snapshot.alerts = snapshot.alerts.filter(
-    item => item.id !== 'zvenfit_estetika_permanent_telegram_failures',
+    item => item.id !== 'zfe_permanent_telegram_failures',
   );
   snapshot.alerts.push({ id: 'zvenfit_estetika_legacy_alert' });
 
@@ -49,7 +49,7 @@ test('reports taxonomy, channel and dashboard drift in addition to thresholds', 
   assert.match(output, /notificationChannels\.zvenfit_estetika_telegram_alerts\.name/);
   assert.match(output, /notificationPolicy/);
   assert.match(output, /dashboard/);
-  assert.match(output, /zvenfit_estetika_permanent_telegram_failures: missing/);
+  assert.match(output, /zfe_permanent_telegram_failures: missing/);
   assert.match(output, /zvenfit_estetika_legacy_alert: unexpected/);
 });
 

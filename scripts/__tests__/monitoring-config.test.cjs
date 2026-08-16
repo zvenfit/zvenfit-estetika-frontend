@@ -49,11 +49,15 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
     assert.equal(alert.labels.environment, 'production');
     assert.equal(typeof alert.labels.service, 'string');
     assert.equal(typeof alert.labels.resource_id, 'string');
+    assert.ok(
+      `${config.project}_${alert.id}`.length <= 64,
+      `${alert.id} exceeds Monium's project-prefixed alert ID limit`,
+    );
     assert.match(docs, new RegExp(`\\b${alert.id}\\b`));
     const expectedNoData =
       alert.id === 'zvenfit_estetika_ydb_storage_usage'
         ? 'WARNING'
-        : alert.id === 'zvenfit_estetika_retry_worker_heartbeat'
+        : alert.id === 'zfe_retry_worker_heartbeat'
           ? 'ALARM'
           : 'OK';
     assert.equal(alert.noData, expectedNoData);
@@ -76,7 +80,7 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
 test('count-sensitive and caught events use true log aggregates', () => {
   const expected = [
     ['zvenfit_estetika_storage_errors', 'zvenfit_estetika_storage_errors_1m'],
-    ['zvenfit_estetika_permanent_telegram_failures', 'zvenfit_estetika_telegram_failed_1m'],
+    ['zfe_permanent_telegram_failures', 'zvenfit_estetika_telegram_failed_1m'],
     ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_ydb_retries_5m'],
     ['zvenfit_estetika_slow_ydb', 'zvenfit_estetika_ydb_slow_5m'],
     ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m'],
@@ -109,7 +113,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
 
 test('direct OTLP is limited to current-state gauges with canonical taxonomy', () => {
   const directAlerts = [
-    config.alerts.find(item => item.id === 'zvenfit_estetika_retry_worker_heartbeat'),
+    config.alerts.find(item => item.id === 'zfe_retry_worker_heartbeat'),
     config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog'),
   ];
 
@@ -133,9 +137,9 @@ test('direct OTLP is limited to current-state gauges with canonical taxonomy', (
 });
 
 test('retry health covers direct heartbeat, queue age, trigger and log-pipeline diagnostics', () => {
-  const heartbeat = config.alerts.find(item => item.id === 'zvenfit_estetika_retry_worker_heartbeat');
+  const heartbeat = config.alerts.find(item => item.id === 'zfe_retry_worker_heartbeat');
   const backlog = config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog');
-  const trigger = config.alerts.find(item => item.id === 'zvenfit_estetika_retry_trigger_errors');
+  const trigger = config.alerts.find(item => item.id === 'zfe_retry_trigger_errors');
   const logHeartbeat = config.logMetrics.find(
     item => item.id === 'zvenfit_estetika_retry_worker_log_heartbeat_1m',
   );
@@ -165,7 +169,7 @@ test('retry health covers direct heartbeat, queue age, trigger and log-pipeline 
 });
 
 test('platform alerts cover runtime errors, throttling and storage capacity', () => {
-  const runtime = config.alerts.find(item => item.id === 'zvenfit_estetika_function_runtime_errors');
+  const runtime = config.alerts.find(item => item.id === 'zfe_function_runtime_errors');
   const throttles = config.alerts.find(item => item.id === 'zvenfit_estetika_function_throttles');
   const storage = config.alerts.find(item => item.id === 'zvenfit_estetika_ydb_storage_usage');
 

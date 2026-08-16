@@ -100,18 +100,22 @@ Timer после успешного retry pass и чтения YDB экспор�
 | Alert ID | Сигнал | Warning / Alarm | No data |
 | --- | --- | --- | --- |
 | `zvenfit_estetika_storage_errors` | log count ошибок сохранения/retry | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_permanent_telegram_failures` | log count окончательных сбоев Telegram | `>0` / `>0.5` | OK |
+| `zfe_permanent_telegram_failures` | log count окончательных сбоев Telegram | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_ydb_retries` | log count YDB retries | `>4.5` / `>5.5` | OK |
 | `zvenfit_estetika_slow_ydb` | log count медленных YDB операций | `>0.5` / `>2.5` | OK |
 | `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
-| `zvenfit_estetika_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
+| `zfe_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
 | `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
-| `zvenfit_estetika_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
+| `zfe_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_function_throttles` | Cloud Functions `functions_throttles` | `>0` / `>0.5` | OK |
-| `zvenfit_estetika_retry_trigger_errors` | trigger access/runtime errors | `>0` / `>0.5` | OK |
+| `zfe_retry_trigger_errors` | trigger access/runtime errors | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_ydb_storage_usage` | `(used_bytes / limit_bytes) * 100` | `>=70` / `>=85` | WARNING |
+
+Префикс `zfe_` используется только для технических ID, которые вместе с обязательным
+префиксом проекта Monium иначе превысили бы лимит в 64 символа. Полные display name и
+таксономия `zvenfit-estetika-*` при этом не сокращаются.
 
 Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов. Direct gauges и
 platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` единичное превышение даёт

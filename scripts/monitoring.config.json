@@ -210,7 +210,7 @@
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
-      "id": "zvenfit_estetika_permanent_telegram_failures",
+      "id": "zfe_permanent_telegram_failures",
       "displayName": "ZvenFit Estetika · Telegram: окончательные сбои доставки",
       "metricId": "zvenfit_estetika_telegram_failed_1m",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_telegram_failed_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
@@ -280,7 +280,7 @@
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
-      "id": "zvenfit_estetika_retry_worker_heartbeat",
+      "id": "zfe_retry_worker_heartbeat",
       "displayName": "ZvenFit Estetika · Retry-worker: нет активности",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "last",
@@ -320,7 +320,7 @@
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
-      "id": "zvenfit_estetika_function_runtime_errors",
+      "id": "zfe_function_runtime_errors",
       "displayName": "ZvenFit Estetika · Cloud Function: ошибки выполнения",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
@@ -346,7 +346,7 @@
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
-      "id": "zvenfit_estetika_retry_trigger_errors",
+      "id": "zfe_retry_trigger_errors",
       "displayName": "ZvenFit Estetika · Retry-trigger: ошибки",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"serverless.triggers.access_error_per_second|serverless.triggers.error_per_second\", trigger=\"a1sc2t1ro4alukatrf99\", type=\"request\"}",
       "aggregation": "max",
