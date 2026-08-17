@@ -107,9 +107,10 @@ Metric `zvenfit_estetika_storage_errors_1m` и alert
 Production smoke 2026-08-17 обнаружил недоступность текущего DNS-адреса Telegram
 `149.154.166.110` из сетевого контура Yandex Cloud: TCP/TLS заканчивался таймаутом, при этом YDB и
 transactional outbox работали штатно. Для функции используется repository variable
-`TELEGRAM_API_IPV4=149.154.167.220`: соединение закрепляется за доступным Telegram IPv4, но URL,
-TLS SNI и `Host` остаются `api.telegram.org`. При смене маршрута значение можно обновить без правки
-кода; deploy preflight отклоняет пустое или некорректное значение.
+`TELEGRAM_API_FALLBACK_IPV4S=149.154.167.220`: DNS остаётся основным маршрутом, а перечисленные IPv4
+используются только после короткой безопасной `HEAD`-пробы. Здоровый маршрут кэшируется на 5 минут,
+поэтому функция автоматически возвращается к DNS после его восстановления. URL, TLS SNI и `Host`
+остаются `api.telegram.org`; deploy preflight принимает от одного до пяти корректных IPv4.
 
 1. открыть `/?utm_source=test` и отправить одну подписку;
 2. открыть `/form/?utm_source=test` и отправить одну маркированную заявку;

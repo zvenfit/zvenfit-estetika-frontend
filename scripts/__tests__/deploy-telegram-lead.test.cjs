@@ -91,14 +91,14 @@ test('deployment package contains compiled runtime modules only', () => {
 test('Telegram retry settings fit inside the Cloud Function timeout', () => {
   assert.match(deployScript, /TELEGRAM_RETRY_BATCH_SIZE="\$\{TELEGRAM_RETRY_BATCH_SIZE:-5\}"/);
   assert.match(deployScript, /TELEGRAM_TIMEOUT_MS="\$\{TELEGRAM_TIMEOUT_MS:-15000\}"/);
-  assert.match(deployScript, /TELEGRAM_API_IPV4="\$\{TELEGRAM_API_IPV4:-\}"/);
+  assert.match(deployScript, /TELEGRAM_API_FALLBACK_IPV4S="\$\{TELEGRAM_API_FALLBACK_IPV4S:-\}"/);
   assert.match(deployScript, /TIMEOUT="\$\{YC_LEAD_TIMEOUT:-120s\}"/);
   assert.match(deployScript, /--environment TELEGRAM_RETRY_BATCH_SIZE=/);
   assert.match(deployScript, /--environment TELEGRAM_TIMEOUT_MS=/);
-  assert.match(deployScript, /--environment TELEGRAM_API_IPV4=/);
+  assert.match(deployScript, /--environment TELEGRAM_API_FALLBACK_IPV4S=/);
   assert.match(workflow, /TELEGRAM_RETRY_BATCH_SIZE:.*'5'/);
   assert.match(workflow, /TELEGRAM_TIMEOUT_MS:.*'15000'/);
-  assert.match(workflow, /TELEGRAM_API_IPV4: \$\{\{ vars\.TELEGRAM_API_IPV4 \}\}/);
+  assert.match(workflow, /TELEGRAM_API_FALLBACK_IPV4S: \$\{\{ vars\.TELEGRAM_API_FALLBACK_IPV4S \}\}/);
   assert.match(workflow, /YC_LEAD_TIMEOUT:.*'120s'/);
 });
 

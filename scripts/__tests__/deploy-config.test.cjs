@@ -17,7 +17,7 @@ function validEnvironment() {
     YC_STORAGE_SERVICE_ACCOUNT_ID: 'ajestorage123',
     TELEGRAM_BOT_TOKEN: '123456789:abcdefghijklmnopqrstuvwxyz_ABCDE',
     TELEGRAM_CHAT_ID: '-1001234567890',
-    TELEGRAM_API_IPV4: '149.154.167.220',
+    TELEGRAM_API_FALLBACK_IPV4S: '149.154.167.220,149.154.167.221',
     LEAD_RATE_LIMIT_SECRET: 'a'.repeat(32),
     MONIUM_API_KEY: 'test-monium-api-key',
     YC_LEAD_SERVICE_ACCOUNT_ID: 'ajeruntime123',
@@ -42,7 +42,7 @@ test('deploy preflight validates formats without returning secret values', () =>
   invalid.YC_DEPLOY_SERVICE_ACCOUNT_ID = 'bad id';
   invalid.TELEGRAM_BOT_TOKEN = 'not-a-bot-token';
   invalid.TELEGRAM_CHAT_ID = 'not-a-chat-id';
-  invalid.TELEGRAM_API_IPV4 = 'not-an-ip';
+  invalid.TELEGRAM_API_FALLBACK_IPV4S = '149.154.167.220,not-an-ip';
   invalid.LEAD_RATE_LIMIT_SECRET = 'short';
   invalid.YANDEX_METRIKA_ID = 'not-numeric';
   assert.deepEqual(validate(invalid), {
@@ -53,7 +53,7 @@ test('deploy preflight validates formats without returning secret values', () =>
       'TELEGRAM_BOT_TOKEN',
       'TELEGRAM_CHAT_ID',
       'YANDEX_METRIKA_ID',
-      'TELEGRAM_API_IPV4',
+      'TELEGRAM_API_FALLBACK_IPV4S',
     ],
   });
 });

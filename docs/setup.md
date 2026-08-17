@@ -372,7 +372,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `MAX_TELEGRAM_ATTEMPTS` | Максимум попыток Telegram; по умолчанию `12` |
 | `TELEGRAM_RETRY_BATCH_SIZE` | Число записей, обрабатываемых timer за вызов; по умолчанию `5`, максимум `25` |
 | `TELEGRAM_TIMEOUT_MS` | Таймаут одного запроса Telegram; по умолчанию `15000`, максимум `25000` |
-| `TELEGRAM_API_IPV4` | IPv4 Telegram Bot API для управляемого обхода недоступного DNS-маршрута; TLS `Host`/SNI остаётся `api.telegram.org` |
+| `TELEGRAM_API_FALLBACK_IPV4S` | 1–5 резервных IPv4 Telegram Bot API через запятую. DNS всегда приоритетен; функция безопасно проверяет маршруты, кэширует здоровый на 5 минут, а TLS `Host`/SNI оставляет `api.telegram.org` |
 | `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
 | `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; production default `10000`, как в обкатанной конфигурации `zvenfit-frontend` |
 | `YDB_SLOW_OPERATION_MS` | Порог медленного `ExecuteQuery`; по умолчанию `3000`. Инициализация клиента и нестабильные фазы получения/создания YDB-сессии не входят в paging-сигнал и пока не собираются |
