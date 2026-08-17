@@ -1,7 +1,9 @@
 import { setDefaultResultOrder } from 'node:dns';
 import { request as httpsRequest } from 'node:https';
+import { isIPv4 } from 'node:net';
 
 import type { ClientRequest, IncomingMessage, RequestOptions } from 'node:http';
+import type { LookupFunction } from 'node:net';
 
 import { TRACKED_UTM_PARAMS } from '../domain/shared';
 
@@ -14,6 +16,7 @@ const DEFAULT_RETRY_BATCH_SIZE = 5;
 const MAX_RETRY_BATCH_SIZE = 25;
 const DEFAULT_MAX_TELEGRAM_ATTEMPTS = 12;
 const MAX_TELEGRAM_RESPONSE_BYTES = 64 * 1024;
+const TELEGRAM_API_HOST = 'api.telegram.org';
 
 type RequestFactory = (
   url: URL,
@@ -97,6 +100,30 @@ function telegramError(
   return Object.assign(new Error(message), { code, name: 'TelegramError', status });
 }
 
+function telegramApiIpv4(): string {
+  const value = process.env.TELEGRAM_API_IPV4?.trim() || '';
+  if (value && !isIPv4(value)) {
+    throw telegramError('Telegram API IPv4 override is invalid', 'telegram_misconfigured');
+  }
+
+  return value;
+}
+
+function telegramLookup(address: string): LookupFunction | undefined {
+  if (!address) {
+    return undefined;
+  }
+
+  return (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [{ address, family: 4 }]);
+      return;
+    }
+
+    callback(null, address, 4);
+  };
+}
+
 function telegramNetworkErrorCode(error: unknown): string {
   if (
     error &&
@@ -133,15 +160,17 @@ export async function sendTelegram(
     throw telegramError('Telegram is not configured', 'telegram_misconfigured');
   }
 
+  const lookup = telegramLookup(telegramApiIpv4());
   const body = JSON.stringify({ chat_id: chatId, text: buildMessage(notification) });
   let response: { body: string; statusCode: number };
   try {
     response = await new Promise((resolve, reject) => {
       const request = requestFactory(
-        new URL(`https://api.telegram.org/bot${token}/sendMessage`),
+        new URL(`https://${TELEGRAM_API_HOST}/bot${token}/sendMessage`),
         {
           method: 'POST',
           family: 4,
+          ...(lookup ? { lookup } : {}),
           headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(body),
@@ -185,4 +214,4 @@ export async function sendTelegram(
   }
 }
 
-export const _private = { telegramNetworkErrorCode };
+export const _private = { telegramApiIpv4, telegramLookup, telegramNetworkErrorCode };

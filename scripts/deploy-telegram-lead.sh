@@ -24,6 +24,7 @@ LEAD_RATE_LIMIT_WINDOW_SECONDS="${LEAD_RATE_LIMIT_WINDOW_SECONDS:-600}"
 MAX_TELEGRAM_ATTEMPTS="${MAX_TELEGRAM_ATTEMPTS:-12}"
 TELEGRAM_RETRY_BATCH_SIZE="${TELEGRAM_RETRY_BATCH_SIZE:-5}"
 TELEGRAM_TIMEOUT_MS="${TELEGRAM_TIMEOUT_MS:-15000}"
+TELEGRAM_API_IPV4="${TELEGRAM_API_IPV4:-}"
 YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS:-10000}"
 YDB_SLOW_OPERATION_MS="${YDB_SLOW_OPERATION_MS:-3000}"
 YDB_SESSION_POOL_SIZE="${YDB_SESSION_POOL_SIZE:-5}"
@@ -49,6 +50,11 @@ fi
 
 if (( ${#LEAD_RATE_LIMIT_SECRET} < 32 )); then
   echo "deploy-telegram-lead: LEAD_RATE_LIMIT_SECRET must contain at least 32 characters" >&2
+  exit 1
+fi
+
+if [[ -n "${TELEGRAM_API_IPV4}" ]] && ! node -e 'process.exit(require("node:net").isIPv4(process.argv[1]) ? 0 : 1)' "${TELEGRAM_API_IPV4}"; then
+  echo "deploy-telegram-lead: TELEGRAM_API_IPV4 must be an IPv4 address" >&2
   exit 1
 fi
 
@@ -162,6 +168,7 @@ yc serverless function version create \
   --environment MAX_TELEGRAM_ATTEMPTS="${MAX_TELEGRAM_ATTEMPTS}" \
   --environment TELEGRAM_RETRY_BATCH_SIZE="${TELEGRAM_RETRY_BATCH_SIZE}" \
   --environment TELEGRAM_TIMEOUT_MS="${TELEGRAM_TIMEOUT_MS}" \
+  --environment TELEGRAM_API_IPV4="${TELEGRAM_API_IPV4}" \
   --environment YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
   --environment YDB_SLOW_OPERATION_MS="${YDB_SLOW_OPERATION_MS}" \
   --environment YDB_SESSION_POOL_SIZE="${YDB_SESSION_POOL_SIZE}" \
