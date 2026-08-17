@@ -193,7 +193,7 @@ test('metrics exporter failures use logs so the alert survives a broken OTLP pat
   assert.equal(chart.source, metric.id);
   assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
   assert.equal(chart.pagingAlert, true);
-  assert.deepEqual(widget.position, { x: '0', y: '55', w: '36', h: '8' });
+  assert.deepEqual(widget.position, { x: '0', y: '60', w: '36', h: '8' });
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors_1m/);
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors/);
   assert.match(operatorHandoff, /ZvenFit Estetika · Хранилище и outbox: ошибки/);
@@ -263,6 +263,17 @@ test('platform alerts cover runtime errors, throttling and storage capacity', ()
 test('dashboard contains the compact Estetika operational view', () => {
   assert.equal(config.dashboard.id, 'zvenfit-estetika-production-monitoring');
   assert.equal(config.dashboard.title, 'ZvenFit Estetika · production');
+  assert.deepEqual(config.dashboard.readingGuide, {
+    title: 'Как читать дашборд',
+    steps: [
+      'Статусы: красный — реагировать; жёлтый — проверить; зелёный — норма.',
+      'Поток обращения: Cloud Function → YDB/outbox → Telegram queue → retry-worker.',
+      'Диагностика: runtime/throttling и p95 → storage/Telegram errors → YDB query_execute и rate limiter/retry-trigger.',
+      'Доставка: сначала размер и возраст очереди, затем heartbeat; окончательная ошибка Telegram означает, что уведомление не доставлено.',
+    ],
+    note: 'Пустой событийный график при зелёном статусе означает, что ошибок не было. Обновление — раз в минуту.',
+    layout: { widthColumns: 36, heightRows: 5 },
+  });
   assert.deepEqual(config.dashboard.alertOverview, {
     title: 'Состояние production',
     selector: '{labels.application = "zvenfit-estetika-frontend", labels.environment = "production", labels.service = "zvenfit-estetika-telegram-lead"}',
@@ -351,7 +362,7 @@ test('dashboard quick links open canonical INFO and ERROR logs for the last hour
 test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   assert.equal(dashboard.title, config.dashboard.title);
   assert.equal(dashboard.name, config.dashboard.id);
-  assert.equal(dashboard.widgets.length, 14);
+  assert.equal(dashboard.widgets.length, 15);
 
   const quickWidget = dashboard.widgets[0];
   assert.equal(quickWidget.widget, 'text');
@@ -361,12 +372,21 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
     assert.ok(quickWidget.text.text.includes(link.url));
   }
 
+  const guideWidget = dashboard.widgets[1];
+  assert.equal(guideWidget.widget, 'text');
+  assert.deepEqual(guideWidget.position, { x: '0', y: '2', w: '36', h: '5' });
+  assert.match(guideWidget.text.text, new RegExp(config.dashboard.readingGuide.title));
+  for (const step of config.dashboard.readingGuide.steps) {
+    assert.ok(guideWidget.text.text.includes(step));
+  }
+  assert.ok(guideWidget.text.text.includes(config.dashboard.readingGuide.note));
+
   const alertWidgets = dashboard.widgets.filter(widget => widget.alertList);
   assert.equal(alertWidgets.length, 1);
   assert.equal(alertWidgets[0].widget, 'alertList');
   assert.equal(alertWidgets[0].alertList.title, config.dashboard.alertOverview.title);
   assert.equal(alertWidgets[0].alertList.selectors, config.dashboard.alertOverview.selector);
-  assert.deepEqual(alertWidgets[0].position, { x: '0', y: '2', w: '36', h: '5' });
+  assert.deepEqual(alertWidgets[0].position, { x: '0', y: '7', w: '36', h: '5' });
 
   const chartWidgets = dashboard.widgets.filter(widget => widget.multiSourceChart);
   assert.equal(chartWidgets.length, 12);
@@ -396,10 +416,10 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   const storageWidget = dashboard.widgets.find(
     widget => widget.multiSourceChart?.title === config.dashboard.ydbStorage.title,
   );
-  assert.deepEqual(storageWidget.position, { x: '18', y: '39', w: '18', h: '8' });
+  assert.deepEqual(storageWidget.position, { x: '18', y: '44', w: '18', h: '8' });
   const finalWidget = dashboard.widgets.at(-1);
   assert.equal(finalWidget.multiSourceChart.title, config.dashboard.metricsExporterFailures.title);
-  assert.deepEqual(finalWidget.position, { x: '0', y: '55', w: '36', h: '8' });
+  assert.deepEqual(finalWidget.position, { x: '0', y: '60', w: '36', h: '8' });
 
   for (let left = 0; left < dashboard.widgets.length; left += 1) {
     const a = Object.fromEntries(

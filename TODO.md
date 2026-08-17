@@ -6,7 +6,8 @@
 Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
 bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. Git desired state
 обновлён и применён: live Monium содержит 9 log metrics, 2 notification channels, 14 alerts,
-12 operational charts, alert overview и строку быстрых ссылок. Read-only drift совпал с Git; synthetic smoke
+12 operational charts, alert overview, памятку **Как читать дашборд** и строку быстрых ссылок.
+Read-only drift совпал с Git; synthetic smoke
 подтвердил пороги и 13 успешных отправок в Telegram/email. До приёма реальных заявок остаются
 юридические решения и проверка цикла форма → YDB → Telegram.
 Руководство для агентов: [`AGENTS.md`](AGENTS.md).
@@ -51,7 +52,8 @@ bucket-scoped ephemeral credentials, прежние статические cloud
   state из следующего пункта
 - [x] **Применить observability после разделения доменов/outbox** — функция задеплоена, display
   names обновлены, exporter log metric/alert созданы, dashboard импортирован со строкой INFO/ERROR
-  shortcuts, alert overview и 12 operational charts; 9 metrics / 14 alerts проверены в live UI,
+  shortcuts, памяткой **Как читать дашборд**, alert overview и 12 operational charts;
+  9 metrics / 14 alerts проверены в live UI,
   drift совпал с Git. Incident-triage графики покрывают storage/outbox и Telegram failures,
   YDB retry/slow query, rate limiter/retry-trigger и Cloud Function throttling.
   Runtime-error alert дополнительно изолирован от функций основного ZvenFit и использует фактическую

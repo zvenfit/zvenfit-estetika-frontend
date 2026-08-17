@@ -62,6 +62,20 @@
         }
       ]
     },
+    "readingGuide": {
+      "title": "Как читать дашборд",
+      "steps": [
+        "Статусы: красный — реагировать; жёлтый — проверить; зелёный — норма.",
+        "Поток обращения: Cloud Function → YDB/outbox → Telegram queue → retry-worker.",
+        "Диагностика: runtime/throttling и p95 → storage/Telegram errors → YDB query_execute и rate limiter/retry-trigger.",
+        "Доставка: сначала размер и возраст очереди, затем heartbeat; окончательная ошибка Telegram означает, что уведомление не доставлено."
+      ],
+      "note": "Пустой событийный график при зелёном статусе означает, что ошибок не было. Обновление — раз в минуту.",
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 5
+      }
+    },
     "alertOverview": {
       "title": "Состояние production",
       "selector": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\"}",
