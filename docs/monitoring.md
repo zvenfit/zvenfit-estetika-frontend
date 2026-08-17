@@ -164,14 +164,20 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/dashboards/zve
 
 1. полноширинную строку **Быстрый доступ к логам**: канонические `INFO за час` и `ERROR за час`
    links с готовой Estetika taxonomy и диапазоном `now-1h` → `now`;
-2. ошибки единственной Cloud Function;
-3. p95 длительности функции;
-4. tile прямого retry heartbeat;
-5. размер и возраст Telegram-очереди;
+2. полноширинный **Состояние production** со статусами всех Estetika alerts;
+3. ошибки и ограничения запуска единственной Cloud Function;
+4. p95 длительности функции и прямой retry heartbeat;
+5. ошибки хранения/outbox и окончательные сбои Telegram;
 6. сохранённые обращения с разложением `lead` / `newsletter`;
-7. диагностический log-pipeline heartbeat;
-8. полноширинный график заполнения отдельной YDB `zvenfit-estetika-leads`;
-9. независимый log-based график и alert сбоев Monium exporter.
+7. полноширинный размер и возраст Telegram-очереди;
+8. YDB retries и медленные `query_execute` рядом с заполнением отдельной
+   `zvenfit-estetika-leads`;
+9. ошибки rate limiter и retry-trigger рядом с диагностическим log-pipeline heartbeat;
+10. независимый log-based график и alert сбоев Monium exporter.
+
+Alert overview и четыре incident-triage графика повторяют operational-путь основной ZvenFit-борды,
+но exact single-function selectors не создают ненужные multialerts. Empty error graph при зелёном
+alert — нормальное состояние.
 
 Dashboard намеренно не содержит Fitbase, расписание, traffic-function, CDN основного сайта или
 бакеты `zvenfit-frontend`. Точные queries и selectors хранятся в конфиге.
@@ -185,8 +191,8 @@ Dashboard намеренно не содержит Fitbase, расписание
 3. четырнадцать alerts и общую notification policy;
 4. импортировать `scripts/monitoring.dashboard.json` через Dashboard → Settings → JSON → Apply.
 
-Нативный JSON содержит девять widgets: одну строку быстрых ссылок и восемь operational charts. После
-ручной правки live dashboard экспортируйте его тем же экраном обратно в этот файл и запустите
+Нативный JSON содержит четырнадцать widgets: строку быстрых ссылок, alert overview и двенадцать
+operational charts. После ручной правки live dashboard экспортируйте его тем же экраном обратно в этот файл и запустите
 `npm run test:monitoring`. Artifact предназначен только для dashboard import/export: log metrics,
 alerts, channels и read-only drift snapshot у него отдельные контракты.
 

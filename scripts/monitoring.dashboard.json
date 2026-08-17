@@ -1,7 +1,7 @@
 {
   "title": "ZvenFit Estetika · production",
   "name": "zvenfit-estetika-production-monitoring",
-  "description": "Операционный дашборд Estetika: обращения, Telegram, retry-worker, Cloud Function и YDB.",
+  "description": "Операционный дашборд Estetika: статусы алертов, обращения, Telegram, retry-worker, Cloud Function и YDB.",
   "parametrization": null,
   "eventSources": {
     "infra": []
@@ -25,6 +25,32 @@
       "position": {
         "x": "0",
         "y": "2",
+        "w": "36",
+        "h": "5"
+      },
+      "alertList": {
+        "annotationNames": [],
+        "groupByLabels": [],
+        "selectors": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\"}",
+        "showAllAnnotations": false,
+        "title": "Состояние production",
+        "pageSize": 100,
+        "groupMultiAlert": true,
+        "allLabelsGrouping": false,
+        "projectId": "folder__b1ge1e4iopttj79hfdfm",
+        "widgetScope": "projectId",
+        "orderByStatus": "ASC",
+        "orderBy": "orderByStatus",
+        "manualLayout": false,
+        "_manualLayout": "manualLayout"
+      },
+      "widget": "alertList"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "7",
         "w": "18",
         "h": "8"
       },
@@ -118,7 +144,101 @@
       "links": [],
       "position": {
         "x": "18",
-        "y": "2",
+        "y": "7",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "a0f40e2b-3170-4202-b754-69999cfdb7a9",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_throttles\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "a0f40e2b-3170-4202-b754-69999cfdb7a9",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "b3a6965a-0ef3-43ec-96b9-8223194ad54a",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Ограничений",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": true,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Cloud Function: ограничения запуска",
+        "displayLegend": true,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "4eb78527-6e19-466f-b874-caac20ee54a1"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "15",
         "w": "18",
         "h": "8"
       },
@@ -211,9 +331,9 @@
     {
       "links": [],
       "position": {
-        "x": "0",
-        "y": "10",
-        "w": "12",
+        "x": "18",
+        "y": "15",
+        "w": "18",
         "h": "8"
       },
       "multiSourceChart": {
@@ -311,9 +431,197 @@
     {
       "links": [],
       "position": {
-        "x": "12",
-        "y": "10",
-        "w": "24",
+        "x": "0",
+        "y": "23",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "61c9d032-4a1b-4b7f-99c9-6e402005bda4",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_storage_errors_1m|zvenfit_estetika_telegram_failed_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "61c9d032-4a1b-4b7f-99c9-6e402005bda4",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "a114cc9b-f27d-47fd-826a-32f69062f7f8",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Ошибок",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": true,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Хранилище/outbox и Telegram: ошибки",
+        "displayLegend": true,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "48a99e88-68f8-4caa-a2b5-a07c88b5aec8"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "18",
+        "y": "23",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
+            "query": "series_sum(\"meta.form_type\", {project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_submissions_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "9327e5ca-0929-4217-95d7-68d2d7dbe8cf",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Заявок / 5 мин",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Сохранённые обращения",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "5a92be09-9cf4-402d-be83-1585c798abf4"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "0",
+        "y": "31",
+        "w": "36",
         "h": "8"
       },
       "multiSourceChart": {
@@ -414,15 +722,15 @@
       "links": [],
       "position": {
         "x": "0",
-        "y": "18",
+        "y": "39",
         "w": "18",
         "h": "8"
       },
       "multiSourceChart": {
         "targets": [
           {
-            "dataSourceId": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
-            "query": "series_sum(\"meta.form_type\", {project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_submissions_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
+            "dataSourceId": "2bfd7ed6-77a7-44db-b581-2a79320e151a",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_ydb_retries_5m|zvenfit_estetika_ydb_slow_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
             "textMode": true,
             "hidden": false,
             "name": "A",
@@ -431,7 +739,7 @@
         ],
         "dataSources": [
           {
-            "id": "29725f97-f2f9-40ac-a472-c06e0a5e2adf",
+            "id": "2bfd7ed6-77a7-44db-b581-2a79320e151a",
             "downsampling": {
               "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
               "gapFilling": "GAP_FILLING_UNSPECIFIED"
@@ -441,7 +749,7 @@
         ],
         "seriesOverrides": [],
         "overlays": [],
-        "id": "9327e5ca-0929-4217-95d7-68d2d7dbe8cf",
+        "id": "6775543d-b60e-4750-9cf5-febfe278248a",
         "visualizationSettings": {
           "type": "VISUALIZATION_TYPE_UNSPECIFIED",
           "normalize": false,
@@ -455,7 +763,7 @@
           "yaxisSettings": {
             "left": {
               "type": "YAXIS_TYPE_LINEAR",
-              "title": "Заявок / 5 мин",
+              "title": "Событий / 5 мин",
               "min": "",
               "max": "",
               "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
@@ -471,21 +779,21 @@
             }
           },
           "title": "",
-          "showLabels": false,
+          "showLabels": true,
           "tilesSettings": null,
           "hidePartialData": false
         },
         "nameHidingSettings": null,
         "description": "",
-        "title": "Сохранённые обращения",
-        "displayLegend": false,
+        "title": "YDB: повторы и медленные запросы",
+        "displayLegend": true,
         "freeze": "FREEZE_DURATION_UNSPECIFIED",
         "repeat": null,
         "thresholds": {
           "items": [
             {
               "color": "#92db00",
-              "id": "5a92be09-9cf4-402d-be83-1585c798abf4"
+              "id": "67aad6d6-aada-437c-bc7a-e040bb795d89"
             }
           ],
           "showMode": "CONSTANT_LINE"
@@ -508,102 +816,8 @@
       "links": [],
       "position": {
         "x": "18",
-        "y": "18",
+        "y": "39",
         "w": "18",
-        "h": "8"
-      },
-      "multiSourceChart": {
-        "targets": [
-          {
-            "dataSourceId": "53c99022-5cdd-45c8-945a-b38ad4555803",
-            "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\"})",
-            "textMode": true,
-            "hidden": false,
-            "name": "A",
-            "type": "monitoring"
-          }
-        ],
-        "dataSources": [
-          {
-            "id": "53c99022-5cdd-45c8-945a-b38ad4555803",
-            "downsampling": {
-              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
-              "gapFilling": "GAP_FILLING_UNSPECIFIED"
-            },
-            "type": "monitoring"
-          }
-        ],
-        "seriesOverrides": [],
-        "overlays": [],
-        "id": "696075ff-d1ae-43f7-830d-a03904859524",
-        "visualizationSettings": {
-          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
-          "normalize": false,
-          "interpolate": "INTERPOLATE_UNSPECIFIED",
-          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
-          "colorSchemeSettings": {
-            "automatic": {},
-            "scheme": "automatic"
-          },
-          "heatmapSettings": null,
-          "yaxisSettings": {
-            "left": {
-              "type": "YAXIS_TYPE_LINEAR",
-              "title": "",
-              "min": "",
-              "max": "",
-              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
-              "precision": null
-            },
-            "right": {
-              "type": "YAXIS_TYPE_LINEAR",
-              "title": "",
-              "min": "",
-              "max": "",
-              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
-              "precision": null
-            }
-          },
-          "title": "",
-          "showLabels": false,
-          "tilesSettings": null,
-          "hidePartialData": false
-        },
-        "nameHidingSettings": null,
-        "description": "",
-        "title": "Поставка логов: heartbeat retry-worker",
-        "displayLegend": false,
-        "freeze": "FREEZE_DURATION_UNSPECIFIED",
-        "repeat": null,
-        "thresholds": {
-          "items": [
-            {
-              "color": "#92db00",
-              "id": "6278f61f-0148-491e-96f8-b7d4964f0f1a"
-            }
-          ],
-          "showMode": "CONSTANT_LINE"
-        },
-        "eventSources": null,
-        "legendSettings": {
-          "sortRules": [],
-          "position": "POSITION_BOTTOM",
-          "truncate": "TRUNCATE_END",
-          "size": null,
-          "list": {
-            "columnsCount": 0
-          },
-          "view": "list"
-        }
-      },
-      "widget": "multiSourceChart"
-    },
-    {
-      "links": [],
-      "position": {
-        "x": "0",
-        "y": "26",
-        "w": "36",
         "h": "8"
       },
       "multiSourceChart": {
@@ -701,9 +915,205 @@
       "widget": "multiSourceChart"
     },
     {
+      "links": [],
       "position": {
         "x": "0",
-        "y": "34",
+        "y": "47",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "dc2808e6-78cb-42e4-86fd-8d63c910af87",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_rate_limit_errors_5m|zvenfit_estetika_rate_limited_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          },
+          {
+            "dataSourceId": "dc2808e6-78cb-42e4-86fd-8d63c910af87",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"serverless.triggers.access_error_per_second|serverless.triggers.error_per_second\", trigger=\"a1sc2t1ro4alukatrf99\", type=\"request\"}",
+            "textMode": true,
+            "hidden": false,
+            "name": "B",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "dc2808e6-78cb-42e4-86fd-8d63c910af87",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "e6297478-02a7-4542-9917-a46fc81e3191",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "Событий / 5 мин",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": true,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Rate limiter и retry-trigger: ошибки",
+        "displayLegend": true,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "107f09ca-e850-4e1f-8397-518619ec92f7"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "links": [],
+      "position": {
+        "x": "18",
+        "y": "47",
+        "w": "18",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "targets": [
+          {
+            "dataSourceId": "53c99022-5cdd-45c8-945a-b38ad4555803",
+            "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\"})",
+            "textMode": true,
+            "hidden": false,
+            "name": "A",
+            "type": "monitoring"
+          }
+        ],
+        "dataSources": [
+          {
+            "id": "53c99022-5cdd-45c8-945a-b38ad4555803",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            },
+            "type": "monitoring"
+          }
+        ],
+        "seriesOverrides": [],
+        "overlays": [],
+        "id": "696075ff-d1ae-43f7-830d-a03904859524",
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "normalize": false,
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "aggregation": "SERIES_AGGREGATION_UNSPECIFIED",
+          "colorSchemeSettings": {
+            "automatic": {},
+            "scheme": "automatic"
+          },
+          "heatmapSettings": null,
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR",
+              "title": "",
+              "min": "",
+              "max": "",
+              "unitFormat": "UNIT_FORMAT_UNSPECIFIED",
+              "precision": null
+            }
+          },
+          "title": "",
+          "showLabels": false,
+          "tilesSettings": null,
+          "hidePartialData": false
+        },
+        "nameHidingSettings": null,
+        "description": "",
+        "title": "Поставка логов: heartbeat retry-worker",
+        "displayLegend": false,
+        "freeze": "FREEZE_DURATION_UNSPECIFIED",
+        "repeat": null,
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "6278f61f-0148-491e-96f8-b7d4964f0f1a"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "eventSources": null,
+        "legendSettings": {
+          "sortRules": [],
+          "position": "POSITION_BOTTOM",
+          "truncate": "TRUNCATE_END",
+          "size": null,
+          "list": {
+            "columnsCount": 0
+          },
+          "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "position": {
+        "x": "0",
+        "y": "55",
         "w": "36",
         "h": "8"
       },

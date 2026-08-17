@@ -193,7 +193,7 @@ test('metrics exporter failures use logs so the alert survives a broken OTLP pat
   assert.equal(chart.source, metric.id);
   assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
   assert.equal(chart.pagingAlert, true);
-  assert.deepEqual(widget.position, { x: '0', y: '34', w: '36', h: '8' });
+  assert.deepEqual(widget.position, { x: '0', y: '55', w: '36', h: '8' });
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors_1m/);
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors/);
   assert.match(operatorHandoff, /ZvenFit Estetika · Хранилище и outbox: ошибки/);
@@ -263,21 +263,45 @@ test('platform alerts cover runtime errors, throttling and storage capacity', ()
 test('dashboard contains the compact Estetika operational view', () => {
   assert.equal(config.dashboard.id, 'zvenfit-estetika-production-monitoring');
   assert.equal(config.dashboard.title, 'ZvenFit Estetika · production');
+  assert.deepEqual(config.dashboard.alertOverview, {
+    title: 'Состояние production',
+    selector: '{labels.application = "zvenfit-estetika-frontend", labels.environment = "production", labels.service = "zvenfit-estetika-telegram-lead"}',
+    visualization: 'alert-list',
+    pageSize: 100,
+    layout: { widthColumns: 36, heightRows: 5 },
+  });
   assert.match(config.dashboard.runtimeErrors.metricSelector, /functions_errors/);
   assert.equal(
     config.dashboard.runtimeErrors.metricSelector,
     config.alerts.find(item => item.id === 'zfe_function_runtime_errors').metricSelector,
   );
+  assert.equal(
+    config.dashboard.functionThrottles.metricSelector,
+    config.alerts.find(item => item.id === 'zvenfit_estetika_function_throttles').metricSelector,
+  );
   assert.match(config.dashboard.functionDurationP95.query, /^histogram_percentile\(95,/);
   assert.match(config.dashboard.retryWorkerHeartbeat.metricSelector, /retry_worker_heartbeat/);
+  assert.match(config.dashboard.deliveryErrors.metricSelector, /storage_errors_1m/);
+  assert.match(config.dashboard.deliveryErrors.metricSelector, /telegram_failed_1m/);
   assert.equal(config.dashboard.telegramQueue.metricSelectors.length, 2);
+  assert.deepEqual(config.dashboard.telegramQueue.layout, {
+    widthColumns: 36,
+    heightRows: 8,
+  });
   assert.deepEqual(config.dashboard.submissionVolume.decomposeBy, ['meta.form_type']);
   assert.match(config.dashboard.submissionVolume.query, /^series_sum\("meta\.form_type",/);
   assert.equal(
     config.dashboard.logPipelineHeartbeat.source,
     'zvenfit_estetika_retry_worker_log_heartbeat_1m',
   );
+  assert.match(config.dashboard.ydbQueryHealth.metricSelector, /ydb_retries_5m/);
+  assert.match(config.dashboard.ydbQueryHealth.metricSelector, /ydb_slow_5m/);
+  assert.equal(config.dashboard.ydbQueryHealth.stablePhase, 'query_execute');
+  assert.doesNotMatch(config.dashboard.ydbQueryHealth.metricSelector, /session_(acquire|create)/);
   assert.match(config.dashboard.ydbStorage.queries.join('\n'), /zvenfit-estetika-leads/);
+  assert.match(config.dashboard.rateLimitAndRetryTrigger.queries[0], /rate_limit_errors_5m/);
+  assert.match(config.dashboard.rateLimitAndRetryTrigger.queries[0], /rate_limited_5m/);
+  assert.match(config.dashboard.rateLimitAndRetryTrigger.queries[1], /a1sc2t1ro4alukatrf99/);
   assert.equal(
     config.dashboard.metricsExporterFailures.source,
     'zvenfit_estetika_monium_metrics_failures_5m',
@@ -288,7 +312,7 @@ test('dashboard contains the compact Estetika operational view', () => {
     workflow: 'settings-json-export-import',
   });
   assert.deepEqual(config.dashboard.ydbStorage.layout, {
-    widthColumns: 36,
+    widthColumns: 18,
     heightRows: 8,
   });
 });
@@ -327,7 +351,7 @@ test('dashboard quick links open canonical INFO and ERROR logs for the last hour
 test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   assert.equal(dashboard.title, config.dashboard.title);
   assert.equal(dashboard.name, config.dashboard.id);
-  assert.equal(dashboard.widgets.length, 9);
+  assert.equal(dashboard.widgets.length, 14);
 
   const quickWidget = dashboard.widgets[0];
   assert.equal(quickWidget.widget, 'text');
@@ -337,8 +361,15 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
     assert.ok(quickWidget.text.text.includes(link.url));
   }
 
+  const alertWidgets = dashboard.widgets.filter(widget => widget.alertList);
+  assert.equal(alertWidgets.length, 1);
+  assert.equal(alertWidgets[0].widget, 'alertList');
+  assert.equal(alertWidgets[0].alertList.title, config.dashboard.alertOverview.title);
+  assert.equal(alertWidgets[0].alertList.selectors, config.dashboard.alertOverview.selector);
+  assert.deepEqual(alertWidgets[0].position, { x: '0', y: '2', w: '36', h: '5' });
+
   const chartWidgets = dashboard.widgets.filter(widget => widget.multiSourceChart);
-  assert.equal(chartWidgets.length, 8);
+  assert.equal(chartWidgets.length, 12);
   for (const widget of chartWidgets) {
     assert.equal(widget.widget, 'multiSourceChart');
   }
@@ -347,12 +378,16 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
     .flatMap(widget => widget.multiSourceChart.targets.map(target => target.query));
   for (const query of [
     config.dashboard.runtimeErrors.metricSelector,
+    config.dashboard.functionThrottles.metricSelector,
     config.dashboard.functionDurationP95.query,
     config.dashboard.retryWorkerHeartbeat.metricSelector,
+    config.dashboard.deliveryErrors.metricSelector,
     ...config.dashboard.telegramQueue.metricSelectors,
     config.dashboard.submissionVolume.query,
+    config.dashboard.ydbQueryHealth.metricSelector,
     config.dashboard.logPipelineHeartbeat.query,
     ...config.dashboard.ydbStorage.queries,
+    ...config.dashboard.rateLimitAndRetryTrigger.queries,
     config.dashboard.metricsExporterFailures.query,
   ]) {
     assert.ok(chartQueries.includes(query), `native dashboard is missing query: ${query}`);
@@ -361,11 +396,26 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   const storageWidget = dashboard.widgets.find(
     widget => widget.multiSourceChart?.title === config.dashboard.ydbStorage.title,
   );
-  assert.deepEqual(storageWidget.position, { x: '0', y: '26', w: '36', h: '8' });
+  assert.deepEqual(storageWidget.position, { x: '18', y: '39', w: '18', h: '8' });
   const finalWidget = dashboard.widgets.at(-1);
   assert.equal(finalWidget.multiSourceChart.title, config.dashboard.metricsExporterFailures.title);
-  assert.deepEqual(finalWidget.position, { x: '0', y: '34', w: '36', h: '8' });
+  assert.deepEqual(finalWidget.position, { x: '0', y: '55', w: '36', h: '8' });
+
+  for (let left = 0; left < dashboard.widgets.length; left += 1) {
+    const a = Object.fromEntries(
+      Object.entries(dashboard.widgets[left].position).map(([key, value]) => [key, Number(value)]),
+    );
+    for (let right = left + 1; right < dashboard.widgets.length; right += 1) {
+      const b = Object.fromEntries(
+        Object.entries(dashboard.widgets[right].position).map(([key, value]) => [key, Number(value)]),
+      );
+      const overlaps = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      assert.equal(overlaps, false, `dashboard widgets ${left} and ${right} overlap`);
+    }
+  }
+
   const serialized = JSON.stringify(dashboard);
+  assert.doesNotMatch(serialized, /session_(acquire|create)/);
   assert.doesNotMatch(serialized, /TELEGRAM_BOT_TOKEN|MONIUM_API_KEY|YC_SA_JSON_KEY/);
   assert.doesNotMatch(serialized, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
 });
