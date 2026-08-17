@@ -75,7 +75,9 @@ Workflow [run #32030115816](https://github.com/zvenfit/zvenfit-estetika-frontend
 read-only production smoke без реальной заявки.
 
 Live Monium синхронизирован с Git desired state: 9 log metrics, 14 alerts, два канала,
-8 operational charts и строка INFO/ERROR shortcuts. Runtime-error alert изолирован на
+12 operational charts, alert overview и строка INFO/ERROR shortcuts. Борда показывает source
+series для storage/outbox и Telegram failures, YDB retries/slow query, rate limiter/retry-trigger и
+Cloud Function throttling. Runtime-error alert изолирован на
 `zvenfit-estetika-telegram-lead` и использует системную серию
 `cluster="default"`, `service="__serverless-functions__"`; throttling/duration используют
 provider-серию `service="serverless-functions"`. Drift-check совпал. Synthetic smoke 2026-08-17

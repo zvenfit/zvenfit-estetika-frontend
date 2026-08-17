@@ -62,9 +62,25 @@
         }
       ]
     },
+    "alertOverview": {
+      "title": "Состояние production",
+      "selector": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "alert-list",
+      "pageSize": 100,
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 5
+      }
+    },
     "runtimeErrors": {
       "title": "Ошибки Cloud Function",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"__serverless-functions__\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "chart",
+      "pagingAlert": true
+    },
+    "functionThrottles": {
+      "title": "Cloud Function: ограничения запуска",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_throttles\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "visualization": "chart",
       "pagingAlert": true
     },
@@ -81,6 +97,12 @@
       "visualization": "tile",
       "pagingAlert": true
     },
+    "deliveryErrors": {
+      "title": "Хранилище/outbox и Telegram: ошибки",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_storage_errors_1m|zvenfit_estetika_telegram_failed_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "chart",
+      "pagingAlert": true
+    },
     "telegramQueue": {
       "title": "Telegram: очередь и возраст",
       "metricSelectors": [
@@ -88,7 +110,11 @@
         "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}"
       ],
       "visualization": "chart",
-      "pagingAlert": true
+      "pagingAlert": true,
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 8
+      }
     },
     "submissionVolume": {
       "title": "Сохранённые обращения",
@@ -104,6 +130,13 @@
       "visualization": "chart",
       "pagingAlert": false
     },
+    "ydbQueryHealth": {
+      "title": "YDB: повторы и медленные запросы",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_ydb_retries_5m|zvenfit_estetika_ydb_slow_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "visualization": "chart",
+      "pagingAlert": true,
+      "stablePhase": "query_execute"
+    },
     "ydbStorage": {
       "title": "YDB: заполнение хранилища",
       "queries": [
@@ -113,9 +146,18 @@
       "visualization": "chart",
       "pagingAlert": true,
       "layout": {
-        "widthColumns": 36,
+        "widthColumns": 18,
         "heightRows": 8
       }
+    },
+    "rateLimitAndRetryTrigger": {
+      "title": "Rate limiter и retry-trigger: ошибки",
+      "queries": [
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_rate_limit_errors_5m|zvenfit_estetika_rate_limited_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"serverless.triggers.access_error_per_second|serverless.triggers.error_per_second\", trigger=\"a1sc2t1ro4alukatrf99\", type=\"request\"}"
+      ],
+      "visualization": "chart",
+      "pagingAlert": true
     },
     "metricsExporterFailures": {
       "title": "Monium: сбои экспорта метрик",
