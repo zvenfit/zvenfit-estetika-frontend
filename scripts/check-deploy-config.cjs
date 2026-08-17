@@ -17,7 +17,7 @@ const REQUIRED = [
   'YC_STORAGE_SERVICE_ACCOUNT_ID',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_CHAT_ID',
-  'TELEGRAM_API_IPV4',
+  'TELEGRAM_API_FALLBACK_IPV4S',
   'LEAD_RATE_LIMIT_SECRET',
   'MONIUM_API_KEY',
   'YC_LEAD_SERVICE_ACCOUNT_ID',
@@ -98,10 +98,13 @@ function validate(environment) {
     invalid.push('YANDEX_METRIKA_ID');
   }
   if (
-    !missing.includes('TELEGRAM_API_IPV4') &&
-    !isIPv4(environment.TELEGRAM_API_IPV4.trim())
+    !missing.includes('TELEGRAM_API_FALLBACK_IPV4S') &&
+    (() => {
+      const values = environment.TELEGRAM_API_FALLBACK_IPV4S.split(/[\s,]+/).filter(Boolean);
+      return values.length === 0 || values.length > 5 || values.some(value => !isIPv4(value));
+    })()
   ) {
-    invalid.push('TELEGRAM_API_IPV4');
+    invalid.push('TELEGRAM_API_FALLBACK_IPV4S');
   }
 
   return { missing, invalid: [...new Set(invalid)] };

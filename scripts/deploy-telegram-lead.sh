@@ -24,7 +24,7 @@ LEAD_RATE_LIMIT_WINDOW_SECONDS="${LEAD_RATE_LIMIT_WINDOW_SECONDS:-600}"
 MAX_TELEGRAM_ATTEMPTS="${MAX_TELEGRAM_ATTEMPTS:-12}"
 TELEGRAM_RETRY_BATCH_SIZE="${TELEGRAM_RETRY_BATCH_SIZE:-5}"
 TELEGRAM_TIMEOUT_MS="${TELEGRAM_TIMEOUT_MS:-15000}"
-TELEGRAM_API_IPV4="${TELEGRAM_API_IPV4:-}"
+TELEGRAM_API_FALLBACK_IPV4S="${TELEGRAM_API_FALLBACK_IPV4S:-}"
 YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS:-10000}"
 YDB_SLOW_OPERATION_MS="${YDB_SLOW_OPERATION_MS:-3000}"
 YDB_SESSION_POOL_SIZE="${YDB_SESSION_POOL_SIZE:-5}"
@@ -53,8 +53,11 @@ if (( ${#LEAD_RATE_LIMIT_SECRET} < 32 )); then
   exit 1
 fi
 
-if [[ -n "${TELEGRAM_API_IPV4}" ]] && ! node -e 'process.exit(require("node:net").isIPv4(process.argv[1]) ? 0 : 1)' "${TELEGRAM_API_IPV4}"; then
-  echo "deploy-telegram-lead: TELEGRAM_API_IPV4 must be an IPv4 address" >&2
+if ! node -e '
+const values = process.argv[1].split(/[\s,]+/).filter(Boolean);
+process.exit(values.length > 0 && values.length <= 5 && values.every(require("node:net").isIPv4) ? 0 : 1);
+' "${TELEGRAM_API_FALLBACK_IPV4S}"; then
+  echo "deploy-telegram-lead: TELEGRAM_API_FALLBACK_IPV4S must contain 1-5 IPv4 addresses" >&2
   exit 1
 fi
 
@@ -168,7 +171,7 @@ yc serverless function version create \
   --environment MAX_TELEGRAM_ATTEMPTS="${MAX_TELEGRAM_ATTEMPTS}" \
   --environment TELEGRAM_RETRY_BATCH_SIZE="${TELEGRAM_RETRY_BATCH_SIZE}" \
   --environment TELEGRAM_TIMEOUT_MS="${TELEGRAM_TIMEOUT_MS}" \
-  --environment TELEGRAM_API_IPV4="${TELEGRAM_API_IPV4}" \
+  --environment TELEGRAM_API_FALLBACK_IPV4S="${TELEGRAM_API_FALLBACK_IPV4S}" \
   --environment YDB_QUERY_TIMEOUT_MS="${YDB_QUERY_TIMEOUT_MS}" \
   --environment YDB_SLOW_OPERATION_MS="${YDB_SLOW_OPERATION_MS}" \
   --environment YDB_SESSION_POOL_SIZE="${YDB_SESSION_POOL_SIZE}" \

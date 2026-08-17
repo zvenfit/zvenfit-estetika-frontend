@@ -104,6 +104,7 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  _private.resetTelegramRouteCache();
   const requestFactory = ((_url: URL, options: Record<string, unknown>) => {
     requestOptions = options;
     const request = new EventEmitter() as EventEmitter & { end: () => void };
@@ -135,6 +136,7 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
     );
     assert.equal(requestOptions.family, 4);
   } finally {
+    _private.resetTelegramRouteCache();
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
     } else {
@@ -148,27 +150,35 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
   }
 });
 
-test('Telegram accepts a successful bounded JSON response over the IPv4 request', async () => {
+test('Telegram falls back after a safe probe and sends exactly one POST', async () => {
   const previousToken = process.env.TELEGRAM_BOT_TOKEN;
   const previousChatId = process.env.TELEGRAM_CHAT_ID;
-  const previousApiIpv4 = process.env.TELEGRAM_API_IPV4;
+  const previousFallbackIpv4s = process.env.TELEGRAM_API_FALLBACK_IPV4S;
   let requestBody = '';
   let requestUrl: URL | undefined;
   let requestOptions: Record<string, unknown> = {};
+  let postCount = 0;
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
-  process.env.TELEGRAM_API_IPV4 = '149.154.167.220';
+  process.env.TELEGRAM_API_FALLBACK_IPV4S = '149.154.167.220';
   const requestFactory = ((url: URL, options: Record<string, unknown>, callback: Function) => {
-    requestUrl = url;
-    requestOptions = options;
-    const request = new EventEmitter() as EventEmitter & { end: (body: string) => void };
+    const request = new EventEmitter() as EventEmitter & { end: (body?: string) => void };
     request.end = body => {
-      requestBody = body;
+      if (options.method === 'HEAD' && !options.lookup) {
+        request.emit('error', Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' }));
+        return;
+      }
       const response = new Readable({ read() {} }) as Readable & { statusCode: number };
-      response.statusCode = 200;
+      response.statusCode = options.method === 'HEAD' ? 302 : 200;
       callback(response);
-      response.push('{"ok":true}');
+      if (options.method === 'POST') {
+        postCount += 1;
+        requestUrl = url;
+        requestOptions = options;
+        requestBody = body || '';
+        response.push('{"ok":true}');
+      }
       response.push(null);
     };
 
@@ -176,11 +186,10 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
   }) as never;
 
   try {
-    await sendTelegram(
-      newsletterNotification(),
-      requestFactory,
-    );
+    _private.resetTelegramRouteCache();
+    await sendTelegram(newsletterNotification(), requestFactory);
     assert.equal(JSON.parse(requestBody).chat_id, '-1001234567890');
+    assert.equal(postCount, 1);
     assert.equal(requestUrl?.hostname, 'api.telegram.org');
     assert.equal(typeof requestOptions.lookup, 'function');
     assert.deepEqual(
@@ -194,6 +203,7 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
       { error: null, addresses: [{ address: '149.154.167.220', family: 4 }] },
     );
   } finally {
+    _private.resetTelegramRouteCache();
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
     } else {
@@ -204,24 +214,25 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
     } else {
       process.env.TELEGRAM_CHAT_ID = previousChatId;
     }
-    if (previousApiIpv4 === undefined) {
-      delete process.env.TELEGRAM_API_IPV4;
+    if (previousFallbackIpv4s === undefined) {
+      delete process.env.TELEGRAM_API_FALLBACK_IPV4S;
     } else {
-      process.env.TELEGRAM_API_IPV4 = previousApiIpv4;
+      process.env.TELEGRAM_API_FALLBACK_IPV4S = previousFallbackIpv4s;
     }
   }
 });
 
-test('Telegram rejects an invalid API IPv4 override before opening a request', async () => {
+test('Telegram rejects an invalid fallback list before opening a request', async () => {
   const previousToken = process.env.TELEGRAM_BOT_TOKEN;
   const previousChatId = process.env.TELEGRAM_CHAT_ID;
-  const previousApiIpv4 = process.env.TELEGRAM_API_IPV4;
+  const previousFallbackIpv4s = process.env.TELEGRAM_API_FALLBACK_IPV4S;
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
-  process.env.TELEGRAM_API_IPV4 = 'not-an-ip';
+  process.env.TELEGRAM_API_FALLBACK_IPV4S = '149.154.167.220,not-an-ip';
 
   try {
+    _private.resetTelegramRouteCache();
     await assert.rejects(
       sendTelegram(newsletterNotification()),
       (error: unknown) =>
@@ -230,8 +241,9 @@ test('Telegram rejects an invalid API IPv4 override before opening a request', a
         error.code === 'telegram_misconfigured' &&
         !error.message.includes(process.env.TELEGRAM_BOT_TOKEN ?? ''),
     );
-    assert.throws(() => _private.telegramApiIpv4(), /IPv4 override is invalid/);
+    assert.throws(() => _private.telegramFallbackIpv4s(), /fallback IPv4 list is invalid/);
   } finally {
+    _private.resetTelegramRouteCache();
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
     } else {
@@ -242,11 +254,102 @@ test('Telegram rejects an invalid API IPv4 override before opening a request', a
     } else {
       process.env.TELEGRAM_CHAT_ID = previousChatId;
     }
-    if (previousApiIpv4 === undefined) {
-      delete process.env.TELEGRAM_API_IPV4;
+    if (previousFallbackIpv4s === undefined) {
+      delete process.env.TELEGRAM_API_FALLBACK_IPV4S;
     } else {
-      process.env.TELEGRAM_API_IPV4 = previousApiIpv4;
+      process.env.TELEGRAM_API_FALLBACK_IPV4S = previousFallbackIpv4s;
     }
+  }
+});
+
+test('Telegram prefers DNS and reuses the healthy route from the warm cache', async () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  const previousFallbackIpv4s = process.env.TELEGRAM_API_FALLBACK_IPV4S;
+  let headCount = 0;
+  let postCount = 0;
+  const postLookups: unknown[] = [];
+
+  process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  process.env.TELEGRAM_API_FALLBACK_IPV4S = '149.154.167.220';
+  const requestFactory = ((_url: URL, options: Record<string, unknown>, callback: Function) => {
+    const request = new EventEmitter() as EventEmitter & { end: () => void };
+    request.end = () => {
+      const response = new Readable({ read() {} }) as Readable & { statusCode: number };
+      response.statusCode = options.method === 'HEAD' ? 302 : 200;
+      callback(response);
+      if (options.method === 'HEAD') {
+        headCount += 1;
+      } else {
+        postCount += 1;
+        postLookups.push(options.lookup);
+        response.push('{"ok":true}');
+      }
+      response.push(null);
+    };
+    return request;
+  }) as never;
+
+  try {
+    _private.resetTelegramRouteCache();
+    await sendTelegram(newsletterNotification(), requestFactory);
+    await sendTelegram(newsletterNotification(), requestFactory);
+    assert.equal(headCount, 2);
+    assert.equal(postCount, 2);
+    assert.deepEqual(postLookups, [undefined, undefined]);
+  } finally {
+    _private.resetTelegramRouteCache();
+    if (previousToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+    else process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    if (previousChatId === undefined) delete process.env.TELEGRAM_CHAT_ID;
+    else process.env.TELEGRAM_CHAT_ID = previousChatId;
+    if (previousFallbackIpv4s === undefined) delete process.env.TELEGRAM_API_FALLBACK_IPV4S;
+    else process.env.TELEGRAM_API_FALLBACK_IPV4S = previousFallbackIpv4s;
+  }
+});
+
+test('Telegram never retries an ambiguous POST over another route', async () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  const previousFallbackIpv4s = process.env.TELEGRAM_API_FALLBACK_IPV4S;
+  let postCount = 0;
+
+  process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  process.env.TELEGRAM_API_FALLBACK_IPV4S = '149.154.167.220';
+  const requestFactory = ((_url: URL, options: Record<string, unknown>, callback: Function) => {
+    const request = new EventEmitter() as EventEmitter & { end: () => void };
+    request.end = () => {
+      if (options.method === 'HEAD' && !options.lookup) {
+        request.emit('error', Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' }));
+        return;
+      }
+      if (options.method === 'POST') {
+        postCount += 1;
+        request.emit('error', Object.assign(new Error('ambiguous timeout'), { code: 'ETIMEDOUT' }));
+        return;
+      }
+      const response = new Readable({ read() {} }) as Readable & { statusCode: number };
+      response.statusCode = 302;
+      callback(response);
+      response.push(null);
+    };
+    return request;
+  }) as never;
+
+  try {
+    _private.resetTelegramRouteCache();
+    await assert.rejects(sendTelegram(newsletterNotification(), requestFactory));
+    assert.equal(postCount, 1);
+  } finally {
+    _private.resetTelegramRouteCache();
+    if (previousToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+    else process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    if (previousChatId === undefined) delete process.env.TELEGRAM_CHAT_ID;
+    else process.env.TELEGRAM_CHAT_ID = previousChatId;
+    if (previousFallbackIpv4s === undefined) delete process.env.TELEGRAM_API_FALLBACK_IPV4S;
+    else process.env.TELEGRAM_API_FALLBACK_IPV4S = previousFallbackIpv4s;
   }
 });
 
@@ -256,13 +359,13 @@ test('Telegram HTTP failures preserve a safe type and upstream status', async ()
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
-  const requestFactory = ((_url: URL, _options: Record<string, unknown>, callback: Function) => {
+  const requestFactory = ((_url: URL, options: Record<string, unknown>, callback: Function) => {
     const request = new EventEmitter() as EventEmitter & { end: () => void };
     request.end = () => {
       const response = new Readable({ read() {} }) as Readable & { statusCode: number };
-      response.statusCode = 429;
+      response.statusCode = options.method === 'HEAD' ? 302 : 429;
       callback(response);
-      response.push('{"ok":false}');
+      if (options.method === 'POST') response.push('{"ok":false}');
       response.push(null);
     };
 
@@ -270,6 +373,7 @@ test('Telegram HTTP failures preserve a safe type and upstream status', async ()
   }) as never;
 
   try {
+    _private.resetTelegramRouteCache();
     await assert.rejects(
       sendTelegram(
         leadNotification({
@@ -289,6 +393,7 @@ test('Telegram HTTP failures preserve a safe type and upstream status', async ()
         error.status === 429,
     );
   } finally {
+    _private.resetTelegramRouteCache();
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
     } else {
