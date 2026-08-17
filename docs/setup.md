@@ -374,13 +374,13 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `TELEGRAM_TIMEOUT_MS` | Таймаут одного запроса Telegram; по умолчанию `15000`, максимум `25000` |
 | `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
 | `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; production default `10000`, как в обкатанной конфигурации `zvenfit-frontend` |
-| `YDB_SLOW_OPERATION_MS` | Порог события медленной бизнес-операции; по умолчанию `3000`. Инициализация YDB-клиента в холодном контейнере измеряется вне этого порога |
+| `YDB_SLOW_OPERATION_MS` | Порог медленного `ExecuteQuery`; по умолчанию `3000`. Инициализация клиента и нестабильные фазы получения/создания YDB-сессии не входят в paging-сигнал и пока не собираются |
 | `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
 | `MONIUM_METRICS_ENABLED` | Прямой экспорт метрик; production default `true` |
 | `MONIUM_PROJECT` | Проект Monium; по умолчанию `folder__<YC_FOLDER_ID>` |
 | `MONIUM_CLUSTER` | Cluster direct metrics; по умолчанию `default` |
 | `MONIUM_SERVICE` | Service direct metrics; по умолчанию `zvenfit-estetika-frontend` |
-| `MONIUM_METRICS_TIMEOUT_MS` | Таймаут OTLP export; по умолчанию `1000`, диапазон `100–5000` |
+| `MONIUM_METRICS_TIMEOUT_MS` | Общий deadline OTLP collect/export/flush/shutdown; по умолчанию `3000`, диапазон `100–5000` |
 
 Для еженедельной проверки паритета приватного `zvenfit/zvenfit-frontend` добавьте необязательный
 repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents. Для публичного upstream

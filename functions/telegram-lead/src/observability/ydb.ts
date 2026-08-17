@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { channel } from 'node:diagnostics_channel';
+import { channel, tracingChannel } from 'node:diagnostics_channel';
 
 import { safeErrorFields } from './errors';
 import { slowOperationMs } from '../ydb/config';
@@ -8,12 +8,71 @@ import type { JsonObject, LoggerLike } from '../types';
 
 interface OperationState {
   retries: number;
+  queryExecution: PhaseAggregate;
+}
+
+interface PhaseAggregate {
+  attempts: number;
+  maxDurationMs: number;
+  totalDurationMs: number;
+}
+
+interface QueryTrace {
+  operation: OperationState;
+  startedAt: number;
 }
 
 const operationStorage = new AsyncLocalStorage<OperationState>();
+const queryTraces = new WeakMap<object, QueryTrace>();
 let subscribed = false;
 
-function subscribeToRetries(): void {
+function emptyPhaseAggregate(): PhaseAggregate {
+  return { attempts: 0, maxDurationMs: 0, totalDurationMs: 0 };
+}
+
+function createOperationState(): OperationState {
+  return {
+    retries: 0,
+    queryExecution: emptyPhaseAggregate(),
+  };
+}
+
+function isTraceContext(message: unknown): message is object {
+  return typeof message === 'object' && message !== null;
+}
+
+function subscribeToQueryExecution(): void {
+  tracingChannel('tracing:ydb:query.execute').subscribe({
+    start(message) {
+      const operation = operationStorage.getStore();
+      if (operation && isTraceContext(message)) {
+        queryTraces.set(message, { operation, startedAt: Date.now() });
+      }
+    },
+    asyncStart(message) {
+      if (!isTraceContext(message)) {
+        return;
+      }
+
+      const trace = queryTraces.get(message);
+      if (!trace) {
+        return;
+      }
+
+      const durationMs = Math.max(0, Date.now() - trace.startedAt);
+      const aggregate = trace.operation.queryExecution;
+      aggregate.attempts += 1;
+      aggregate.totalDurationMs += durationMs;
+      aggregate.maxDurationMs = Math.max(aggregate.maxDurationMs, durationMs);
+      queryTraces.delete(message);
+    },
+    end() {},
+    asyncEnd() {},
+    error() {},
+  });
+}
+
+function subscribeToDiagnostics(): void {
   if (subscribed) {
     return;
   }
@@ -29,7 +88,16 @@ function subscribeToRetries(): void {
       operation.retries += 1;
     }
   });
+  subscribeToQueryExecution();
   subscribed = true;
+}
+
+function queryFields(operation: OperationState): JsonObject {
+  return {
+    query_execute_attempts: operation.queryExecution.attempts,
+    query_execute_duration_ms: operation.queryExecution.totalDurationMs,
+    query_execute_max_duration_ms: operation.queryExecution.maxDurationMs,
+  };
 }
 
 function writeLog(
@@ -48,9 +116,9 @@ export async function observeYdbOperation<T>(
   logger: LoggerLike | undefined,
   callback: () => Promise<T>,
 ): Promise<T> {
-  subscribeToRetries();
+  subscribeToDiagnostics();
   const startedAt = Date.now();
-  const operation = { retries: 0 };
+  const operation = createOperationState();
 
   try {
     const result = await operationStorage.run(operation, callback);
@@ -60,6 +128,7 @@ export async function observeYdbOperation<T>(
       operation: operationName,
       duration_ms: durationMs,
       retry_attempts: operation.retries,
+      ...queryFields(operation),
     });
     if (operation.retries > 0) {
       writeLog(logger, 'warn', {
@@ -68,11 +137,14 @@ export async function observeYdbOperation<T>(
         retry_attempts: operation.retries,
       });
     }
-    if (durationMs >= slowOperationMs()) {
+    const queryDurationMs = operation.queryExecution.maxDurationMs;
+    if (queryDurationMs >= slowOperationMs()) {
       writeLog(logger, 'warn', {
         event: 'ydb_slow_operation',
         operation: operationName,
-        duration_ms: durationMs,
+        phase: 'query_execute',
+        duration_ms: queryDurationMs,
+        total_duration_ms: durationMs,
       });
     }
 
@@ -83,6 +155,7 @@ export async function observeYdbOperation<T>(
       operation: operationName,
       duration_ms: Date.now() - startedAt,
       retry_attempts: operation.retries,
+      ...queryFields(operation),
       ...safeErrorFields(error, { fallbackCode: 'ydb_error' }),
     });
     throw error;
@@ -113,4 +186,9 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
   return observeYdbOperation(operationName, logger, callback);
 }
 
-export const _private = { subscribeToRetries, writeLog };
+export const _private = {
+  createOperationState,
+  queryFields,
+  subscribeToDiagnostics,
+  writeLog,
+};

@@ -1,11 +1,13 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-16**: отдельная инфраструктура Estetika создана и развёрнута через
+Состояние проверено **2026-08-17**: отдельная инфраструктура Estetika создана и развёрнута через
 разделённые deploy/verifier OIDC subjects в [run #31947477061](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31947477061).
 Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
-bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. В Monium созданы 8
-log metrics, 2 notification channels, 13 alerts и production dashboard. До приёма реальных заявок
-остаются юридические решения, synthetic delivery smoke и проверка цикла форма → YDB → Telegram.
+bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. Git desired state
+обновлён до 9 log metrics, 2 notification channels, 14 alerts и 8 operational charts; read-only
+проверка показала, что live Monium пока остаётся на прежних 8 metrics / 13 alerts / 7 charts. До
+приёма реальных заявок нужны согласованный deploy функции и observability, юридические решения,
+synthetic delivery smoke и проверка цикла форма → YDB → Telegram.
 Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
@@ -14,7 +16,9 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
 
 1. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
 2. **Провести release smoke-test с реальными данными** — одна маркированная заявка, одна подписка, Telegram, YDB и визит Метрики; read-only smoke страниц уже проходит в CI.
-3. **Проверить monitoring delivery** — выполнить подтверждённый synthetic smoke, проверить оба канала уведомлений и read-only drift.
+3. **Синхронизировать live observability** — после деплоя функции создать новую log metric,
+   alert exporter failures, импортировать dashboard и только затем выполнить synthetic smoke обоих
+   каналов и read-only drift.
 4. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
 5. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
 
@@ -43,7 +47,22 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
   - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
   - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
-- [x] **Создать monitoring live state в Monium** — созданы 8 log metrics, Telegram/email channels, 13 alerts и dashboard с быстрыми INFO/ERROR log shortcuts и нативным JSON artifact; retry/heartbeat alerts и production logs проверены live
+- [x] **Создать исходный monitoring live state в Monium** — созданы 8 log metrics,
+  Telegram/email channels, 13 alerts и 7 operational charts; retry/heartbeat alerts и production
+  logs проверены live. Нативный JSON artifact хранит также строку INFO/ERROR shortcuts, но
+  read-only snapshot 2026-08-17 подтвердил, что в live dashboard этой строки сейчас нет
+- [ ] **Применить observability после разделения доменов/outbox** — после deploy версии функции
+  обновить display name существующих `zvenfit_estetika_storage_errors_1m` и
+  `zvenfit_estetika_storage_errors` на «ZvenFit Estetika · Хранилище и outbox: ошибки», создать
+  `zvenfit_estetika_monium_metrics_failures_5m`, alert `zfe_monium_metrics_failures`,
+  импортировать dashboard со строкой INFO/ERROR shortcuts и 8 operational charts и проверить drift.
+  Функция публикует старый и новый queue gauge параллельно, поэтому частичный rollout не создаёт
+  разрыв видимости
+- [ ] **Завершить миграцию queue gauge** — после подтверждённого обновления live dashboard и одного
+  стабильного production rollout удалить legacy `zvenfit_estetika_telegram_pending_submissions`
+- [ ] **Вернуться к YDB session phases telemetry** — `session_acquire` / `session_create` пока
+  флапают и намеренно не собираются; повторно оценить после стабилизации diagnostics channels,
+  сохранив `query_execute` единственным paging-сигналом
 - [ ] **Проверить synthetic monitoring delivery** — выполнить `bash scripts/test-monitoring-alerts.sh --confirm`, проверить уведомления в обоих каналах, возврат alert statuses в `OK` и read-only drift snapshot
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - [ ] **Юридическая проверка форм до приёма заявок** — по решению владельца согласие выражается отправкой формы без отдельных чекбоксов и сохраняется с версией в YDB; остаётся подтвердить такой способ и формулировки с юристом
@@ -73,7 +92,9 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
   - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
   - [ ] Проверить заголовки для `/`, `/form/`, `/404.html` и юридических страниц командой `curl -I` после распространения настроек CDN
 - [ ] **Content Security Policy** — вынести исполняемый inline-код, запустить CSP сначала в `Report-Only`, учесть домены Яндекс Метрики, затем включить enforcement с `frame-ancestors 'none'`
-- [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через log aggregates; direct OTLP только для queue gauges/heartbeat; 13 alerts, dashboard, drift check и безопасный smoke-скрипт
+- [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через 9
+  log aggregates; direct OTLP только для outbox gauges/heartbeat; 14 alerts, `query_execute` telemetry,
+  exporter-failure health, dashboard desired state, строгий drift check и безопасный smoke-скрипт
 
 ---
 
@@ -188,7 +209,7 @@ log metrics, 2 notification channels, 13 alerts и production dashboard. До п
 
 ## Чек-лист перед релизом
 
-- [x] `npm test` проходит: линтер, strict TypeScript, 37 unit-тестов Cloud Function, проверка CommonJS-артефакта, 39 contract-тестов CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-16)
+- [x] `npm test` проходит: линтер, strict TypeScript, 48 unit-тестов Cloud Function, проверка CommonJS-артефакта, 43 contract-теста CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-17)
 - [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
 - [ ] Заявка и рассылка проверены с `?utm_source=test`
 - [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)

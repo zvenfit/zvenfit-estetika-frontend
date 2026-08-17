@@ -67,6 +67,7 @@ export async function deliverNotification(
       {
         attempts: claimed.attempts,
         fallbackCode: code,
+        notificationKind: claimed.kind,
         retriable: !terminal,
       },
     );

@@ -10,6 +10,7 @@ const deployScript = fs.readFileSync(path.join(ROOT, 'scripts/deploy-telegram-le
 const verifyScript = fs.readFileSync(path.join(ROOT, 'scripts/verify-telegram-lead-ydb.sh'), 'utf8');
 const packageScript = fs.readFileSync(path.join(ROOT, 'scripts/package-telegram-lead.sh'), 'utf8');
 const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/main.yml'), 'utf8');
+const envExample = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');
 
 test('production deploy jobs wait for quality checks', () => {
   const quality = workflow.indexOf('  quality-checks:');
@@ -233,4 +234,8 @@ test('direct gauges carry the same Estetika taxonomy in runtime and selectors', 
     assert.match(workflow, new RegExp(`${name}: ${value}`));
     assert.match(deployScript, new RegExp(`--environment ${name}=`));
   }
+
+  assert.match(workflow, /MONIUM_METRICS_TIMEOUT_MS:.*'3000'/);
+  assert.match(deployScript, /MONIUM_METRICS_TIMEOUT_MS="\$\{MONIUM_METRICS_TIMEOUT_MS:-3000\}"/);
+  assert.match(envExample, /^MONIUM_METRICS_TIMEOUT_MS=3000$/m);
 });

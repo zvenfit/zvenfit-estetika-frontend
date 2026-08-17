@@ -84,7 +84,7 @@
     "telegramQueue": {
       "title": "Telegram: очередь и возраст",
       "metricSelectors": [
-        "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_submissions\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+        "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_notifications\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
         "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_oldest_pending_age_seconds\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}"
       ],
       "visualization": "chart",
@@ -110,6 +110,17 @@
         "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.used_bytes\", database.serverless=\"zvenfit-estetika-leads\"}",
         "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"ydb\", name=\"resources.storage.limit_bytes\", database.serverless=\"zvenfit-estetika-leads\"}"
       ],
+      "visualization": "chart",
+      "pagingAlert": true,
+      "layout": {
+        "widthColumns": 36,
+        "heightRows": 8
+      }
+    },
+    "metricsExporterFailures": {
+      "title": "Monium: сбои экспорта метрик",
+      "source": "zvenfit_estetika_monium_metrics_failures_5m",
+      "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_monium_metrics_failures_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
       "visualization": "chart",
       "pagingAlert": true,
       "layout": {
@@ -151,7 +162,7 @@
   "logMetrics": [
     {
       "id": "zvenfit_estetika_storage_errors_1m",
-      "displayName": "ZvenFit Estetika · Заявки: ошибки сохранения",
+      "displayName": "ZvenFit Estetika · Хранилище и outbox: ошибки",
       "events": ["submission_storage_error", "telegram_delivery_retry_error"],
       "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"submission_storage_error|telegram_delivery_retry_error\", resource_id=\"*\"}",
       "aggregation": "count",
@@ -223,12 +234,23 @@
       "window": "1m",
       "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"],
       "synthetic": false
+    },
+    {
+      "id": "zvenfit_estetika_monium_metrics_failures_5m",
+      "displayName": "ZvenFit Estetika · Monium: сбои экспорта метрик",
+      "events": ["monium_metrics_export_error", "monium_metrics_init_error", "monium_metrics_misconfigured"],
+      "filters": { "resource_id": "*" },
+      "selector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"default\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\", meta.event=\"monium_metrics_export_error|monium_metrics_init_error|monium_metrics_misconfigured\", resource_id=\"*\"}",
+      "aggregation": "count",
+      "window": "5m",
+      "groupBy": ["meta.application", "meta.environment", "meta.service", "resource_id"],
+      "synthetic": false
     }
   ],
   "alerts": [
     {
       "id": "zvenfit_estetika_storage_errors",
-      "displayName": "ZvenFit Estetika · Заявки: ошибки сохранения",
+      "displayName": "ZvenFit Estetika · Хранилище и outbox: ошибки",
       "metricId": "zvenfit_estetika_storage_errors_1m",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_storage_errors_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "max",
@@ -348,6 +370,20 @@
       "warning": 0,
       "alarm": 2,
       "window": "10m",
+      "delay": "3m",
+      "noData": "OK",
+      "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
+    },
+    {
+      "id": "zfe_monium_metrics_failures",
+      "displayName": "ZvenFit Estetika · Monium: сбои экспорта метрик",
+      "metricId": "zvenfit_estetika_monium_metrics_failures_5m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_monium_metrics_failures_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
+      "aggregation": "sum",
+      "operator": ">",
+      "warning": 2,
+      "alarm": 5,
+      "window": "30m",
       "delay": "3m",
       "noData": "OK",
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }

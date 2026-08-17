@@ -133,7 +133,9 @@ npm run check:upstream-parity # есть ли новые неразобранн�
 
 Production dashboard восстанавливается через нативный Monium JSON artifact
 `scripts/monitoring.dashboard.json`; semantic selectors, alerts и read-only drift contract остаются
-в `scripts/monitoring.config.json`.
+в `scripts/monitoring.config.json`. При переименовании direct metric функция на один rollout
+публикует legacy и canonical series параллельно; после этого обновляются log metrics/alerts и
+импортируется dashboard, а legacy series удаляется отдельным следующим релизом.
 
 Ручной деплой:
 

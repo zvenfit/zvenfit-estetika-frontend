@@ -9,11 +9,13 @@ const ROOT = path.resolve(__dirname, '../..');
 const config = require('../monitoring.config.json');
 const dashboard = require('../monitoring.dashboard.json');
 const docs = fs.readFileSync(path.join(ROOT, 'docs/monitoring.md'), 'utf8');
+const operatorHandoff = fs.readFileSync(path.join(ROOT, 'docs/operator-handoff.md'), 'utf8');
 const smokeScript = fs.readFileSync(path.join(ROOT, 'scripts/test-monitoring-alerts.sh'), 'utf8');
 const source = [
   'functions/telegram-lead/src/handler.ts',
   'functions/telegram-lead/src/application/retry-notifications.ts',
   'functions/telegram-lead/src/telegram/delivery.ts',
+  'functions/telegram-lead/src/observability/metrics.ts',
   'functions/telegram-lead/src/observability/ydb.ts',
 ]
   .map(filename => fs.readFileSync(path.join(ROOT, filename), 'utf8'))
@@ -67,7 +69,7 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
     alertIds.add(alert.id);
   }
 
-  assert.equal(alertIds.size, 13);
+  assert.equal(alertIds.size, 14);
   assert.deepEqual(config.notificationChannels.map(channel => channel.id), [
     'zvenfit_estetika_telegram_alerts',
     'zvenfit_estetika_email_alerts',
@@ -91,6 +93,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
     ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m'],
     ['zvenfit_estetika_submission_volume', 'zvenfit_estetika_submissions_5m'],
     ['zvenfit_estetika_rate_limit_health', 'zvenfit_estetika_rate_limit_errors_5m'],
+    ['zfe_monium_metrics_failures', 'zvenfit_estetika_monium_metrics_failures_5m'],
   ];
 
   for (const [alertId, metricId] of expected) {
@@ -139,6 +142,70 @@ test('direct OTLP is limited to current-state gauges with canonical taxonomy', (
     resource_id: 'zvenfit-estetika-telegram-lead',
   });
   assert.equal(config.directMetrics.transport, 'OTLP cumulative gauges');
+  assert.match(config.dashboard.telegramQueue.metricSelectors[0], /telegram_pending_notifications/);
+  assert.match(directMetricsSource, /telegram_pending_submissions/);
+  assert.match(directMetricsSource, /telegram_pending_notifications/);
+});
+
+test('YDB monitoring uses only stable query execution timing', () => {
+  assert.match(source, /tracing:ydb:query\.execute/);
+  assert.match(source, /phase: 'query_execute'/);
+  assert.doesNotMatch(source, /tracing:ydb:query\.session\.(?:acquire|create)/);
+  assert.doesNotMatch(source, /ydb_slow_session_phase/);
+  assert.equal('ydbSessionPhases' in config.dashboard, false);
+  assert.equal(
+    config.logMetrics.some(item => item.id === 'zvenfit_estetika_ydb_slow_session_phases_5m'),
+    false,
+  );
+  assert.match(docs, /YDB session\s+phases[\s\S]*техдолг/i);
+});
+
+test('metrics exporter failures use logs so the alert survives a broken OTLP path', () => {
+  const metric = config.logMetrics.find(
+    item => item.id === 'zvenfit_estetika_monium_metrics_failures_5m',
+  );
+  const alert = config.alerts.find(item => item.id === 'zfe_monium_metrics_failures');
+  const chart = config.dashboard.metricsExporterFailures;
+  const widget = dashboard.widgets.find(
+    item => item.multiSourceChart?.title === chart.title,
+  );
+
+  assert.deepEqual(metric.events, [
+    'monium_metrics_export_error',
+    'monium_metrics_init_error',
+    'monium_metrics_misconfigured',
+  ]);
+  assert.deepEqual(metric.groupBy, [
+    'meta.application',
+    'meta.environment',
+    'meta.service',
+    'resource_id',
+  ]);
+  assert.equal(metric.synthetic, false);
+  assert.equal(alert.metricId, metric.id);
+  assert.match(alert.metricSelector, /service="logging_aggregates"/);
+  assert.deepEqual(
+    { warning: alert.warning, alarm: alert.alarm, window: alert.window, delay: alert.delay },
+    { warning: 2, alarm: 5, window: '30m', delay: '3m' },
+  );
+  assert.match(docs, /Три ошибки за 30 минут дают `Warning`/);
+  assert.match(docs, /шесть —\s+`Alarm`/);
+  assert.equal(chart.source, metric.id);
+  assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
+  assert.equal(chart.pagingAlert, true);
+  assert.deepEqual(widget.position, { x: '0', y: '34', w: '36', h: '8' });
+  assert.match(operatorHandoff, /zvenfit_estetika_storage_errors_1m/);
+  assert.match(operatorHandoff, /zvenfit_estetika_storage_errors/);
+  assert.match(operatorHandoff, /ZvenFit Estetika · Хранилище и outbox: ошибки/);
+});
+
+test('all log metrics stay within the Monium four-label grouping limit', () => {
+  for (const metric of config.logMetrics) {
+    assert.ok(
+      metric.groupBy.length <= 4,
+      `${metric.id} has ${metric.groupBy.length} groupBy labels; Monium allows at most 4`,
+    );
+  }
 });
 
 test('retry health covers direct heartbeat, queue age, trigger and log-pipeline diagnostics', () => {
@@ -205,6 +272,10 @@ test('dashboard contains the compact Estetika operational view', () => {
     'zvenfit_estetika_retry_worker_log_heartbeat_1m',
   );
   assert.match(config.dashboard.ydbStorage.queries.join('\n'), /zvenfit-estetika-leads/);
+  assert.equal(
+    config.dashboard.metricsExporterFailures.source,
+    'zvenfit_estetika_monium_metrics_failures_5m',
+  );
   assert.deepEqual(config.dashboard.nativeJson, {
     artifact: 'scripts/monitoring.dashboard.json',
     scope: 'dashboard-only',
@@ -247,10 +318,10 @@ test('dashboard quick links open canonical INFO and ERROR logs for the last hour
   assert.equal(queryTokens.size, 2, 'INFO and ERROR must use different encoded selectors');
 });
 
-test('native Monium JSON mirrors the reviewed live dashboard layout', () => {
+test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   assert.equal(dashboard.title, config.dashboard.title);
   assert.equal(dashboard.name, config.dashboard.id);
-  assert.equal(dashboard.widgets.length, 8);
+  assert.equal(dashboard.widgets.length, 9);
 
   const quickWidget = dashboard.widgets[0];
   assert.equal(quickWidget.widget, 'text');
@@ -260,8 +331,13 @@ test('native Monium JSON mirrors the reviewed live dashboard layout', () => {
     assert.ok(quickWidget.text.text.includes(link.url));
   }
 
-  const chartQueries = dashboard.widgets
-    .filter(widget => widget.widget === 'multiSourceChart')
+  const chartWidgets = dashboard.widgets.filter(widget => widget.multiSourceChart);
+  assert.equal(chartWidgets.length, 8);
+  for (const widget of chartWidgets) {
+    assert.equal(widget.widget, 'multiSourceChart');
+  }
+
+  const chartQueries = chartWidgets
     .flatMap(widget => widget.multiSourceChart.targets.map(target => target.query));
   for (const query of [
     config.dashboard.runtimeErrors.metricSelector,
@@ -271,13 +347,18 @@ test('native Monium JSON mirrors the reviewed live dashboard layout', () => {
     config.dashboard.submissionVolume.query,
     config.dashboard.logPipelineHeartbeat.query,
     ...config.dashboard.ydbStorage.queries,
+    config.dashboard.metricsExporterFailures.query,
   ]) {
     assert.ok(chartQueries.includes(query), `native dashboard is missing query: ${query}`);
   }
 
+  const storageWidget = dashboard.widgets.find(
+    widget => widget.multiSourceChart?.title === config.dashboard.ydbStorage.title,
+  );
+  assert.deepEqual(storageWidget.position, { x: '0', y: '26', w: '36', h: '8' });
   const finalWidget = dashboard.widgets.at(-1);
-  assert.equal(finalWidget.multiSourceChart.title, config.dashboard.ydbStorage.title);
-  assert.deepEqual(finalWidget.position, { x: '0', y: '26', w: '36', h: '8' });
+  assert.equal(finalWidget.multiSourceChart.title, config.dashboard.metricsExporterFailures.title);
+  assert.deepEqual(finalWidget.position, { x: '0', y: '34', w: '36', h: '8' });
   const serialized = JSON.stringify(dashboard);
   assert.doesNotMatch(serialized, /TELEGRAM_BOT_TOKEN|MONIUM_API_KEY|YC_SA_JSON_KEY/);
   assert.doesNotMatch(serialized, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);

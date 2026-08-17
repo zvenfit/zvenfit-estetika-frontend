@@ -231,7 +231,7 @@ jobs:
           MONIUM_ENVIRONMENT: production
           MONIUM_COMPONENT: zvenfit-estetika-telegram-lead
           MONIUM_RESOURCE_ID: zvenfit-estetika-telegram-lead
-          MONIUM_METRICS_TIMEOUT_MS: ${{ vars.MONIUM_METRICS_TIMEOUT_MS || '1000' }}
+          MONIUM_METRICS_TIMEOUT_MS: ${{ vars.MONIUM_METRICS_TIMEOUT_MS || '3000' }}
           ALLOWED_ORIGINS: ${{ env.ALLOWED_ORIGINS }}
           YC_LEAD_SERVICE_ACCOUNT_ID: ${{ vars.YC_LEAD_SERVICE_ACCOUNT_ID }}
           YDB_DATABASE_ID: ${{ vars.YDB_DATABASE_ID }}

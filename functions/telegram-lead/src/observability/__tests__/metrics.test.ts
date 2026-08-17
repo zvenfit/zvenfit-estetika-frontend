@@ -145,6 +145,16 @@ test('does not propagate initialization or export failures or expose credentials
 
 test('bounds exporter timeout', () => {
   const timeouts: number[] = [];
+  const defaultMetrics = createInvocationMetrics(undefined, new TestLogger(), {
+    env: enabledEnv(),
+    transportFactory: options => {
+      timeouts.push(options.timeoutMs);
+
+      return { recordGauge() {}, async flush() {} };
+    },
+  });
+  defaultMetrics.recordGauge('test_gauge', 1);
+
   for (const configured of ['10', '9000']) {
     const metrics = createInvocationMetrics(undefined, new TestLogger(), {
       env: enabledEnv({ MONIUM_METRICS_TIMEOUT_MS: configured }),
@@ -156,7 +166,7 @@ test('bounds exporter timeout', () => {
     });
     metrics.recordGauge('test_gauge', 1);
   }
-  assert.deepEqual(timeouts, [100, 5000]);
+  assert.deepEqual(timeouts, [3000, 100, 5000]);
 });
 
 test('exports cumulative gauges and surfaces collector rejection', async () => {
@@ -201,6 +211,28 @@ test('exports cumulative gauges and surfaces collector rejection', async () => {
   await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
 });
 
+test('bounds the complete flush lifecycle when exporter cleanup never settles', async () => {
+  for (const stuckMethod of ['forceFlush', 'shutdown'] as const) {
+    const never = () => new Promise<void>(() => {});
+    const exporter: PushMetricExporter = {
+      export(_metrics, callback) {
+        callback({ code: ExportResultCode.SUCCESS });
+      },
+      forceFlush: stuckMethod === 'forceFlush' ? never : async () => {},
+      shutdown: stuckMethod === 'shutdown' ? never : async () => {},
+    };
+    const transport = createOtelTransport(
+      { endpoint: 'https://example.test', headers: {}, timeoutMs: 30 },
+      () => exporter,
+    );
+    transport.recordGauge('zvenfit_test_health', 1);
+
+    const startedAt = Date.now();
+    await assert.rejects(transport.flush(), { code: 'metrics_flush_timeout' });
+    assert.ok(Date.now() - startedAt < 1_000, `${stuckMethod} exceeded the flush deadline`);
+  }
+});
+
 test('exports zero-valued queue gauges as real samples', async () => {
   let exportedMetrics: ResourceMetrics | undefined;
   const exporter: PushMetricExporter = {
@@ -217,6 +249,7 @@ test('exports zero-valued queue gauges as real samples', async () => {
   );
 
   transport.recordGauge('zvenfit_estetika_telegram_pending_submissions', 0);
+  transport.recordGauge('zvenfit_estetika_telegram_pending_notifications', 0);
   transport.recordGauge('zvenfit_estetika_telegram_oldest_pending_age_seconds', 0);
   transport.recordGauge('zvenfit_estetika_retry_worker_heartbeat', 1);
   await transport.flush();
@@ -225,6 +258,7 @@ test('exports zero-valued queue gauges as real samples', async () => {
   const gauges = new Map(metrics.map(metric => [metric.descriptor.name, metric]));
   for (const [name, expectedValue] of [
     ['zvenfit_estetika_telegram_pending_submissions', 0],
+    ['zvenfit_estetika_telegram_pending_notifications', 0],
     ['zvenfit_estetika_telegram_oldest_pending_age_seconds', 0],
     ['zvenfit_estetika_retry_worker_heartbeat', 1],
   ] as const) {

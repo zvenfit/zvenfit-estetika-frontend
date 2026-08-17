@@ -4,8 +4,8 @@
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
 не копируются автоматически.
 
-Текущий аудит выполнен 2026-08-16 до опубликованного commit
-`184556357a237d4541ec2f8dcc37f3e70bc9da4e`. Перенесены архитектурные изменения production
+Текущий аудит выполнен 2026-08-17 до опубликованного commit
+`20251191a99e5e9b2c6153d4eab24aa3d425b24d`. Перенесены архитектурные изменения production
 observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
 direct gauges, log-pipeline heartbeat, throttling alert, dashboard desired state, read-only drift
 check, GitHub OIDC/WIF и bucket-scoped ephemeral Object Storage credentials.
@@ -17,6 +17,16 @@ Estetika сохранены семь её operational charts, сверху до�
 непарный YDB-график остаётся полноширинным. Upstream traffic/FitBase widgets, traffic analytics,
 FitBase future roadmaps и project-local knowledge base не применимы к этому статическому
 lead/newsletter-проекту и не переносились.
+
+Из диапазона `184556357a237d4541ec2f8dcc37f3e70bc9da4e..20251191a99e5e9b2c6153d4eab24aa3d425b24d`
+перенесён стабильный `query_execute` timing, независимый log-based alert отказов Monium exporter,
+общий трёхсекундный deadline OTLP lifecycle и строгая проверка наличия notification settings в live
+drift snapshot. Dashboard Estetika дополнен одним полноширинным графиком exporter health.
+`session_acquire` / `session_create` намеренно не перенесены: диагностические каналы пока флапают,
+их повторная оценка зафиксирована как техдолг. После разделения доменов и transactional outbox
+канонический direct queue gauge называется `zvenfit_estetika_telegram_pending_notifications`;
+upstream/legacy `pending_submissions` временно публикуется параллельно для безразрывного rollout.
+Staging gateway/E2E, traffic и FitBase изменения этого диапазона не переносились как неприменимые.
 
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а

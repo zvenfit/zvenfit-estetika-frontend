@@ -81,13 +81,20 @@ function normalizeCollection(items, fields, name) {
     .sort((left, right) => String(left.id).localeCompare(String(right.id)));
 }
 
-function normalizeMonitoringState(state) {
+function normalizeMonitoringState(state, options = {}) {
+  const { inheritDefaults = true } = options;
   const defaultChannelIds = state.notificationPolicy?.channelIds;
   const defaultRepeatMinutes = state.notificationPolicy?.repeatMinutes;
   const alerts = state.alerts?.map(alert => ({
     ...alert,
-    notificationChannelIds: alert.notificationChannelIds ?? defaultChannelIds,
-    notificationRepeatMinutes: alert.notificationRepeatMinutes ?? defaultRepeatMinutes,
+    notificationChannelIds:
+      inheritDefaults && alert.notificationChannelIds === undefined
+        ? defaultChannelIds
+        : alert.notificationChannelIds,
+    notificationRepeatMinutes:
+      inheritDefaults && alert.notificationRepeatMinutes === undefined
+        ? defaultRepeatMinutes
+        : alert.notificationRepeatMinutes,
   }));
 
   return {
@@ -144,8 +151,8 @@ function diffCollection(kind, expectedItems, actualItems) {
 }
 
 function diffMonitoringState(expectedState, actualState) {
-  const expected = normalizeMonitoringState(expectedState);
-  const actual = normalizeMonitoringState(actualState);
+  const expected = normalizeMonitoringState(expectedState, { inheritDefaults: true });
+  const actual = normalizeMonitoringState(actualState, { inheritDefaults: false });
 
   return [
     ...diffCollection('logMetrics', expected.logMetrics, actual.logMetrics),
