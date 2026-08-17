@@ -320,7 +320,7 @@
         "targets": [
           {
             "dataSourceId": "5369d7c3-d83c-4e55-896d-b760a056c7ea",
-            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_submissions\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_telegram_pending_notifications\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
             "textMode": false,
             "hidden": false,
             "name": "A",
@@ -696,6 +696,72 @@
             "columnsCount": 0
           },
           "view": "list"
+        }
+      },
+      "widget": "multiSourceChart"
+    },
+    {
+      "position": {
+        "x": "0",
+        "y": "34",
+        "w": "36",
+        "h": "8"
+      },
+      "multiSourceChart": {
+        "id": "6ca9c86d-18c6-48bb-9453-93a7cc05d405",
+        "dataSources": [
+          {
+            "id": "1d5848ca-c43b-4bdd-9f83-b508e96699e8",
+            "type": "monitoring",
+            "downsampling": {
+              "gridAggregation": "GRID_AGGREGATION_UNSPECIFIED",
+              "gapFilling": "GAP_FILLING_UNSPECIFIED"
+            }
+          }
+        ],
+        "targets": [
+          {
+            "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_monium_metrics_failures_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
+            "hidden": false,
+            "name": "A",
+            "textMode": true,
+            "type": "monitoring",
+            "dataSourceId": "1d5848ca-c43b-4bdd-9f83-b508e96699e8",
+            "growDown": false
+          }
+        ],
+        "seriesOverrides": [],
+        "visualizationSettings": {
+          "type": "VISUALIZATION_TYPE_UNSPECIFIED",
+          "interpolate": "INTERPOLATE_UNSPECIFIED",
+          "yaxisSettings": {
+            "left": {
+              "type": "YAXIS_TYPE_LINEAR"
+            },
+            "right": {
+              "type": "YAXIS_TYPE_LINEAR"
+            }
+          },
+          "colorSchemeSettings": {
+            "automatic": {}
+          }
+        },
+        "thresholds": {
+          "items": [
+            {
+              "color": "#92db00",
+              "id": "2e132ab9-df5c-49a7-93c9-ae26f86f0c78"
+            }
+          ],
+          "showMode": "CONSTANT_LINE"
+        },
+        "title": "Monium: сбои экспорта метрик",
+        "legendSettings": {
+          "position": "POSITION_BOTTOM",
+          "list": {
+            "columnsCount": 0
+          },
+          "truncate": "TRUNCATE_END"
         }
       },
       "widget": "multiSourceChart"

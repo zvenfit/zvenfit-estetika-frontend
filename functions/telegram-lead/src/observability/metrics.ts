@@ -10,7 +10,7 @@ const DEFAULT_APPLICATION = 'zvenfit-estetika-frontend';
 const DEFAULT_ENVIRONMENT = 'production';
 const DEFAULT_COMPONENT = 'zvenfit-estetika-telegram-lead';
 const DEFAULT_RESOURCE_ID = 'zvenfit-estetika-telegram-lead';
-const DEFAULT_TIMEOUT_MS = 1000;
+const DEFAULT_TIMEOUT_MS = 3000;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 5000;
 

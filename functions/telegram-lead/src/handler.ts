@@ -179,8 +179,14 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
           now: dependencies.now(),
           logger,
         });
+        // Keep the legacy series for one rollout so the current live dashboard does not go blind
+        // between the function deploy and the coordinated Monium dashboard import.
         metrics.recordGauge(
           'zvenfit_estetika_telegram_pending_submissions',
+          queueHealth.pendingCount,
+        );
+        metrics.recordGauge(
+          'zvenfit_estetika_telegram_pending_notifications',
           queueHealth.pendingCount,
         );
         metrics.recordGauge(
@@ -193,7 +199,7 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
           {
             event: heartbeatEvent,
             ...retrySummary,
-            queue_pending: queueHealth.pendingCount,
+            outbox_pending: queueHealth.pendingCount,
             oldest_pending_age_seconds: queueHealth.oldestPendingAgeSeconds,
           },
           heartbeatEvent,

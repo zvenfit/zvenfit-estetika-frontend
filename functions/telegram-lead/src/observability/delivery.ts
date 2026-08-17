@@ -7,12 +7,18 @@ export function logDeliveryFailure(
   event: string,
   notificationId: string,
   error: unknown,
-  options: { attempts: number; fallbackCode: string; retriable: boolean },
+  options: {
+    attempts: number;
+    fallbackCode: string;
+    notificationKind?: string;
+    retriable: boolean;
+  },
 ): void {
   logger.error(
     {
       event,
       notification_id: notificationId,
+      ...(options.notificationKind ? { notification_kind: options.notificationKind } : {}),
       attempts: options.attempts,
       ...safeErrorFields(error, {
         fallbackCode: options.fallbackCode,

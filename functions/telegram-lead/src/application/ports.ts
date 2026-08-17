@@ -83,7 +83,12 @@ export interface NotificationDeliveryDependencies {
     event: string,
     notificationId: string,
     error: unknown,
-    options: { attempts: number; fallbackCode: string; retriable: boolean },
+    options: {
+      attempts: number;
+      fallbackCode: string;
+      notificationKind?: string;
+      retriable: boolean;
+    },
   ): void;
   telegramSender(notification: ClaimedTelegramNotification): Promise<void>;
   uuid(): string;

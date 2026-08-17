@@ -52,6 +52,14 @@ class OtelMetricsTransport implements MetricsTransport {
   }
 
   public async flush(): Promise<void> {
+    await withTimeout(
+      this.flushAndShutdown(),
+      this.timeoutMs,
+      'metrics_flush_timeout',
+    );
+  }
+
+  private async flushAndShutdown(): Promise<void> {
     let exportFailure: unknown;
     try {
       const { resourceMetrics, errors } = await this.reader.collect({ timeoutMillis: this.timeoutMs });
@@ -72,6 +80,19 @@ class OtelMetricsTransport implements MetricsTransport {
     if (providerShutdown.status === 'rejected') throw providerShutdown.reason;
     if (exporterShutdown.status === 'rejected') throw exporterShutdown.reason;
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, code: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(Object.assign(new Error('Metrics flush timed out'), { code }));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function settle<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {

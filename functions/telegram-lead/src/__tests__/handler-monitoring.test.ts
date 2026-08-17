@@ -49,6 +49,7 @@ test('timer exports queue health and heartbeat after a retry pass', async () => 
   assert.deepEqual(result, { processed: 0, sent: 0, pending: 0, failed: 0, skipped: 0 });
   assert.deepEqual(gauges, [
     { name: 'zvenfit_estetika_telegram_pending_submissions', value: 2 },
+    { name: 'zvenfit_estetika_telegram_pending_notifications', value: 2 },
     { name: 'zvenfit_estetika_telegram_oldest_pending_age_seconds', value: 901 },
     { name: 'zvenfit_estetika_retry_worker_heartbeat', value: 1 },
   ]);
@@ -60,7 +61,7 @@ test('timer exports queue health and heartbeat after a retry pass', async () => 
       pending: 0,
       failed: 0,
       skipped: 0,
-      queue_pending: 2,
+      outbox_pending: 2,
       oldest_pending_age_seconds: 901,
     },
   ]);
