@@ -1,5 +1,7 @@
 'use strict';
 
+const { isIPv4 } = require('node:net');
+
 const PRODUCTION = Object.freeze({
   siteUrl: 'https://estetika.zvenfit.ru',
   s3Bucket: 'zvenfit-estetika-frontend',
@@ -15,6 +17,7 @@ const REQUIRED = [
   'YC_STORAGE_SERVICE_ACCOUNT_ID',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_CHAT_ID',
+  'TELEGRAM_API_IPV4',
   'LEAD_RATE_LIMIT_SECRET',
   'MONIUM_API_KEY',
   'YC_LEAD_SERVICE_ACCOUNT_ID',
@@ -93,6 +96,12 @@ function validate(environment) {
     !/^\d+$/.test(environment.YANDEX_METRIKA_ID.trim())
   ) {
     invalid.push('YANDEX_METRIKA_ID');
+  }
+  if (
+    !missing.includes('TELEGRAM_API_IPV4') &&
+    !isIPv4(environment.TELEGRAM_API_IPV4.trim())
+  ) {
+    invalid.push('TELEGRAM_API_IPV4');
   }
 
   return { missing, invalid: [...new Set(invalid)] };

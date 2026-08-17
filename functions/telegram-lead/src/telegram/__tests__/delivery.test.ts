@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import test from 'node:test';
 
-import { buildMessage, retryBatchSize, sendTelegram, telegramTimeoutMs } from '../delivery';
+import { _private, buildMessage, retryBatchSize, sendTelegram, telegramTimeoutMs } from '../delivery';
 import type {
   ClaimedTelegramNotification,
   LeadTelegramNotification,
@@ -151,11 +151,17 @@ test('Telegram forces an IPv4 socket and preserves a safe network diagnostic cod
 test('Telegram accepts a successful bounded JSON response over the IPv4 request', async () => {
   const previousToken = process.env.TELEGRAM_BOT_TOKEN;
   const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  const previousApiIpv4 = process.env.TELEGRAM_API_IPV4;
   let requestBody = '';
+  let requestUrl: URL | undefined;
+  let requestOptions: Record<string, unknown> = {};
 
   process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
   process.env.TELEGRAM_CHAT_ID = '-1001234567890';
-  const requestFactory = ((_url: URL, _options: Record<string, unknown>, callback: Function) => {
+  process.env.TELEGRAM_API_IPV4 = '149.154.167.220';
+  const requestFactory = ((url: URL, options: Record<string, unknown>, callback: Function) => {
+    requestUrl = url;
+    requestOptions = options;
     const request = new EventEmitter() as EventEmitter & { end: (body: string) => void };
     request.end = body => {
       requestBody = body;
@@ -175,6 +181,18 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
       requestFactory,
     );
     assert.equal(JSON.parse(requestBody).chat_id, '-1001234567890');
+    assert.equal(requestUrl?.hostname, 'api.telegram.org');
+    assert.equal(typeof requestOptions.lookup, 'function');
+    assert.deepEqual(
+      await new Promise(resolve => {
+        (requestOptions.lookup as Function)(
+          'api.telegram.org',
+          { all: true, family: 4 },
+          (error: Error | null, addresses: unknown) => resolve({ error, addresses }),
+        );
+      }),
+      { error: null, addresses: [{ address: '149.154.167.220', family: 4 }] },
+    );
   } finally {
     if (previousToken === undefined) {
       delete process.env.TELEGRAM_BOT_TOKEN;
@@ -185,6 +203,49 @@ test('Telegram accepts a successful bounded JSON response over the IPv4 request'
       delete process.env.TELEGRAM_CHAT_ID;
     } else {
       process.env.TELEGRAM_CHAT_ID = previousChatId;
+    }
+    if (previousApiIpv4 === undefined) {
+      delete process.env.TELEGRAM_API_IPV4;
+    } else {
+      process.env.TELEGRAM_API_IPV4 = previousApiIpv4;
+    }
+  }
+});
+
+test('Telegram rejects an invalid API IPv4 override before opening a request', async () => {
+  const previousToken = process.env.TELEGRAM_BOT_TOKEN;
+  const previousChatId = process.env.TELEGRAM_CHAT_ID;
+  const previousApiIpv4 = process.env.TELEGRAM_API_IPV4;
+
+  process.env.TELEGRAM_BOT_TOKEN = '123456789:test-token-value-with-valid-length';
+  process.env.TELEGRAM_CHAT_ID = '-1001234567890';
+  process.env.TELEGRAM_API_IPV4 = 'not-an-ip';
+
+  try {
+    await assert.rejects(
+      sendTelegram(newsletterNotification()),
+      (error: unknown) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'telegram_misconfigured' &&
+        !error.message.includes(process.env.TELEGRAM_BOT_TOKEN ?? ''),
+    );
+    assert.throws(() => _private.telegramApiIpv4(), /IPv4 override is invalid/);
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.TELEGRAM_BOT_TOKEN;
+    } else {
+      process.env.TELEGRAM_BOT_TOKEN = previousToken;
+    }
+    if (previousChatId === undefined) {
+      delete process.env.TELEGRAM_CHAT_ID;
+    } else {
+      process.env.TELEGRAM_CHAT_ID = previousChatId;
+    }
+    if (previousApiIpv4 === undefined) {
+      delete process.env.TELEGRAM_API_IPV4;
+    } else {
+      process.env.TELEGRAM_API_IPV4 = previousApiIpv4;
     }
   }
 });
