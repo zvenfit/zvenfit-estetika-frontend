@@ -105,8 +105,11 @@ invocation до общего timeout функции.
 
 Эти ошибки вместе с `monium_metrics_misconfigured` считаются независимым log aggregate
 `zvenfit_estetika_monium_metrics_failures_5m`: он остаётся видимым при поломке самого direct OTLP
-path. Три ошибки за 30 минут дают `Warning`, шесть — `Alarm`; одиночный сетевой таймаут остаётся
-диагностической точкой и не создаёт цикл `Warning → OK`.
+path. Alert берёт максимум 5-минутного счётчика за последние 30 минут: три ошибки в одном
+5-минутном интервале дают `Warning`, шесть — `Alarm`. Повторное суммирование точек скользящего
+счётчика намеренно не используется, поэтому одиночный сетевой таймаут остаётся диагностической
+точкой и не создаёт цикл `Warning → OK`. Задержка вычисления равна 5 минутам и совпадает с окном
+исходной log metric, чтобы поздняя поставка точки не меняла уже вычисленное состояние.
 
 ## Notification channels
 
@@ -131,7 +134,7 @@ path. Три ошибки за 30 минут дают `Warning`, шесть — 
 | `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
-| `zfe_monium_metrics_failures` | log count сбоев direct metrics exporter | `>2` / `>5` за 30m | OK |
+| `zfe_monium_metrics_failures` | максимум 5m log count сбоев direct metrics exporter за 30m | `>2` / `>5` | OK |
 | `zfe_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
 | `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
 | `zfe_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
