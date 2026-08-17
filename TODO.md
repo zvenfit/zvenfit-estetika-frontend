@@ -1,13 +1,14 @@
 # ZvenFit Estetika — список задач
 
 Состояние проверено **2026-08-17**: отдельная инфраструктура Estetika создана и развёрнута через
-разделённые deploy/verifier OIDC subjects в [run #31947477061](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31947477061).
+разделённые deploy/verifier OIDC subjects. Production observability rollout прошёл в
+[run #32030115816](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32030115816).
 Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
 bucket-scoped ephemeral credentials, прежние статические cloud keys отозваны. Git desired state
-обновлён до 9 log metrics, 2 notification channels, 14 alerts и 8 operational charts; read-only
-проверка показала, что live Monium пока остаётся на прежних 8 metrics / 13 alerts / 7 charts. До
-приёма реальных заявок нужны согласованный deploy функции и observability, юридические решения,
-synthetic delivery smoke и проверка цикла форма → YDB → Telegram.
+обновлён и применён: live Monium содержит 9 log metrics, 2 notification channels, 14 alerts,
+8 operational charts и строку быстрых ссылок. Read-only drift совпал с Git; synthetic smoke
+подтвердил пороги и 13 успешных отправок в Telegram/email. До приёма реальных заявок остаются
+юридические решения и проверка цикла форма → YDB → Telegram.
 Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий handoff владельцу проекта: [`docs/operator-handoff.md`](docs/operator-handoff.md).
@@ -16,11 +17,8 @@ synthetic delivery smoke и проверка цикла форма → YDB → T
 
 1. **Закрыть юридические блокеры** — подтвердить владельца данных, реквизиты, тексты и фиксацию отдельных согласий.
 2. **Провести release smoke-test с реальными данными** — одна маркированная заявка, одна подписка, Telegram, YDB и визит Метрики; read-only smoke страниц уже проходит в CI.
-3. **Синхронизировать live observability** — после деплоя функции создать новую log metric,
-   alert exporter failures, импортировать dashboard и только затем выполнить synthetic smoke обоих
-   каналов и read-only drift.
-4. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
-5. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
+3. **Включить базовые security headers на CDN** — сначала обратимые заголовки; HSTS только после проверки стабильного HTTPS.
+4. **До рекламного трафика** — API Gateway + Smart Web Security, CSP и уведомления расходов. Производительность, SEO и контент вести отдельно, если они не блокируют юридическую проверку.
 
 ---
 
@@ -47,23 +45,23 @@ synthetic delivery smoke и проверка цикла форма → YDB → T
   - [x] После первого успешного деплоя очищен кеш только CDN-ресурса `estetika.zvenfit.ru`
   - [x] `/`, `/form/`, неизвестный URL с пользовательской 404 и обе юридические страницы проверены 2026-08-13
 - [x] **Развернуть облачную функцию и YDB** — отдельно от основного проекта созданы `zvenfit-estetika-leads`, функция, runtime/CI service accounts, resource-level bindings и retry timer; CI только создаёт версии функции, получает рабочий URL и проверяет `LEAD_API_URL` в production-сборке
-- [x] **Создать исходный monitoring live state в Monium** — созданы 8 log metrics,
+- [x] **Создать исходный monitoring live state в Monium** — первый этап дал 8 log metrics,
   Telegram/email channels, 13 alerts и 7 operational charts; retry/heartbeat alerts и production
-  logs проверены live. Нативный JSON artifact хранит также строку INFO/ERROR shortcuts, но
-  read-only snapshot 2026-08-17 подтвердил, что в live dashboard этой строки сейчас нет
-- [ ] **Применить observability после разделения доменов/outbox** — после deploy версии функции
-  обновить display name существующих `zvenfit_estetika_storage_errors_1m` и
-  `zvenfit_estetika_storage_errors` на «ZvenFit Estetika · Хранилище и outbox: ошибки», создать
-  `zvenfit_estetika_monium_metrics_failures_5m`, alert `zfe_monium_metrics_failures`,
-  импортировать dashboard со строкой INFO/ERROR shortcuts и 8 operational charts и проверить drift.
-  Функция публикует старый и новый queue gauge параллельно, поэтому частичный rollout не создаёт
-  разрыв видимости
+  logs были проверены live. Этот исходный state позже заменён синхронизированным observability
+  state из следующего пункта
+- [x] **Применить observability после разделения доменов/outbox** — функция задеплоена, display
+  names обновлены, exporter log metric/alert созданы, dashboard импортирован со строкой INFO/ERROR
+  shortcuts и 8 operational charts; 9 metrics / 14 alerts проверены в live UI, drift совпал с Git.
+  Runtime-error alert дополнительно изолирован от функций основного ZvenFit и использует фактическую
+  системную серию `service="__serverless-functions__"`
 - [ ] **Завершить миграцию queue gauge** — после подтверждённого обновления live dashboard и одного
   стабильного production rollout удалить legacy `zvenfit_estetika_telegram_pending_submissions`
 - [ ] **Вернуться к YDB session phases telemetry** — `session_acquire` / `session_create` пока
   флапают и намеренно не собираются; повторно оценить после стабилизации diagnostics channels,
   сохранив `query_execute` единственным paging-сигналом
-- [ ] **Проверить synthetic monitoring delivery** — выполнить `bash scripts/test-monitoring-alerts.sh --confirm`, проверить уведомления в обоих каналах, возврат alert statuses в `OK` и read-only drift snapshot
+- [x] **Проверить synthetic monitoring delivery** — smoke 2026-08-17 дал ожидаемые 6 `Alarm` +
+  диагностический `Warning`, 13 отправок завершились `Success`; после выхода точек из окон правила
+  вернулись в `OK`, read-only drift snapshot совпал с desired state
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - [ ] **Юридическая проверка форм до приёма заявок** — по решению владельца согласие выражается отправкой формы без отдельных чекбоксов и сохраняется с версией в YDB; остаётся подтвердить такой способ и формулировки с юристом
 - [x] **Проверить владельца данных в документах** — ИП, ИНН, адрес и телефон подтверждены владельцем проекта 2026-08-14

@@ -64,7 +64,7 @@
     },
     "runtimeErrors": {
       "title": "Ошибки Cloud Function",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"__serverless-functions__\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "visualization": "chart",
       "pagingAlert": true
     },
@@ -391,7 +391,7 @@
     {
       "id": "zfe_function_runtime_errors",
       "displayName": "ZvenFit Estetika · Cloud Function: ошибки выполнения",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"__serverless-functions__\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
       "warning": 0,

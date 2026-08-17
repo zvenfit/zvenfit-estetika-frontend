@@ -32,7 +32,7 @@
         "targets": [
           {
             "dataSourceId": "0b2ce281-6534-45ad-8269-6ab061e1dae5",
-            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", service=\"serverless-functions\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
+            "query": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"__serverless-functions__\", name=\"functions_errors\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
             "textMode": false,
             "hidden": false,
             "name": "A",

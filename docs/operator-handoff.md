@@ -67,37 +67,37 @@ credential broker.
 - считать `estetika.zvenfit.ru` единственным production-доменом; `www.estetika.zvenfit.ru` не поддерживать;
 - отозвать Telegram token, если он когда-либо попадал в экспорт или HTML.
 
-## 4. WIF deploy выполнен; observability требует синхронизации
+## 4. WIF deploy и observability выполнены
 
-Workflow [run #31947477061](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/31947477061)
+Workflow [run #32030115816](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32030115816)
 выполнил preflight, integration-тест YDB, проверку готовой схемы, WIF deploy функции, отдельную
 сборку и bucket-scoped загрузку сайта с негативными access-boundary тестами, затем безопасный
-read-only production smoke без реальной заявки. Исходный live Monium содержит 8 log metrics,
-Telegram/email channels, 13 alerts и dashboard из 7 operational charts; live retry/heartbeat и
-production logs проверены. Строка INFO/ERROR shortcuts хранится в Git artifact, но read-only JSON
-snapshot 2026-08-17 подтвердил, что в live dashboard её сейчас нет.
+read-only production smoke без реальной заявки.
 
-После разделения lead/newsletter/outbox и upstream-аудита Git desired state обновлён до 9 log
-metrics, 14 alerts и 8 operational charts. Добавлены независимый health Monium exporter и queue
-gauge `zvenfit_estetika_telegram_pending_notifications`. Функция один переходный rollout публикует
-также legacy `zvenfit_estetika_telegram_pending_submissions`, поэтому старый dashboard не теряет
-очередь. Read-only проверка 2026-08-17 подтвердила, что live dashboard ещё старый. Сначала
-задеплойте функцию с dual-publish. Затем обновите display name существующих log metric
-`zvenfit_estetika_storage_errors_1m` и alert `zvenfit_estetika_storage_errors` на
-**ZvenFit Estetika · Хранилище и outbox: ошибки**, создайте новую exporter log metric и alert из
-`scripts/monitoring.config.json`, импортируйте
-`scripts/monitoring.dashboard.json` (он восстановит также INFO/ERROR shortcuts) и сравните полный
-live snapshot. YDB session phases отложены как нестабильный техдолг; paging использует только
-`query_execute`.
+Live Monium синхронизирован с Git desired state: 9 log metrics, 14 alerts, два канала,
+8 operational charts и строка INFO/ERROR shortcuts. Runtime-error alert изолирован на
+`zvenfit-estetika-telegram-lead` и использует системную серию
+`cluster="default"`, `service="__serverless-functions__"`; throttling/duration используют
+provider-серию `service="serverless-functions"`. Drift-check совпал. Synthetic smoke 2026-08-17
+подтвердил ожидаемые пороги, 13 успешных отправок (оба канала для paging, только email для slow-YDB)
+и возврат правил в `OK`. YDB session phases отложены как нестабильный техдолг; paging использует
+только `query_execute`.
+
+Metric `zvenfit_estetika_storage_errors_1m` и alert
+`zvenfit_estetika_storage_errors` теперь имеют единое display name
+**ZvenFit Estetika · Хранилище и outbox: ошибки**.
+
+Функция пока публикует canonical queue gauge
+`zvenfit_estetika_telegram_pending_notifications` и legacy alias
+`zvenfit_estetika_telegram_pending_submissions`. Legacy удаляется отдельным следующим rollout после
+наблюдения стабильности текущего dual-publish, не в том же окне миграции dashboard.
 
 Осталось:
 
 1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 2. включать HSTS только после стабильной проверки HTTPS;
-3. синхронизировать live Monium с новым desired state после deploy функции;
-4. выполнить `bash scripts/test-monitoring-alerts.sh --confirm` и дождаться уведомлений и возврата
-   в `OK`.
+3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout.
 
 ## 5. Единственная проверка с реальными данными
 

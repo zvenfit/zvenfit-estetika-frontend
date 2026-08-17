@@ -250,6 +250,8 @@ test('platform alerts cover runtime errors, throttling and storage capacity', ()
     assert.equal(alert.delay, '30s');
   }
   assert.match(runtime.metricSelector, /name="functions_errors"/);
+  assert.match(runtime.metricSelector, /cluster="default"/);
+  assert.match(runtime.metricSelector, /service="__serverless-functions__"/);
   assert.match(throttles.metricSelector, /name="functions_throttles"/);
   assert.match(storage.queries.map(query => query.query).join('\n'), /zvenfit-estetika-leads/);
   assert.equal(storage.signal, 'C');
@@ -262,6 +264,10 @@ test('dashboard contains the compact Estetika operational view', () => {
   assert.equal(config.dashboard.id, 'zvenfit-estetika-production-monitoring');
   assert.equal(config.dashboard.title, 'ZvenFit Estetika · production');
   assert.match(config.dashboard.runtimeErrors.metricSelector, /functions_errors/);
+  assert.equal(
+    config.dashboard.runtimeErrors.metricSelector,
+    config.alerts.find(item => item.id === 'zfe_function_runtime_errors').metricSelector,
+  );
   assert.match(config.dashboard.functionDurationP95.query, /^histogram_percentile\(95,/);
   assert.match(config.dashboard.retryWorkerHeartbeat.metricSelector, /retry_worker_heartbeat/);
   assert.equal(config.dashboard.telegramQueue.metricSelectors.length, 2);

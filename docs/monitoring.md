@@ -27,6 +27,10 @@ provider не покрывают полный жизненный цикл эти
 | Log metric output | `cluster="default"`, `service="logging_aggregates"` |
 | Direct gauges | `cluster="default"`, `service="zvenfit-estetika-frontend"` |
 
+Cloud Function runtime errors приходят из системной серии
+`cluster="default"`, `service="__serverless-functions__"`; duration и throttling остаются в
+provider-серии `service="serverless-functions"`. Эти источники не взаимозаменяемы.
+
 Pino пишет structured JSON в stdout Cloud Function. Во всех application logs присутствуют
 `application`, `environment`, `service`, `event`, уровень и при наличии `request_id`. Логгер
 редактирует имя, телефон, Telegram username, IP/rate key, UTM, body, headers, токены и секреты.
