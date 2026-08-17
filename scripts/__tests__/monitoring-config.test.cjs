@@ -86,17 +86,17 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
 
 test('count-sensitive and caught events use true log aggregates', () => {
   const expected = [
-    ['zvenfit_estetika_storage_errors', 'zvenfit_estetika_storage_errors_1m'],
-    ['zfe_permanent_telegram_failures', 'zvenfit_estetika_telegram_failed_1m'],
-    ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_ydb_retries_5m'],
-    ['zvenfit_estetika_slow_ydb', 'zvenfit_estetika_ydb_slow_5m'],
-    ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m'],
-    ['zvenfit_estetika_submission_volume', 'zvenfit_estetika_submissions_5m'],
-    ['zvenfit_estetika_rate_limit_health', 'zvenfit_estetika_rate_limit_errors_5m'],
-    ['zfe_monium_metrics_failures', 'zvenfit_estetika_monium_metrics_failures_5m'],
+    ['zvenfit_estetika_storage_errors', 'zvenfit_estetika_storage_errors_1m', '3m'],
+    ['zfe_permanent_telegram_failures', 'zvenfit_estetika_telegram_failed_1m', '3m'],
+    ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_ydb_retries_5m', '3m'],
+    ['zvenfit_estetika_slow_ydb', 'zvenfit_estetika_ydb_slow_5m', '3m'],
+    ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m', '3m'],
+    ['zvenfit_estetika_submission_volume', 'zvenfit_estetika_submissions_5m', '3m'],
+    ['zvenfit_estetika_rate_limit_health', 'zvenfit_estetika_rate_limit_errors_5m', '3m'],
+    ['zfe_monium_metrics_failures', 'zvenfit_estetika_monium_metrics_failures_5m', '5m'],
   ];
 
-  for (const [alertId, metricId] of expected) {
+  for (const [alertId, metricId, delay] of expected) {
     const alert = config.alerts.find(item => item.id === alertId);
     const metric = config.logMetrics.find(item => item.id === metricId);
     assert.equal(alert.metricId, metricId);
@@ -105,7 +105,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
     assert.match(alert.metricSelector, /meta\.application="zvenfit-estetika-frontend"/);
     assert.match(alert.metricSelector, /meta\.environment="production"/);
     assert.match(alert.metricSelector, /meta\.service="zvenfit-estetika-telegram-lead"/);
-    assert.equal(alert.delay, '3m');
+    assert.equal(alert.delay, delay);
     assert.match(metric.selector, /meta\.application="zvenfit-estetika-frontend"/);
     assert.match(metric.selector, /meta\.environment="production"/);
     assert.match(metric.selector, /meta\.service="zvenfit-estetika-telegram-lead"/);
@@ -185,11 +185,18 @@ test('metrics exporter failures use logs so the alert survives a broken OTLP pat
   assert.equal(alert.metricId, metric.id);
   assert.match(alert.metricSelector, /service="logging_aggregates"/);
   assert.deepEqual(
-    { warning: alert.warning, alarm: alert.alarm, window: alert.window, delay: alert.delay },
-    { warning: 2, alarm: 5, window: '30m', delay: '3m' },
+    {
+      aggregation: alert.aggregation,
+      warning: alert.warning,
+      alarm: alert.alarm,
+      window: alert.window,
+      delay: alert.delay,
+    },
+    { aggregation: 'max', warning: 2, alarm: 5, window: '30m', delay: '5m' },
   );
-  assert.match(docs, /Три ошибки за 30 минут дают `Warning`/);
+  assert.match(docs, /три ошибки в одном\s+5-минутном интервале дают `Warning`/i);
   assert.match(docs, /шесть —\s+`Alarm`/);
+  assert.match(docs, /Повторное суммирование[^.]+не используется/);
   assert.equal(chart.source, metric.id);
   assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
   assert.equal(chart.pagingAlert, true);
