@@ -102,23 +102,28 @@ Metric `zvenfit_estetika_storage_errors_1m` и alert
 2. включать HSTS только после стабильной проверки HTTPS;
 3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout.
 
-## 5. Единственная проверка с реальными данными
+## 5. Production-проверка с реальными данными
 
 Production smoke 2026-08-17 обнаружил недоступность текущего DNS-адреса Telegram
 `149.154.166.110` из сетевого контура Yandex Cloud: TCP/TLS заканчивался таймаутом, при этом YDB и
-transactional outbox работали штатно. Для функции используется repository variable
+transactional outbox работали штатно. Для функции используется production environment variable
 `TELEGRAM_API_FALLBACK_IPV4S=149.154.167.220`: DNS остаётся основным маршрутом, а перечисленные IPv4
 используются только после короткой безопасной `HEAD`-пробы. Здоровый маршрут кэшируется на 5 минут,
 поэтому функция автоматически возвращается к DNS после его восстановления. URL, TLS SNI и `Host`
 остаются `api.telegram.org`; deploy preflight принимает от одного до пяти корректных IPv4.
 
-1. открыть `/?utm_source=test` и отправить одну подписку;
-2. открыть `/form/?utm_source=test` и отправить одну маркированную заявку;
-3. проверить обе записи в Telegram/YDB и разделение `form_type` в метриках;
-4. проверить визит в Яндекс Метрике; цели включать после реализации `reachGoal` из `TODO.md`;
-5. проверить `/`, `/form/`, неизвестный URL и обе юридические страницы;
-6. проверить security headers командой `curl -I` после распространения CDN-настроек.
+После [первого production deploy](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32041295899)
+исходные заявка и подписка получили `status=sent` и `last_error=null`. После внедрения DNS-first
+failover [deploy #32052911717](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32052911717)
+прошёл полностью, а новая тестовая заявка `b08d0be7-c445-45d3-a5dd-bea7d8dba913` сохранилась в
+`leads` и доставилась из `telegram_outbox` с `status=sent`, `attempts=1`,
+`delivered_at=2026-08-17T18:07:27.277Z`, `last_error=null`.
 
-После этого production можно считать полностью проверенным для пилотного приёма заявок. API Gateway
-+ Smart Web Security, CSP и budget alerts остаются обязательным следующим уровнем до рекламного
-трафика.
+Осталось:
+
+1. проверить production-визит в Яндекс Метрике; цели включать после реализации `reachGoal` из `TODO.md`;
+2. проверить security headers командой `curl -I` после распространения CDN-настроек.
+
+Read-only проверка страниц прошла в deploy #32052911717. До пилотного приёма реальных заявок
+остаётся юридическая проверка форм. API Gateway + Smart Web Security, CSP и budget alerts остаются
+обязательным следующим уровнем до рекламного трафика.
