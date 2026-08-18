@@ -50,6 +50,19 @@ export async function observed<T>(
   return prepareAndObserveYdbOperation(operation, logger, getSql, callback);
 }
 
+export async function observedReadOnly<T>(
+  operation: string,
+  logger: LoggerLike | undefined,
+  callback: () => Promise<T>,
+): Promise<T> {
+  // A dead YDB session can abort a safe read before the SDK retry policy
+  // classifies it. Re-running the callback creates a fresh Query and lets the
+  // pool acquire another session without resetting the shared driver.
+  return prepareAndObserveYdbOperation(operation, logger, getSql, callback, {
+    retryAbortOnce: true,
+  });
+}
+
 export function firstResultSet(resultSets: unknown): SqlRow[] {
   return Array.isArray(resultSets) && Array.isArray(resultSets[0])
     ? (resultSets[0] as SqlRow[])

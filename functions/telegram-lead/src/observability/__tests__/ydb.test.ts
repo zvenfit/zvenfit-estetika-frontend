@@ -26,6 +26,13 @@ function fieldsByEvent(
   return record.fields;
 }
 
+function abortError(): Error {
+  const error = new Error('aborted');
+  error.name = 'AbortError';
+
+  return error;
+}
+
 async function tracePhase<T>(phase: TestPhase, callback: () => Promise<T>): Promise<T> {
   let result: T | undefined;
   await Promise.resolve(
@@ -123,6 +130,66 @@ test('logs a safe error code without the database error message', async () => {
   assert.equal(records[0]?.fields.retriable, true);
   assert.match(String(records[0]?.fields.stack_fingerprint), /^[a-f0-9]{16}$/);
   assert.doesNotMatch(JSON.stringify(records), /private row data/);
+});
+
+test('retries one AbortError for an explicitly safe read', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  const result = await observeYdbOperation(
+    'list_telegram_candidates',
+    recordingLogger(records),
+    async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw abortError();
+      }
+
+      return 'ok';
+    },
+    { retryAbortOnce: true },
+  );
+
+  assert.equal(result, 'ok');
+  assert.equal(attempts, 2);
+  assert.equal(fieldsByEvent(records, 'ydb_operation_completed').retry_attempts, 1);
+  assert.equal(fieldsByEvent(records, 'ydb_retry').retry_attempts, 1);
+  assert.equal(records.some(record => record.fields.event === 'ydb_operation_failed'), false);
+});
+
+test('does not retry AbortError unless the operation opts in', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  await assert.rejects(() =>
+    observeYdbOperation('record_lead', recordingLogger(records), async () => {
+      attempts += 1;
+      throw abortError();
+    }),
+  );
+
+  assert.equal(attempts, 1);
+  assert.equal(fieldsByEvent(records, 'ydb_operation_failed').error_code, 'AbortError');
+});
+
+test('stops after one AbortError retry', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  await assert.rejects(() =>
+    observeYdbOperation(
+      'get_telegram_queue_health',
+      recordingLogger(records),
+      async () => {
+        attempts += 1;
+        throw abortError();
+      },
+      { retryAbortOnce: true },
+    ),
+  );
+
+  assert.equal(attempts, 2);
+  assert.equal(fieldsByEvent(records, 'ydb_operation_failed').retry_attempts, 1);
 });
 
 test('records query execution duration without logging SQL text or unstable session phases', async () => {

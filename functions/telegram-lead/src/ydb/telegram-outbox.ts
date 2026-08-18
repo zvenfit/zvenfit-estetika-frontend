@@ -4,6 +4,7 @@ import {
   firstResultSet,
   getSql,
   observed,
+  observedReadOnly,
   rowToClaimedNotification,
   stringValue,
   timed,
@@ -235,7 +236,7 @@ export async function listCandidates({
   limit: number;
   logger?: LoggerLike;
 }): Promise<string[]> {
-  return observed('list_telegram_candidates', logger, async () => {
+  return observedReadOnly('list_telegram_candidates', logger, async () => {
     const sql = await getSql();
     const outboxTable = sql.identifier(telegramOutboxTableName());
     const dueIndex = sql.identifier(dueIndexName());
@@ -267,7 +268,7 @@ export async function getQueueHealth({
   now: Date;
   logger?: LoggerLike;
 }): Promise<TelegramQueueHealth> {
-  return observed('get_telegram_queue_health', logger, async () => {
+  return observedReadOnly('get_telegram_queue_health', logger, async () => {
     const sql = await getSql();
     const outboxTable = sql.identifier(telegramOutboxTableName());
     const queueHealthIndex = sql.identifier(queueHealthIndexName());
