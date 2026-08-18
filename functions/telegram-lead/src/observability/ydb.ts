@@ -22,6 +22,10 @@ interface QueryTrace {
   startedAt: number;
 }
 
+interface ObserveYdbOperationOptions {
+  retryAbortOnce?: boolean;
+}
+
 const operationStorage = new AsyncLocalStorage<OperationState>();
 const queryTraces = new WeakMap<object, QueryTrace>();
 let subscribed = false;
@@ -100,6 +104,10 @@ function queryFields(operation: OperationState): JsonObject {
   };
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 function writeLog(
   logger: LoggerLike | undefined,
   level: 'info' | 'warn' | 'error',
@@ -115,13 +123,26 @@ export async function observeYdbOperation<T>(
   operationName: string,
   logger: LoggerLike | undefined,
   callback: () => Promise<T>,
+  options: ObserveYdbOperationOptions = {},
 ): Promise<T> {
   subscribeToDiagnostics();
   const startedAt = Date.now();
   const operation = createOperationState();
 
   try {
-    const result = await operationStorage.run(operation, callback);
+    const result = await operationStorage.run(operation, async () => {
+      try {
+        return await callback();
+      } catch (error) {
+        if (!options.retryAbortOnce || !isAbortError(error)) {
+          throw error;
+        }
+
+        operation.retries += 1;
+
+        return callback();
+      }
+    });
     const durationMs = Date.now() - startedAt;
     writeLog(logger, 'info', {
       event: 'ydb_operation_completed',
@@ -167,6 +188,7 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
   logger: LoggerLike | undefined,
   prepare: () => Promise<TPrepared>,
   callback: () => Promise<TResult>,
+  options: ObserveYdbOperationOptions = {},
 ): Promise<TResult> {
   const startedAt = Date.now();
   try {
@@ -183,11 +205,12 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
     throw error;
   }
 
-  return observeYdbOperation(operationName, logger, callback);
+  return observeYdbOperation(operationName, logger, callback, options);
 }
 
 export const _private = {
   createOperationState,
+  isAbortError,
   queryFields,
   subscribeToDiagnostics,
   writeLog,
