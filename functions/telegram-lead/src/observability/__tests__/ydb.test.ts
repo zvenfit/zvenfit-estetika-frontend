@@ -33,6 +33,13 @@ function abortError(): Error {
   return error;
 }
 
+function namedError(name: string, code?: string | number): Error {
+  const error = new Error(`${name} details must not be logged`);
+  error.name = name;
+
+  return Object.assign(error, code === undefined ? {} : { code });
+}
+
 async function tracePhase<T>(phase: TestPhase, callback: () => Promise<T>): Promise<T> {
   let result: T | undefined;
   await Promise.resolve(
@@ -132,7 +139,7 @@ test('logs a safe error code without the database error message', async () => {
   assert.doesNotMatch(JSON.stringify(records), /private row data/);
 });
 
-test('retries one AbortError for an explicitly safe read', async () => {
+test('retries one transient error for an explicitly safe read', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
@@ -147,7 +154,7 @@ test('retries one AbortError for an explicitly safe read', async () => {
 
       return 'ok';
     },
-    { retryAbortOnce: true },
+    { retryTransientOnce: true },
   );
 
   assert.equal(result, 'ok');
@@ -157,7 +164,56 @@ test('retries one AbortError for an explicitly safe read', async () => {
   assert.equal(records.some(record => record.fields.event === 'ydb_operation_failed'), false);
 });
 
-test('does not retry AbortError unless the operation opts in', async () => {
+test('retries TimeoutError and ClientError for explicitly safe reads', async () => {
+  for (const errorName of ['TimeoutError', 'ClientError']) {
+    const records: Array<{ level: string; fields: JsonObject }> = [];
+    let attempts = 0;
+
+    const result = await observeYdbOperation(
+      'list_telegram_candidates',
+      recordingLogger(records),
+      async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw namedError(errorName);
+        }
+
+        return 'ok';
+      },
+      { retryTransientOnce: true },
+    );
+
+    assert.equal(result, 'ok');
+    assert.equal(attempts, 2);
+    assert.equal(fieldsByEvent(records, 'ydb_operation_completed').retry_attempts, 1);
+  }
+});
+
+test('retries a nested transient gRPC error for an explicitly safe read', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  const result = await observeYdbOperation(
+    'get_telegram_queue_health',
+    recordingLogger(records),
+    async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw Object.assign(new Error('session acquisition failed'), {
+          cause: namedError('TransportError', 14),
+        });
+      }
+
+      return 'ok';
+    },
+    { retryTransientOnce: true },
+  );
+
+  assert.equal(result, 'ok');
+  assert.equal(attempts, 2);
+});
+
+test('does not retry transient errors unless the operation opts in', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
@@ -172,7 +228,46 @@ test('does not retry AbortError unless the operation opts in', async () => {
   assert.equal(fieldsByEvent(records, 'ydb_operation_failed').error_code, 'AbortError');
 });
 
-test('stops after one AbortError retry', async () => {
+test('does not retry a permanent read error', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  await assert.rejects(() =>
+    observeYdbOperation(
+      'get_telegram_queue_health',
+      recordingLogger(records),
+      async () => {
+        attempts += 1;
+        throw namedError('PermissionError', 'PERMISSION_DENIED');
+      },
+      { retryTransientOnce: true },
+    ),
+  );
+
+  assert.equal(attempts, 1);
+  assert.equal(fieldsByEvent(records, 'ydb_operation_failed').retry_attempts, 0);
+});
+
+test('does not retry ClientError with an explicit permanent code', async () => {
+  const records: Array<{ level: string; fields: JsonObject }> = [];
+  let attempts = 0;
+
+  await assert.rejects(() =>
+    observeYdbOperation(
+      'get_telegram_queue_health',
+      recordingLogger(records),
+      async () => {
+        attempts += 1;
+        throw namedError('ClientError', 'PERMISSION_DENIED');
+      },
+      { retryTransientOnce: true },
+    ),
+  );
+
+  assert.equal(attempts, 1);
+});
+
+test('stops after one transient retry', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
@@ -184,7 +279,7 @@ test('stops after one AbortError retry', async () => {
         attempts += 1;
         throw abortError();
       },
-      { retryAbortOnce: true },
+      { retryTransientOnce: true },
     ),
   );
 

@@ -55,11 +55,12 @@ export async function observedReadOnly<T>(
   logger: LoggerLike | undefined,
   callback: () => Promise<T>,
 ): Promise<T> {
-  // A dead YDB session can abort a safe read before the SDK retry policy
-  // classifies it. Re-running the callback creates a fresh Query and lets the
-  // pool acquire another session without resetting the shared driver.
+  // Session acquisition and an idempotent query can fail transiently before
+  // the SDK retries them. Re-running the callback creates a new Query, so the
+  // pool can acquire a fresh session without tearing down the shared driver.
+  // This opt-in is intentionally limited to read-only operations.
   return prepareAndObserveYdbOperation(operation, logger, getSql, callback, {
-    retryAbortOnce: true,
+    retryTransientOnce: true,
   });
 }
 

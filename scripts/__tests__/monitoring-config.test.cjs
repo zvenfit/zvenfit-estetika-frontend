@@ -160,6 +160,24 @@ test('YDB monitoring uses only stable query execution timing', () => {
   assert.match(docs, /YDB session\s+phases[\s\S]*техдолг/i);
 });
 
+test('slow YDB alert ignores one event, warns on two, and alarms on three in ten minutes', () => {
+  const alert = config.alerts.find(item => item.id === 'zvenfit_estetika_slow_ydb');
+
+  assert.deepEqual(
+    {
+      warning: alert.warning,
+      alarm: alert.alarm,
+      aggregation: alert.aggregation,
+      operator: alert.operator,
+      window: alert.window,
+    },
+    { warning: 1.5, alarm: 2.5, aggregation: 'sum', operator: '>', window: '10m' },
+  );
+  assert.match(docs, /Единичное превышение остаётся диагностикой/);
+  assert.match(docs, /`Warning` требует минимум два превышения за 10 минут/);
+  assert.match(docs, /`Alarm` — минимум три/);
+});
+
 test('metrics exporter failures use logs so the alert survives a broken OTLP path', () => {
   const metric = config.logMetrics.find(
     item => item.id === 'zvenfit_estetika_monium_metrics_failures_5m',

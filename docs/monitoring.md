@@ -73,7 +73,11 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs
 retry count и агрегаты `query_execute_*`, но не SQL, параметры или данные обращения. Alert
 `zvenfit_estetika_slow_ydb` реагирует только на медленный `query_execute`. Нестабильные YDB session
 phases (`session_acquire` / `session_create`) намеренно не собираются и остаются техдолгом до
-стабилизации диагностических каналов. Log heartbeat не имеет paging-alert: он независимо показывает работоспособность
+стабилизации диагностических каналов. Read-only операции `list_telegram_candidates` и
+`get_telegram_queue_health` один раз повторяют transient `AbortError`, `TimeoutError`,
+неклассифицированный `ClientError` и известные временные gRPC/transport-коды через новую query.
+Явные постоянные коды, например `PERMISSION_DENIED`, не повторяются; write-path заявок этим
+механизмом не затрагивается. Log heartbeat не имеет paging-alert: он независимо показывает работоспособность
 цепочки Cloud Logging → log metric, а недоступность retry-worker уже покрыта прямым heartbeat.
 
 ## Direct gauges
@@ -130,7 +134,7 @@ path. Alert берёт максимум 5-минутного счётчика з
 | `zvenfit_estetika_storage_errors` | log count ошибок доменных записей/outbox | `>0` / `>0.5` | OK |
 | `zfe_permanent_telegram_failures` | log count окончательных сбоев Telegram | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_ydb_retries` | log count YDB retries | `>4.5` / `>5.5` | OK |
-| `zvenfit_estetika_slow_ydb` | log count медленных YDB операций | `>0.5` / `>2.5` | OK |
+| `zvenfit_estetika_slow_ydb` | log count медленных YDB операций | `>1.5` / `>2.5` | OK |
 | `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
@@ -150,7 +154,8 @@ Log aggregate alerts используют delay `3m`, чтобы дождать�
 platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` учитывается только
 `ExecuteQuery` дольше 3 секунд; инициализация YDB-клиента, получение и создание сессии исключены
 из paging-сигнала и пока не экспортируются как отдельная telemetry.
-Единичное превышение даёт `Warning`, а `Alarm` требует минимум три превышения за 10 минут. Backlog предупреждает после 10
+Единичное превышение остаётся диагностикой, `Warning` требует минимум два превышения за 10 минут,
+а `Alarm` — минимум три. Backlog предупреждает после 10
 минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие
 storage metrics считается `Warning`, остальные no-data состояния — `OK`.
 

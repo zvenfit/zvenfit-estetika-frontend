@@ -353,7 +353,7 @@
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_ydb_slow_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
       "aggregation": "sum",
       "operator": ">",
-      "warning": 0.5,
+      "warning": 1.5,
       "alarm": 2.5,
       "window": "10m",
       "delay": "3m",
