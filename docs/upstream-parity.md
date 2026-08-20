@@ -4,8 +4,8 @@
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
 не копируются автоматически.
 
-Текущий аудит выполнен 2026-08-17 до опубликованного commit
-`20251191a99e5e9b2c6153d4eab24aa3d425b24d`. Перенесены архитектурные изменения production
+Текущий аудит выполнен 2026-08-20 до опубликованного commit
+`5c386309a3b84151c0f9aca5454ac7a2c9967c1c`. Перенесены архитектурные изменения production
 observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
 direct gauges, log-pipeline heartbeat, throttling alert, dashboard desired state, read-only drift
 check, GitHub OIDC/WIF и bucket-scoped ephemeral Object Storage credentials.
@@ -27,6 +27,16 @@ drift snapshot. Dashboard Estetika дополнен одним полношир�
 канонический direct queue gauge называется `zvenfit_estetika_telegram_pending_notifications`;
 upstream/legacy `pending_submissions` временно публикуется параллельно для безразрывного rollout.
 Staging gateway/E2E, traffic и FitBase изменения этого диапазона не переносились как неприменимые.
+
+Из диапазона `20251191a99e5e9b2c6153d4eab24aa3d425b24d..5c386309a3b84151c0f9aca5454ac7a2c9967c1c`
+перенесены DNS-first Telegram route failover с безопасными `HEAD`-пробами, одноразовый retry
+transient YDB driver initialization и расширенный одноразовый retry transient session/query
+ошибок только для read-only операций retry-worker. Медленный YDB alert теперь оставляет одно
+событие диагностикой, переходит в `Warning` на двух и в `Alarm` на трёх событиях за 10 минут.
+В Estetika route selection остаётся внутри её единственного Telegram delivery-модуля, а upstream
+выносит этот же механизм в отдельный `routes.ts`; это структурное, не поведенческое расхождение.
+Изменения upstream project-local knowledge base не копировались: адаптированный operational
+контракт зафиксирован в `docs/monitoring.md` этого репозитория.
 
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а

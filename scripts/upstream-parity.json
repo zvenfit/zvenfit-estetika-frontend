@@ -1,7 +1,7 @@
 {
   "repository": "zvenfit/zvenfit-frontend",
   "branch": "main",
-  "baselineSha": "20251191a99e5e9b2c6153d4eab24aa3d425b24d",
-  "auditedAt": "2026-08-17",
+  "baselineSha": "5c386309a3b84151c0f9aca5454ac7a2c9967c1c",
+  "auditedAt": "2026-08-20",
   "policy": "Audit every new upstream commit for portable reliability, security, observability, CI and accessibility changes; preserve Estetika branding and static-site architecture."
 }

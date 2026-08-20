@@ -23,8 +23,13 @@ interface QueryTrace {
 }
 
 interface ObserveYdbOperationOptions {
-  retryAbortOnce?: boolean;
+  retryTransientOnce?: boolean;
 }
+
+const RETRYABLE_READ_ERROR_NAMES = new Set(['AbortError', 'TimeoutError']);
+const RETRYABLE_GRPC_CODES = new Set([4, 8, 10, 13, 14]);
+const RETRYABLE_ERROR_PATTERN =
+  /ABORTED|DEADLINE_EXCEEDED|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|INTERNAL|RESOURCE_EXHAUSTED|TIMEOUT|UNAVAILABLE/i;
 
 const operationStorage = new AsyncLocalStorage<OperationState>();
 const queryTraces = new WeakMap<object, QueryTrace>();
@@ -104,8 +109,46 @@ function queryFields(operation: OperationState): JsonObject {
   };
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
+function errorChain(error: unknown): unknown[] {
+  const chain: unknown[] = [];
+  const visited = new Set<unknown>();
+  let current = error;
+
+  while (current && typeof current === 'object' && !visited.has(current) && chain.length < 4) {
+    chain.push(current);
+    visited.add(current);
+    current = (current as Record<string, unknown>).cause;
+  }
+
+  return chain;
+}
+
+function isTransientReadError(error: unknown): boolean {
+  return errorChain(error).some(item => {
+    const record = item as Record<string, unknown>;
+    const errorName = item instanceof Error ? item.name : record.name;
+
+    if (typeof errorName === 'string' && RETRYABLE_READ_ERROR_NAMES.has(errorName)) {
+      return true;
+    }
+
+    // The YDB SDK uses a bare ClientError for some session-pool transport
+    // failures. Retry an unclassified ClientError once, but let an explicit
+    // permanent code such as PERMISSION_DENIED fall through the checks below.
+    if (errorName === 'ClientError' && record.code === undefined) {
+      return true;
+    }
+
+    if (typeof record.code === 'number' && RETRYABLE_GRPC_CODES.has(record.code)) {
+      return true;
+    }
+
+    const description = [record.code, record.details, record.message]
+      .filter(value => typeof value === 'string')
+      .join(' ');
+
+    return RETRYABLE_ERROR_PATTERN.test(description);
+  });
 }
 
 function writeLog(
@@ -134,7 +177,7 @@ export async function observeYdbOperation<T>(
       try {
         return await callback();
       } catch (error) {
-        if (!options.retryAbortOnce || !isAbortError(error)) {
+        if (!options.retryTransientOnce || !isTransientReadError(error)) {
           throw error;
         }
 
@@ -210,7 +253,8 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
 
 export const _private = {
   createOperationState,
-  isAbortError,
+  errorChain,
+  isTransientReadError,
   queryFields,
   subscribeToDiagnostics,
   writeLog,
