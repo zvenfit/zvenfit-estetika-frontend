@@ -44,20 +44,18 @@
       "alertList": {
         "annotationNames": [],
         "groupByLabels": [],
-        "selectors": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\"}",
+        "selectors": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\", id = \"folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_storage_errors|folder__b1ge1e4iopttj79hfdfm_zfe_permanent_telegram_failures|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_ydb_retries|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_slow_ydb|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_rate_limited|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_submission_volume|folder__b1ge1e4iopttj79hfdfm_zfe_retry_worker_heartbeat|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_telegram_backlog|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_rate_limit_health|folder__b1ge1e4iopttj79hfdfm_zfe_monium_metrics_failures|folder__b1ge1e4iopttj79hfdfm_zfe_function_runtime_errors|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_function_throttles|folder__b1ge1e4iopttj79hfdfm_zfe_retry_trigger_errors|folder__b1ge1e4iopttj79hfdfm_zvenfit_estetika_ydb_storage_usage\"}",
         "showAllAnnotations": false,
         "title": "Состояние production",
         "pageSize": 100,
         "groupMultiAlert": true,
         "allLabelsGrouping": false,
         "projectId": "folder__b1ge1e4iopttj79hfdfm",
-        "widgetScope": "projectId",
         "orderByStatus": "ASC",
         "orderBy": "orderByStatus",
         "manualLayout": false,
         "_manualLayout": "manualLayout"
-      },
-      "widget": "alertList"
+      }
     },
     {
       "links": [],

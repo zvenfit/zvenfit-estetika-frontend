@@ -210,11 +210,10 @@ test('metrics exporter failures use logs so the alert survives a broken OTLP pat
       window: alert.window,
       delay: alert.delay,
     },
-    { aggregation: 'max', warning: 2, alarm: 5, window: '30m', delay: '5m' },
+    { aggregation: 'sum', warning: 2, alarm: 5, window: '30m', delay: '5m' },
   );
-  assert.match(docs, /три ошибки в одном\s+5-минутном интервале дают `Warning`/i);
+  assert.match(docs, /три ошибки за 30 минут дают\s+`Warning`/i);
   assert.match(docs, /шесть —\s+`Alarm`/);
-  assert.match(docs, /Повторное суммирование[^.]+не используется/);
   assert.equal(chart.source, metric.id);
   assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
   assert.equal(chart.pagingAlert, true);
@@ -301,8 +300,9 @@ test('dashboard contains the compact Estetika operational view', () => {
   });
   assert.deepEqual(config.dashboard.alertOverview, {
     title: 'Состояние production',
-    selector: '{labels.application = "zvenfit-estetika-frontend", labels.environment = "production", labels.service = "zvenfit-estetika-telegram-lead"}',
     visualization: 'alert-list',
+    source: 'alerts',
+    filterStrategy: 'fully-qualified-alert-id-allowlist',
     pageSize: 100,
     layout: { widthColumns: 36, heightRows: 5 },
   });
@@ -406,12 +406,18 @@ test('native Monium JSON mirrors the reviewed desired dashboard layout', () => {
   }
   assert.ok(guideWidget.text.text.includes(config.dashboard.readingGuide.note));
 
-  const alertWidgets = dashboard.widgets.filter(widget => widget.alertList);
-  assert.equal(alertWidgets.length, 1);
-  assert.equal(alertWidgets[0].widget, 'alertList');
-  assert.equal(alertWidgets[0].alertList.title, config.dashboard.alertOverview.title);
-  assert.equal(alertWidgets[0].alertList.selectors, config.dashboard.alertOverview.selector);
-  assert.deepEqual(alertWidgets[0].position, { x: '0', y: '7', w: '36', h: '5' });
+  const alertListWidgets = dashboard.widgets.filter(widget => widget.alertList);
+  assert.equal(alertListWidgets.length, 1);
+  const alertList = alertListWidgets[0];
+  const alertIdAllowlist = config.alerts.map(alert => `${config.project}_${alert.id}`).join('|');
+  assert.equal(alertList.widget, undefined);
+  assert.equal(alertList.alertList.widgetScope, undefined);
+  assert.equal(alertList.alertList.title, config.dashboard.alertOverview.title);
+  assert.equal(
+    alertList.alertList.selectors,
+    `{labels.application = "zvenfit-estetika-frontend", labels.environment = "production", labels.service = "zvenfit-estetika-telegram-lead", id = "${alertIdAllowlist}"}`,
+  );
+  assert.deepEqual(alertList.position, { x: '0', y: '7', w: '36', h: '5' });
 
   const chartWidgets = dashboard.widgets.filter(widget => widget.multiSourceChart);
   assert.equal(chartWidgets.length, 12);
