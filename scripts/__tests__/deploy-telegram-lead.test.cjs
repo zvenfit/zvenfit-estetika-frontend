@@ -238,7 +238,14 @@ test('direct gauges carry the same Estetika taxonomy in runtime and selectors', 
     assert.match(deployScript, new RegExp(`--environment ${name}=`));
   }
 
-  assert.match(workflow, /MONIUM_METRICS_TIMEOUT_MS:.*'3000'/);
+  assert.match(
+    workflow,
+    /MONIUM_METRICS_TIMEOUT_MS: \$\{\{ vars\.ZVENFIT_ESTETIKA_MONIUM_METRICS_TIMEOUT_MS \|\| '3000' \}\}/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /MONIUM_METRICS_TIMEOUT_MS: \$\{\{ vars\.MONIUM_METRICS_TIMEOUT_MS/,
+  );
   assert.match(deployScript, /MONIUM_METRICS_TIMEOUT_MS="\$\{MONIUM_METRICS_TIMEOUT_MS:-3000\}"/);
   assert.match(envExample, /^MONIUM_METRICS_TIMEOUT_MS=3000$/m);
 });

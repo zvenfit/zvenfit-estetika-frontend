@@ -381,7 +381,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `MONIUM_PROJECT` | Проект Monium; по умолчанию `folder__<YC_FOLDER_ID>` |
 | `MONIUM_CLUSTER` | Cluster direct metrics; по умолчанию `default` |
 | `MONIUM_SERVICE` | Service direct metrics; по умолчанию `zvenfit-estetika-frontend` |
-| `MONIUM_METRICS_TIMEOUT_MS` | Общий deadline OTLP collect/export/flush/shutdown; по умолчанию `3000`, диапазон `100–5000` |
+| `ZVENFIT_ESTETIKA_MONIUM_METRICS_TIMEOUT_MS` | Repository-level deadline каждой стадии OTLP collect/export/force flush/shutdown; workflow передаёт его функции как `MONIUM_METRICS_TIMEOUT_MS`. По умолчанию `3000`, диапазон `100–5000`. Проектное имя защищает Estetika от одноимённой organization variable |
 
 Для еженедельной проверки паритета приватного `zvenfit/zvenfit-frontend` добавьте необязательный
 repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents. Для публичного upstream
