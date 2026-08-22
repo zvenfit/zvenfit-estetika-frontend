@@ -52,14 +52,6 @@ class OtelMetricsTransport implements MetricsTransport {
   }
 
   public async flush(): Promise<void> {
-    await withTimeout(
-      this.flushAndShutdown(),
-      this.timeoutMs,
-      'metrics_flush_timeout',
-    );
-  }
-
-  private async flushAndShutdown(): Promise<void> {
     let exportFailure: unknown;
     try {
       const { resourceMetrics, errors } = await this.reader.collect({ timeoutMillis: this.timeoutMs });
@@ -67,14 +59,24 @@ class OtelMetricsTransport implements MetricsTransport {
       if (resourceMetrics.scopeMetrics.length) {
         await exportCollectedMetrics(this.exporter, resourceMetrics, this.timeoutMs);
       }
-      await this.exporter.forceFlush();
+      await withTimeout(
+        this.exporter.forceFlush(),
+        this.timeoutMs,
+        'metrics_force_flush_timeout',
+      );
     } catch (error) {
       exportFailure = normalizeMetricError(error, 'metrics_export_failed');
     }
 
     const [providerShutdown, exporterShutdown] = await Promise.all([
       settle(this.provider.shutdown({ timeoutMillis: this.timeoutMs })),
-      settle(this.exporter.shutdown()),
+      settle(
+        withTimeout(
+          this.exporter.shutdown(),
+          this.timeoutMs,
+          'metrics_shutdown_timeout',
+        ),
+      ),
     ]);
     if (exportFailure !== undefined) throw exportFailure;
     if (providerShutdown.status === 'rejected') throw providerShutdown.reason;
@@ -86,7 +88,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, code: string): P
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
-      reject(Object.assign(new Error('Metrics flush timed out'), { code }));
+      reject(Object.assign(new Error('Metrics lifecycle stage timed out'), { code }));
     }, timeoutMs);
   });
 
@@ -113,16 +115,16 @@ function exportCollectedMetrics(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let completed = false;
-    const timer = setTimeout(() => {
-      if (!completed) reject(Object.assign(new Error('Metric export timed out'), { code: 'metrics_export_timeout' }));
-      completed = true;
-    }, timeoutMs);
+    const timeoutState: { value?: NodeJS.Timeout } = {};
     const finish = (error?: Error) => {
       if (completed) return;
       completed = true;
-      clearTimeout(timer);
+      if (timeoutState.value) clearTimeout(timeoutState.value);
       error ? reject(error) : resolve();
     };
+    timeoutState.value = setTimeout(() => {
+      finish(Object.assign(new Error('Metric export timed out'), { code: 'metrics_export_timeout' }));
+    }, timeoutMs);
     try {
       exporter.export(resourceMetrics, result => {
         finish(

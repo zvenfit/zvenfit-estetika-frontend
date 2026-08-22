@@ -103,17 +103,17 @@ Timer после успешного retry pass и чтения YDB экспор�
 Явный ноль очереди экспортируется настоящей cumulative-точкой. Если retry pass, чтение YDB или
 экспорт не завершились, heartbeat не записывается. Ошибка OTLP безопасно логируется как
 `monium_metrics_init_error` или `monium_metrics_export_error` и не меняет результат приёма заявки.
-Весь OTLP lifecycle — collect, export, force flush и shutdown — получает единый deadline 3 секунды
-по умолчанию, жёстко ограниченный диапазоном `100–5000` мс. Поэтому зависший exporter не удерживает
-invocation до общего timeout функции.
+Каждый этап OTLP lifecycle — collect, export, force flush и shutdown — получает собственный
+deadline 3 секунды по умолчанию, жёстко ограниченный диапазоном `100–5000` мс. Последовательные
+этапы не расходуют один общий таймер, поэтому нормальный медленный export не превращается в ложный
+`metrics_flush_timeout`, а зависший cleanup остаётся ограничен по времени.
 
 Эти ошибки вместе с `monium_metrics_misconfigured` считаются независимым log aggregate
 `zvenfit_estetika_monium_metrics_failures_5m`: он остаётся видимым при поломке самого direct OTLP
-path. Alert берёт максимум 5-минутного счётчика за последние 30 минут: три ошибки в одном
-5-минутном интервале дают `Warning`, шесть — `Alarm`. Повторное суммирование точек скользящего
-счётчика намеренно не используется, поэтому одиночный сетевой таймаут остаётся диагностической
-точкой и не создаёт цикл `Warning → OK`. Задержка вычисления равна 5 минутам и совпадает с окном
-исходной log metric, чтобы поздняя поставка точки не меняла уже вычисленное состояние.
+path. Alert суммирует 5-минутные счётчики за последние 30 минут: три ошибки за 30 минут дают
+`Warning`, шесть — `Alarm`. Поэтому распределённые по разным buckets сбои больше не скрываются
+агрегацией `max`. Задержка вычисления равна 5 минутам и совпадает с окном исходной log metric,
+чтобы поздняя поставка точки не меняла уже вычисленное состояние.
 
 ## Notification channels
 
@@ -138,7 +138,7 @@ path. Alert берёт максимум 5-минутного счётчика з
 | `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
-| `zfe_monium_metrics_failures` | максимум 5m log count сбоев direct metrics exporter за 30m | `>2` / `>5` | OK |
+| `zfe_monium_metrics_failures` | сумма 5m log count сбоев direct metrics exporter за 30m | `>2` / `>5` | OK |
 | `zfe_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
 | `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
 | `zfe_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
@@ -174,7 +174,9 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/dashboards/zve
    links с готовой Estetika taxonomy и диапазоном `now-1h` → `now`;
 2. полноширинную памятку **Как читать дашборд** с порядком разбора потока
    Cloud Function → YDB/outbox → Telegram → retry-worker;
-3. полноширинный **Состояние production** со статусами всех Estetika alerts;
+3. компактный `alertList` с явным allowlist полных ID всех Estetika alerts; legacy-поля
+   `widgetScope: "projectId"` и внешний `widget: "alertList"` не используются, потому что
+   с ними Monium игнорировал прикладной selector и смешивал alerts shared project;
 4. ошибки и ограничения запуска единственной Cloud Function;
 5. p95 длительности функции и прямой retry heartbeat;
 6. ошибки хранения/outbox и окончательные сбои Telegram;
@@ -202,7 +204,7 @@ Dashboard намеренно не содержит Fitbase, расписание
 4. импортировать `scripts/monitoring.dashboard.json` через Dashboard → Settings → JSON → Apply.
 
 Нативный JSON содержит пятнадцать widgets: строку быстрых ссылок, памятку **Как читать дашборд**,
-alert overview и двенадцать operational charts. После ручной правки live dashboard экспортируйте
+компактный alert-list с allowlist четырнадцати alert ID и двенадцать operational charts. После ручной правки live dashboard экспортируйте
 его тем же экраном обратно в этот файл и запустите
 `npm run test:monitoring`. Artifact предназначен только для dashboard import/export: log metrics,
 alerts, channels и read-only drift snapshot у него отдельные контракты.

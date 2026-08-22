@@ -78,8 +78,9 @@
     },
     "alertOverview": {
       "title": "Состояние production",
-      "selector": "{labels.application = \"zvenfit-estetika-frontend\", labels.environment = \"production\", labels.service = \"zvenfit-estetika-telegram-lead\"}",
       "visualization": "alert-list",
+      "source": "alerts",
+      "filterStrategy": "fully-qualified-alert-id-allowlist",
       "pageSize": 100,
       "layout": {
         "widthColumns": 36,
@@ -435,7 +436,7 @@
       "displayName": "ZvenFit Estetika · Monium: сбои экспорта метрик",
       "metricId": "zvenfit_estetika_monium_metrics_failures_5m",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_monium_metrics_failures_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
-      "aggregation": "max",
+      "aggregation": "sum",
       "operator": ">",
       "warning": 2,
       "alarm": 5,

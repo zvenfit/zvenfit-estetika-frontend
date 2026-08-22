@@ -211,8 +211,11 @@ test('exports cumulative gauges and surfaces collector rejection', async () => {
   await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
 });
 
-test('bounds the complete flush lifecycle when exporter cleanup never settles', async () => {
-  for (const stuckMethod of ['forceFlush', 'shutdown'] as const) {
+test('bounds exporter cleanup stages independently', async () => {
+  for (const [stuckMethod, errorCode] of [
+    ['forceFlush', 'metrics_force_flush_timeout'],
+    ['shutdown', 'metrics_shutdown_timeout'],
+  ] as const) {
     const never = () => new Promise<void>(() => {});
     const exporter: PushMetricExporter = {
       export(_metrics, callback) {
@@ -228,9 +231,27 @@ test('bounds the complete flush lifecycle when exporter cleanup never settles', 
     transport.recordGauge('zvenfit_test_health', 1);
 
     const startedAt = Date.now();
-    await assert.rejects(transport.flush(), { code: 'metrics_flush_timeout' });
+    await assert.rejects(transport.flush(), { code: errorCode });
     assert.ok(Date.now() - startedAt < 1_000, `${stuckMethod} exceeded the flush deadline`);
   }
+});
+
+test('does not charge sequential lifecycle stages against one shared deadline', async () => {
+  const delay = () => new Promise<void>(resolve => setTimeout(resolve, 20));
+  const exporter: PushMetricExporter = {
+    export(_metrics, callback) {
+      setTimeout(() => callback({ code: ExportResultCode.SUCCESS }), 20);
+    },
+    forceFlush: delay,
+    shutdown: delay,
+  };
+  const transport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 30 },
+    () => exporter,
+  );
+  transport.recordGauge('zvenfit_test_health', 1);
+
+  await assert.doesNotReject(transport.flush());
 });
 
 test('exports zero-valued queue gauges as real samples', async () => {
