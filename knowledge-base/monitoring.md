@@ -70,6 +70,26 @@ Collect, export, force flush и shutdown — последовательные с
 
 Реализация: [`otel-transport.ts`](../functions/telegram-lead/src/observability/otel-transport.ts).
 
+## GitHub Actions variable isolation
+
+Production-проверка 22 августа 2026 года выявила отдельный configuration drift:
+workflow читал общее `vars.MONIUM_METRICS_TIMEOUT_MS`, а одноимённая
+organization-level variable передала в функцию `1000` мс вместо проектного
+default `3000` мс. Новая версия функции корректно разделяла lifecycle deadlines,
+но зафиксировала реальные `metrics_export_timeout` примерно через одну секунду.
+
+Принятое решение:
+
+- workflow читает только проектно-специфичную GitHub Actions variable
+  `ZVENFIT_ESTETIKA_MONIUM_METRICS_TIMEOUT_MS` с fallback `3000`;
+- в runtime функции значение по-прежнему называется
+  `MONIUM_METRICS_TIMEOUT_MS`;
+- контрактный тест запрещает возвращать общее `vars.MONIUM_METRICS_TIMEOUT_MS`,
+  чтобы organization-level настройка не могла снова молча изменить Estetika;
+- после deploy сначала проверяется фактическое значение в логе workflow, затем
+  отсутствие новых `metrics_export_timeout`; старый `Warning` может сохраняться
+  до выхода событий из окна `30m` с задержкой `5m`.
+
 ## Verification and delivery state
 
 На момент фиксации решения:
