@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { _private } from '../client';
+import { initializationAttempts } from '../initialization-attempts';
 
 interface FakeDriver {
   close(): void;
@@ -62,25 +63,29 @@ test('does not retry a permanent YDB initialization failure', async () => {
   let closed = 0;
   const error = Object.assign(new Error('Permission denied'), { code: 'PERMISSION_DENIED' });
 
-  await assert.rejects(
-    _private.initializeDriver(
-      () => {
-        created += 1;
+  await assert.rejects(async () => {
+    try {
+      await _private.initializeDriver(
+        () => {
+          created += 1;
 
-        return {
-          close() {
-            closed += 1;
-          },
-          async ready() {
-            throw error;
-          },
-        };
-      },
-      5_000,
-      { delay: async () => assert.fail('permanent failures must not be retried') },
-    ),
-    error,
-  );
+          return {
+            close() {
+              closed += 1;
+            },
+            async ready() {
+              throw error;
+            },
+          };
+        },
+        5_000,
+        { delay: async () => assert.fail('permanent failures must not be retried') },
+      );
+    } catch (caught) {
+      assert.equal(initializationAttempts(caught), 1);
+      throw caught;
+    }
+  }, error);
 
   assert.equal(created, 1);
   assert.equal(closed, 1);
@@ -91,22 +96,29 @@ test('stops after one retry when YDB discovery remains unavailable', async () =>
   let closed = 0;
 
   await assert.rejects(
-    _private.initializeDriver(
-      () => {
-        created += 1;
+    async () => {
+      try {
+        await _private.initializeDriver(
+          () => {
+            created += 1;
 
-        return {
-          close() {
-            closed += 1;
+            return {
+              close() {
+                closed += 1;
+              },
+              async ready() {
+                throw transientError();
+              },
+            };
           },
-          async ready() {
-            throw transientError();
-          },
-        };
-      },
-      5_000,
-      { delay: async () => {} },
-    ),
+          5_000,
+          { delay: async () => {} },
+        );
+      } catch (error) {
+        assert.equal(initializationAttempts(error), 2);
+        throw error;
+      }
+    },
     { code: 'DEADLINE_EXCEEDED' },
   );
 

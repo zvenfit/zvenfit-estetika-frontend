@@ -146,6 +146,11 @@ path. Alert суммирует 5-минутные счётчики за посл
 | `zfe_retry_trigger_errors` | trigger access/runtime errors | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_ydb_storage_usage` | `(used_bytes / limit_bytes) * 100` | `>=70` / `>=85` | WARNING |
 
+Managed `functions_errors` — это `DGAUGE`, а не дискретный log count. Runtime-error alert
+использует `max` за окно 5 минут: одна ошибка по-прежнему немедленно даёт `Alarm`, но повторные
+точки одной platform-серии не складываются в вводящий в заблуждение псевдосчётчик invocation.
+Точное число упавших запусков подтверждается по системным `ERROR ... RequestID` в raw logs.
+
 Префикс `zfe_` используется только для технических ID, которые вместе с обязательным
 префиксом проекта Monium иначе превысили бы лимит в 64 символа. Полные display name и
 таксономия `zvenfit-estetika-*` при этом не сокращаются.
@@ -153,7 +158,9 @@ path. Alert суммирует 5-минутные счётчики за посл
 Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов. Direct gauges и
 platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` учитывается только
 `ExecuteQuery` дольше 3 секунд; инициализация YDB-клиента, получение и создание сессии исключены
-из paging-сигнала и пока не экспортируются как отдельная telemetry.
+из slow-query paging-сигнала. Ошибка подготовки клиента пишет отдельные
+`phase=client_preparation` и `initialization_attempts`; `retry_attempts` остаётся счётчиком
+повторов read-only query/session path и не смешивается с инициализацией driver.
 Единичное превышение остаётся диагностикой, `Warning` требует минимум два превышения за 10 минут,
 а `Alarm` — минимум три. Backlog предупреждает после 10
 минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие

@@ -38,3 +38,25 @@ test('uses stable fallbacks and allows an explicit retry decision', () => {
     stack_fingerprint: null,
   });
 });
+
+test('derives only an allowlisted transient code from an error message', () => {
+  const error = new Error(
+    '/Ydb.Discovery.V1.DiscoveryService/ListEndpoints DEADLINE_EXCEEDED: private details',
+  );
+  error.name = 'ClientError';
+
+  const fields = safeErrorFields(error, { fallbackCode: 'ydb_initialization_error' });
+
+  assert.equal(fields.error_code, 'DEADLINE_EXCEEDED');
+  assert.equal(fields.retriable, true);
+  assert.doesNotMatch(JSON.stringify(fields), /private details|ListEndpoints/);
+});
+
+test('does not promote an arbitrary message into the safe error code', () => {
+  const fields = safeErrorFields(new Error('private_token_123'), {
+    fallbackCode: 'storage_error',
+  });
+
+  assert.equal(fields.error_code, 'storage_error');
+  assert.doesNotMatch(JSON.stringify(fields), /private_token_123/);
+});

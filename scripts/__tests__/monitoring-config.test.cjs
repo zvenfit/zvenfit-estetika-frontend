@@ -276,6 +276,7 @@ test('platform alerts cover runtime errors, throttling and storage capacity', ()
   assert.match(runtime.metricSelector, /name="functions_errors"/);
   assert.match(runtime.metricSelector, /cluster="default"/);
   assert.match(runtime.metricSelector, /service="__serverless-functions__"/);
+  assert.equal(runtime.aggregation, 'max');
   assert.match(throttles.metricSelector, /name="functions_throttles"/);
   assert.match(storage.queries.map(query => query.query).join('\n'), /zvenfit-estetika-leads/);
   assert.equal(storage.signal, 'C');

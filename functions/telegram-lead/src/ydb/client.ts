@@ -1,4 +1,5 @@
 import { normalizeConnectionString, queryTimeoutMs, sessionPoolSize } from './config';
+import { recordInitializationAttempts } from './initialization-attempts';
 
 import type { YdbClient, YdbSql, YdbValueConstructor } from '../types';
 import type { CredentialsProvider } from '@ydbjs/auth' with { 'resolution-mode': 'import' };
@@ -71,6 +72,7 @@ async function initializeDriver<T extends ReadyDriver>(
       driver.close();
 
       if (attempt === attempts || !isTransientInitializationError(error)) {
+        recordInitializationAttempts(error, attempt);
         throw error;
       }
 

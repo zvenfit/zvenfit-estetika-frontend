@@ -7,10 +7,67 @@ interface SafeErrorFieldOptions {
   retriable?: boolean;
 }
 
-const RETRIABLE_CODE = /(abort|timeout|unavailable|overload|connection|econn|etimedout|rate_limit)/i;
+const RETRIABLE_CODE =
+  /(abort|deadline_exceeded|timeout|unavailable|resource_exhausted|overload|connection|econn|etimedout|eai_again|rate_limit|internal)/i;
+const SAFE_MESSAGE_CODES = [
+  'DEADLINE_EXCEEDED',
+  'RESOURCE_EXHAUSTED',
+  'UNAVAILABLE',
+  'ABORTED',
+  'INTERNAL',
+  'EAI_AGAIN',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+] as const;
+const GRPC_CODE_NAMES = new Map<number, string>([
+  [4, 'DEADLINE_EXCEEDED'],
+  [8, 'RESOURCE_EXHAUSTED'],
+  [10, 'ABORTED'],
+  [13, 'INTERNAL'],
+  [14, 'UNAVAILABLE'],
+]);
+const GENERIC_ERROR_NAMES = new Set(['ClientError', 'TransportError']);
 
 function errorRecord(error: unknown): Record<string, unknown> | undefined {
   return error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined;
+}
+
+function errorChain(error: unknown): unknown[] {
+  const chain: unknown[] = [];
+  const visited = new Set<unknown>();
+  let current = error;
+
+  while (current && typeof current === 'object' && !visited.has(current) && chain.length < 4) {
+    chain.push(current);
+    visited.add(current);
+    current = errorRecord(current)?.cause;
+  }
+
+  return chain;
+}
+
+function allowlistedMessageCode(error: unknown): string | undefined {
+  for (const item of errorChain(error)) {
+    const record = errorRecord(item);
+    const description = [
+      record?.name,
+      item instanceof Error ? item.constructor?.name : undefined,
+      record?.details,
+      record?.message,
+    ]
+      .filter(value => typeof value === 'string')
+      .join(' ');
+
+    const match = SAFE_MESSAGE_CODES.find(code =>
+      new RegExp(`(?:^|[^A-Z0-9_])${code}(?:$|[^A-Z0-9_])`, 'i').test(description),
+    );
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
 }
 
 function normalizeIdentifier(value: unknown, fallback: string): string {
@@ -38,11 +95,25 @@ function upstreamStatus(error: unknown): number | null {
 }
 
 function errorCode(error: unknown, fallback: string): string {
-  const record = errorRecord(error);
-  const cause = errorRecord(record?.cause);
+  const chain = errorChain(error);
+  const explicitCode = chain
+    .map(item => errorRecord(item)?.code)
+    .find(value => typeof value === 'string' && value.trim());
+  const numericCode = chain
+    .map(item => errorRecord(item)?.code)
+    .find(value => typeof value === 'number' && GRPC_CODE_NAMES.has(value));
   const namedError = error instanceof Error && error.name !== 'Error' ? error.name : undefined;
+  const specificNamedError =
+    namedError && !GENERIC_ERROR_NAMES.has(namedError) ? namedError : undefined;
 
-  return normalizeIdentifier(record?.code ?? cause?.code ?? namedError, fallback);
+  return normalizeIdentifier(
+    explicitCode ??
+      (typeof numericCode === 'number' ? GRPC_CODE_NAMES.get(numericCode) : undefined) ??
+      specificNamedError ??
+      allowlistedMessageCode(error) ??
+      namedError,
+    fallback,
+  );
 }
 
 function errorType(error: unknown): string {
@@ -92,6 +163,8 @@ export function safeErrorFields(error: unknown, options: SafeErrorFieldOptions):
 }
 
 export const _private = {
+  allowlistedMessageCode,
+  errorChain,
   errorCode,
   errorType,
   inferRetriable,
