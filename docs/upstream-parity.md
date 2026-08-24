@@ -38,6 +38,14 @@ transient YDB driver initialization и расширенный одноразов
 Изменения upstream project-local knowledge base не копировались: адаптированный operational
 контракт зафиксирован в `docs/monitoring.md` этого репозитория.
 
+Из диапазона `5c386309a3b84151c0f9aca5454ac7a2c9967c1c..84c8e21324b55cee9b4d45e6c761d43819537363`
+проверены изоляция alert-list в общем Monium project, семантика managed `functions_errors` и
+диагностика подготовки YDB client. Применимые изменения уже независимо перенесены в Estetika:
+dashboard использует allowlist четырнадцати полных alert ID без legacy `widgetScope`, runtime
+alert агрегирует `DGAUGE` через `max`, а YDB initialization attempts отделены от query/session
+retry и публикуют только безопасные allowlisted error codes. Дополнительный перенос кода не
+потребовался; Estetika сохраняет exact single-function selectors и собственный namespace.
+
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а
 ephemeral issuer ограничен storage SA и подтверждается негативными live-проверками. На audited
