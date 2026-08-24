@@ -1,7 +1,7 @@
 ---
 type: decision
 title: ZvenFit Estetika production monitoring decisions
-updated: 2026-08-22
+updated: 2026-08-24
 ---
 
 # Production monitoring decisions
@@ -52,6 +52,20 @@ direct OTLP path, поэтому он использует независимы�
 не складывались и могли не достигнуть порога. Сразу после исправления live rule
 получил результат `5` и корректно перешёл в `Warning`; это наблюдение относится
 к окну проверки 22 августа 2026 года, а не является постоянным статусом сервиса.
+
+## Cloud Function runtime errors
+
+Managed `functions_errors` имеет тип `DGAUGE`. Для сигнала «был хотя бы один упавший
+invocation» используется `max` за 5 минут с порогами `>0` / `>0.5`, а не `sum`:
+один platform error продолжает давать `Alarm`, но несколько поставленных точек одной
+ошибки не выглядят как несколько независимых Request ID. Точное число invocation
+восстанавливается по системным Cloud Function logs.
+
+YDB client-preparation failures дополнительно фиксируют `initialization_attempts`.
+Это отдельный счётчик от `retry_attempts`, который относится к read-only
+query/session retry. Safe error normalization может извлечь только фиксированный
+allowlist технических transient-кодов из message/details; произвольный текст ошибки
+в structured event по-прежнему не попадает.
 
 ## OTLP lifecycle timeout
 

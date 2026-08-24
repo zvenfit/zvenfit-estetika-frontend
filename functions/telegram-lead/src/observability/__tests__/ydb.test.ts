@@ -3,6 +3,7 @@ import { tracingChannel } from 'node:diagnostics_channel';
 import test from 'node:test';
 
 import { observeYdbOperation, prepareAndObserveYdbOperation } from '../ydb';
+import { recordInitializationAttempts } from '../../ydb/initialization-attempts';
 
 import type { JsonObject, LoggerLike } from '../../types';
 
@@ -103,6 +104,7 @@ test('logs client preparation failures without treating cold-start time as slow 
   const error = Object.assign(new Error('private initialization details'), {
     code: 'UNAVAILABLE',
   });
+  recordInitializationAttempts(error, 2);
 
   await assert.rejects(
     prepareAndObserveYdbOperation(
@@ -119,6 +121,8 @@ test('logs client preparation failures without treating cold-start time as slow 
   assert.equal(records[0]?.fields.event, 'ydb_operation_failed');
   assert.equal(records[0]?.fields.operation, 'record_lead');
   assert.equal(records[0]?.fields.phase, 'client_preparation');
+  assert.equal(records[0]?.fields.initialization_attempts, 2);
+  assert.equal(records[0]?.fields.retry_attempts, 0);
   assert.equal(records[0]?.fields.error_code, 'UNAVAILABLE');
   assert.doesNotMatch(JSON.stringify(records), /private initialization details/);
 });
