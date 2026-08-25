@@ -161,6 +161,8 @@ platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` 
 из slow-query paging-сигнала. Ошибка подготовки клиента пишет отдельные
 `phase=client_preparation` и `initialization_attempts`; `retry_attempts` остаётся счётчиком
 повторов read-only query/session path и не смешивается с инициализацией driver.
+Transient discovery-сбой при подготовке driver допускает до трёх попыток с
+exponential backoff `250ms` / `500ms`; постоянные ошибки не повторяются.
 Единичное превышение остаётся диагностикой, `Warning` требует минимум два превышения за 10 минут,
 а `Alarm` — минимум три. Backlog предупреждает после 10
 минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие

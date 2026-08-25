@@ -66,6 +66,8 @@ YDB client-preparation failures дополнительно фиксируют `i
 query/session retry. Safe error normalization может извлечь только фиксированный
 allowlist технических transient-кодов из message/details; произвольный текст ошибки
 в structured event по-прежнему не попадает.
+Transient YDB driver discovery использует до трёх попыток инициализации с
+exponential backoff `250ms` / `500ms`; постоянные ошибки завершаются сразу.
 
 ## OTLP lifecycle timeout
 

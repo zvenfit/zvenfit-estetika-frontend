@@ -46,6 +46,13 @@ alert агрегирует `DGAUGE` через `max`, а YDB initialization atte
 retry и публикуют только безопасные allowlisted error codes. Дополнительный перенос кода не
 потребовался; Estetika сохраняет exact single-function selectors и собственный namespace.
 
+Из диапазона `84c8e21324b55cee9b4d45e6c761d43819537363..6065815a30fa03d4bcb2a05c45ac77967d9031a5`
+перенесено усиление transient YDB driver discovery: до трёх попыток инициализации с
+exponential backoff `250ms` / `500ms`, немедленный отказ для постоянных ошибок и тест
+восстановления на третьей попытке. Query/session retry Estetika не изменялся: инцидент
+25 августа исчерпал уже существующий read-only query retry и относится к отдельному
+кратковременному сбою выполнения запроса, а не к driver discovery.
+
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а
 ephemeral issuer ограничен storage SA и подтверждается негативными live-проверками. На audited

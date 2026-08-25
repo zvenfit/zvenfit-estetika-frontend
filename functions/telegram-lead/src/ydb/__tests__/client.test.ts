@@ -58,6 +58,52 @@ test('recreates the YDB driver after a transient discovery failure', async () =>
   assert.deepEqual(delays, [1]);
 });
 
+test('recovers on the third YDB driver initialization attempt', async () => {
+  let created = 0;
+  let closed = 0;
+  const delays: number[] = [];
+  const recoveredDriver: FakeDriver = {
+    close() {
+      closed += 1;
+    },
+    async ready() {},
+  };
+
+  const result = await _private.initializeDriver(
+    () => {
+      created += 1;
+
+      if (created < 3) {
+        return {
+          close() {
+            closed += 1;
+          },
+          async ready() {
+            throw transientError();
+          },
+        };
+      }
+
+      return recoveredDriver;
+    },
+    5_000,
+    {
+      delay: async attempt => {
+        delays.push(attempt);
+      },
+    },
+  );
+
+  assert.equal(result, recoveredDriver);
+  assert.equal(created, 3);
+  assert.equal(closed, 2);
+  assert.deepEqual(delays, [1, 2]);
+});
+
+test('backs off exponentially between YDB driver initialization attempts', () => {
+  assert.deepEqual([1, 2].map(_private.initializationRetryDelayMs), [250, 500]);
+});
+
 test('does not retry a permanent YDB initialization failure', async () => {
   let created = 0;
   let closed = 0;
@@ -91,7 +137,7 @@ test('does not retry a permanent YDB initialization failure', async () => {
   assert.equal(closed, 1);
 });
 
-test('stops after one retry when YDB discovery remains unavailable', async () => {
+test('stops after two retries when YDB discovery remains unavailable', async () => {
   let created = 0;
   let closed = 0;
 
@@ -115,15 +161,15 @@ test('stops after one retry when YDB discovery remains unavailable', async () =>
           { delay: async () => {} },
         );
       } catch (error) {
-        assert.equal(initializationAttempts(error), 2);
+        assert.equal(initializationAttempts(error), 3);
         throw error;
       }
     },
     { code: 'DEADLINE_EXCEEDED' },
   );
 
-  assert.equal(created, 2);
-  assert.equal(closed, 2);
+  assert.equal(created, 3);
+  assert.equal(closed, 3);
 });
 
 test('recognizes transient gRPC codes in nested causes', () => {

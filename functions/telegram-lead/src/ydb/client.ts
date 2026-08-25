@@ -14,8 +14,8 @@ interface DriverInitializationOptions {
   delay?: (attempt: number) => Promise<void>;
 }
 
-const DEFAULT_INITIALIZATION_ATTEMPTS = 2;
-const INITIALIZATION_RETRY_DELAY_MS = 100;
+const DEFAULT_INITIALIZATION_ATTEMPTS = 3;
+const INITIALIZATION_RETRY_BASE_DELAY_MS = 250;
 const TRANSIENT_GRPC_CODES = new Set([4, 8, 10, 13, 14]);
 const TRANSIENT_ERROR_PATTERN =
   /ABORTED|DEADLINE_EXCEEDED|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|INTERNAL|RESOURCE_EXHAUSTED|TIMEOUT|UNAVAILABLE/i;
@@ -49,8 +49,12 @@ function isTransientInitializationError(error: unknown): boolean {
   });
 }
 
+function initializationRetryDelayMs(attempt: number): number {
+  return INITIALIZATION_RETRY_BASE_DELAY_MS * 2 ** Math.max(attempt - 1, 0);
+}
+
 function retryDelay(attempt: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, INITIALIZATION_RETRY_DELAY_MS * attempt));
+  return new Promise(resolve => setTimeout(resolve, initializationRetryDelayMs(attempt)));
 }
 
 async function initializeDriver<T extends ReadyDriver>(
@@ -122,4 +126,4 @@ export async function createYdbClient(): Promise<YdbClient> {
   };
 }
 
-export const _private = { errorChain, initializeDriver, isTransientInitializationError };
+export const _private = { errorChain, initializationRetryDelayMs, initializeDriver, isTransientInitializationError };
