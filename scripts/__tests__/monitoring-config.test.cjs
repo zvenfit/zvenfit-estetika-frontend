@@ -81,7 +81,7 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
   });
   const slowYdbAlert = config.alerts.find(alert => alert.id === 'zvenfit_estetika_slow_ydb');
   assert.deepEqual(slowYdbAlert.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
-  assert.equal(slowYdbAlert.notificationRepeatMinutes, 24 * 60);
+  assert.equal(slowYdbAlert.repeatMinutes, 24 * 60);
 });
 
 test('count-sensitive and caught events use true log aggregates', () => {
@@ -92,6 +92,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
     ['zvenfit_estetika_slow_ydb', 'zvenfit_estetika_ydb_slow_5m', '3m'],
     ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m', '3m'],
     ['zvenfit_estetika_submission_volume', 'zvenfit_estetika_submissions_5m', '3m'],
+    ['zfe_retry_worker_heartbeat', 'zvenfit_estetika_retry_worker_log_heartbeat_1m', '3m'],
     ['zvenfit_estetika_rate_limit_health', 'zvenfit_estetika_rate_limit_errors_5m', '3m'],
     ['zfe_monium_metrics_failures', 'zvenfit_estetika_monium_metrics_failures_5m', '5m'],
   ];
@@ -120,10 +121,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
 });
 
 test('direct OTLP is limited to current-state gauges with canonical taxonomy', () => {
-  const directAlerts = [
-    config.alerts.find(item => item.id === 'zfe_retry_worker_heartbeat'),
-    config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog'),
-  ];
+  const directAlerts = [config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog')];
 
   for (const alert of directAlerts) {
     assert.match(alert.metricSelector, /service="zvenfit-estetika-frontend"/);
@@ -145,6 +143,7 @@ test('direct OTLP is limited to current-state gauges with canonical taxonomy', (
   assert.match(config.dashboard.telegramQueue.metricSelectors[0], /telegram_pending_notifications/);
   assert.match(directMetricsSource, /telegram_pending_submissions/);
   assert.match(directMetricsSource, /telegram_pending_notifications/);
+  assert.match(directMetricsSource, /zvenfit_estetika_retry_worker_heartbeat/);
 });
 
 test('YDB monitoring uses only stable query execution timing', () => {
@@ -214,9 +213,16 @@ test('metrics exporter failures use logs so the alert survives a broken OTLP pat
   );
   assert.match(docs, /три ошибки за 30 минут дают\s+`Warning`/i);
   assert.match(docs, /шесть —\s+`Alarm`/);
+  assert.equal(alert.level, 'INFO');
+  assert.deepEqual(alert.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
+  assert.deepEqual(alert.notificationStatuses, ['ALARM', 'WARNING', 'OK']);
+  assert.equal(alert.repeatMinutes, 0);
+  assert.match(source, /event === 'monium_metrics_export_error' && logger\.warn/);
+  assert.match(source, /['"]monium_metrics_export_completed['"]/);
+  assert.match(docs, /`monium_metrics_export_completed`/);
   assert.equal(chart.source, metric.id);
   assert.equal(chart.query, widget.multiSourceChart.targets[0].query);
-  assert.equal(chart.pagingAlert, true);
+  assert.equal(chart.pagingAlert, false);
   assert.deepEqual(widget.position, { x: '0', y: '60', w: '36', h: '8' });
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors_1m/);
   assert.match(operatorHandoff, /zvenfit_estetika_storage_errors/);
@@ -232,7 +238,7 @@ test('all log metrics stay within the Monium four-label grouping limit', () => {
   }
 });
 
-test('retry health covers direct heartbeat, queue age, trigger and log-pipeline diagnostics', () => {
+test('retry health uses the independent log heartbeat and keeps direct gauges diagnostic', () => {
   const heartbeat = config.alerts.find(item => item.id === 'zfe_retry_worker_heartbeat');
   const backlog = config.alerts.find(item => item.id === 'zvenfit_estetika_telegram_backlog');
   const trigger = config.alerts.find(item => item.id === 'zfe_retry_trigger_errors');
@@ -241,9 +247,27 @@ test('retry health covers direct heartbeat, queue age, trigger and log-pipeline 
   );
 
   assert.deepEqual(
-    { operator: heartbeat.operator, warning: heartbeat.warning, alarm: heartbeat.alarm, noData: heartbeat.noData },
-    { operator: '<', warning: 0.9, alarm: 0.5, noData: 'ALARM' },
+    {
+      metricId: heartbeat.metricId,
+      aggregation: heartbeat.aggregation,
+      operator: heartbeat.operator,
+      warning: heartbeat.warning,
+      alarm: heartbeat.alarm,
+      delay: heartbeat.delay,
+      noData: heartbeat.noData,
+    },
+    {
+      metricId: 'zvenfit_estetika_retry_worker_log_heartbeat_1m',
+      aggregation: 'max',
+      operator: '<',
+      warning: 0.9,
+      alarm: 0.5,
+      delay: '3m',
+      noData: 'ALARM',
+    },
   );
+  assert.match(heartbeat.metricSelector, /service="logging_aggregates"/);
+  assert.match(heartbeat.metricSelector, /name="zvenfit_estetika_retry_worker_log_heartbeat_1m"/);
   assert.deepEqual(
     { warning: backlog.warning, alarm: backlog.alarm, aggregation: backlog.aggregation },
     { warning: 600, alarm: 1800, aggregation: 'last' },
@@ -318,6 +342,7 @@ test('dashboard contains the compact Estetika operational view', () => {
   );
   assert.match(config.dashboard.functionDurationP95.query, /^histogram_percentile\(95,/);
   assert.match(config.dashboard.retryWorkerHeartbeat.metricSelector, /retry_worker_heartbeat/);
+  assert.equal(config.dashboard.retryWorkerHeartbeat.pagingAlert, false);
   assert.match(config.dashboard.deliveryErrors.metricSelector, /storage_errors_1m/);
   assert.match(config.dashboard.deliveryErrors.metricSelector, /telegram_failed_1m/);
   assert.equal(config.dashboard.telegramQueue.metricSelectors.length, 2);
@@ -331,6 +356,7 @@ test('dashboard contains the compact Estetika operational view', () => {
     config.dashboard.logPipelineHeartbeat.source,
     'zvenfit_estetika_retry_worker_log_heartbeat_1m',
   );
+  assert.equal(config.dashboard.logPipelineHeartbeat.pagingAlert, true);
   assert.match(config.dashboard.ydbQueryHealth.metricSelector, /ydb_retries_5m/);
   assert.match(config.dashboard.ydbQueryHealth.metricSelector, /ydb_slow_5m/);
   assert.equal(config.dashboard.ydbQueryHealth.stablePhase, 'query_execute');

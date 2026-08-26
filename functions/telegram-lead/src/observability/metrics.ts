@@ -10,7 +10,7 @@ const DEFAULT_APPLICATION = 'zvenfit-estetika-frontend';
 const DEFAULT_ENVIRONMENT = 'production';
 const DEFAULT_COMPONENT = 'zvenfit-estetika-telegram-lead';
 const DEFAULT_RESOURCE_ID = 'zvenfit-estetika-telegram-lead';
-const DEFAULT_TIMEOUT_MS = 3000;
+const DEFAULT_TIMEOUT_MS = 5000;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 5000;
 
@@ -47,10 +47,13 @@ class LazyInvocationMetrics implements InvocationMetrics {
   public async flush(): Promise<void> {
     if (this.flushed || !this.transport) return;
     this.flushed = true;
+    const startedAt = Date.now();
+
     try {
       await this.transport.flush();
+      logMetricExportCompleted(this.logger, Date.now() - startedAt);
     } catch (error) {
-      logMetricError(this.logger, 'monium_metrics_export_error', error);
+      logMetricError(this.logger, 'monium_metrics_export_error', error, Date.now() - startedAt);
     }
   }
 
@@ -78,8 +81,42 @@ function metricErrorCode(error: unknown): string {
   return String(coded.code || coded.cause?.code || error.name || 'metrics_error').slice(0, 64);
 }
 
-function logMetricError(logger: LoggerLike, event: string, error: unknown): void {
-  logger.error({ event, error_code: metricErrorCode(error) }, event);
+function metricErrorType(error: unknown): string {
+  const errorCode = metricErrorCode(error).toLowerCase();
+  if (errorCode.includes('timeout') || errorCode.includes('abort')) {
+    return 'timeout';
+  }
+  if (/econn|eai_|enet|network|socket/.test(errorCode)) {
+    return 'network';
+  }
+  if (error instanceof Error && typeof (error as Error & { code?: unknown }).code === 'number') {
+    return 'http';
+  }
+
+  return 'exporter';
+}
+
+function logMetricError(logger: LoggerLike, event: string, error: unknown, durationMs?: number): void {
+  const fields = {
+    event,
+    outcome: 'failure',
+    error_type: event === 'monium_metrics_init_error' ? 'initialization' : metricErrorType(error),
+    error_code: metricErrorCode(error),
+    ...(durationMs === undefined ? {} : { duration_ms: Math.max(0, durationMs) }),
+  };
+
+  if (event === 'monium_metrics_export_error' && logger.warn) {
+    logger.warn(fields, event);
+
+    return;
+  }
+
+  logger.error(fields, event);
+}
+
+function logMetricExportCompleted(logger: LoggerLike, durationMs: number): void {
+  const event = 'monium_metrics_export_completed';
+  logger.info?.({ event, outcome: 'success', duration_ms: Math.max(0, durationMs) }, event);
 }
 
 function metricsEnabled(env: NodeJS.ProcessEnv): boolean {

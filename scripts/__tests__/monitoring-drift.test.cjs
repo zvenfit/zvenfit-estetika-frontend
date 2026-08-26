@@ -14,7 +14,10 @@ function liveSnapshot() {
   const snapshot = JSON.parse(JSON.stringify(config));
   for (const alert of snapshot.alerts) {
     alert.notificationChannelIds ??= [...snapshot.notificationPolicy.channelIds];
-    alert.notificationRepeatMinutes ??= snapshot.notificationPolicy.repeatMinutes;
+    alert.notificationStatuses ??= [...snapshot.notificationPolicy.statuses];
+    if (!Object.prototype.hasOwnProperty.call(alert, 'repeatMinutes')) {
+      alert.repeatMinutes = snapshot.notificationPolicy.repeatMinutes;
+    }
   }
 
   return snapshot;
@@ -36,11 +39,27 @@ test('reports a live alert whose inherited notification settings are omitted', (
   const snapshot = liveSnapshot();
   const alert = snapshot.alerts.find(item => item.id === 'zfe_function_runtime_errors');
   delete alert.notificationChannelIds;
-  delete alert.notificationRepeatMinutes;
+  delete alert.repeatMinutes;
 
   const output = diffMonitoringState(config, snapshot).join('\n');
   assert.match(output, /alerts\.zfe_function_runtime_errors\.notificationChannelIds/);
-  assert.match(output, /alerts\.zfe_function_runtime_errors\.notificationRepeatMinutes/);
+  assert.match(output, /alerts\.zfe_function_runtime_errors\.repeatMinutes/);
+});
+
+test('preserves per-alert exporter notification delivery overrides', () => {
+  const snapshot = liveSnapshot();
+  const alert = snapshot.alerts.find(item => item.id === 'zfe_monium_metrics_failures');
+
+  assert.deepEqual(alert.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
+  assert.deepEqual(alert.notificationStatuses, ['ALARM', 'WARNING', 'OK']);
+  assert.equal(alert.repeatMinutes, 0);
+  assert.deepEqual(diffMonitoringState(config, snapshot), []);
+
+  alert.repeatMinutes = 30;
+  assert.match(
+    diffMonitoringState(config, snapshot).join('\n'),
+    /alerts\.zfe_monium_metrics_failures\.repeatMinutes/,
+  );
 });
 
 test('reports taxonomy, channel and dashboard drift in addition to thresholds', () => {
