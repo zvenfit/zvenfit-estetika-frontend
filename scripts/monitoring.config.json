@@ -110,7 +110,7 @@
       "title": "Retry-worker: heartbeat",
       "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
       "visualization": "tile",
-      "pagingAlert": true
+      "pagingAlert": false
     },
     "deliveryErrors": {
       "title": "Хранилище/outbox и Telegram: ошибки",
@@ -143,7 +143,7 @@
       "source": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
       "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\"})",
       "visualization": "chart",
-      "pagingAlert": false
+      "pagingAlert": true
     },
     "ydbQueryHealth": {
       "title": "YDB: повторы и медленные запросы",
@@ -179,7 +179,7 @@
       "source": "zvenfit_estetika_monium_metrics_failures_5m",
       "query": "series_sum({project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_monium_metrics_failures_5m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"})",
       "visualization": "chart",
-      "pagingAlert": true,
+      "pagingAlert": false,
       "layout": {
         "widthColumns": 36,
         "heightRows": 8
@@ -360,7 +360,7 @@
       "delay": "3m",
       "noData": "OK",
       "notificationChannelIds": ["zvenfit_estetika_email_alerts"],
-      "notificationRepeatMinutes": 1440,
+      "repeatMinutes": 1440,
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {
@@ -394,13 +394,14 @@
     {
       "id": "zfe_retry_worker_heartbeat",
       "displayName": "ZvenFit Estetika · Retry-worker: нет активности",
-      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"zvenfit-estetika-frontend\", name=\"zvenfit_estetika_retry_worker_heartbeat\", application=\"zvenfit-estetika-frontend\", environment=\"production\", component=\"zvenfit-estetika-telegram-lead\", resource_id=\"zvenfit-estetika-telegram-lead\"}",
-      "aggregation": "last",
+      "metricId": "zvenfit_estetika_retry_worker_log_heartbeat_1m",
+      "metricSelector": "{project=\"folder__b1ge1e4iopttj79hfdfm\", cluster=\"default\", service=\"logging_aggregates\", name=\"zvenfit_estetika_retry_worker_log_heartbeat_1m\", meta.application=\"zvenfit-estetika-frontend\", meta.environment=\"production\", meta.service=\"zvenfit-estetika-telegram-lead\"}",
+      "aggregation": "max",
       "operator": "<",
       "warning": 0.9,
       "alarm": 0.5,
       "window": "5m",
-      "delay": "30s",
+      "delay": "3m",
       "noData": "ALARM",
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
@@ -443,6 +444,10 @@
       "window": "30m",
       "delay": "5m",
       "noData": "OK",
+      "level": "INFO",
+      "notificationChannelIds": ["zvenfit_estetika_email_alerts"],
+      "notificationStatuses": ["ALARM", "WARNING", "OK"],
+      "repeatMinutes": 0,
       "labels": { "application": "zvenfit-estetika-frontend", "environment": "production", "service": "zvenfit-estetika-telegram-lead", "resource_id": "zvenfit-estetika-telegram-lead" }
     },
     {

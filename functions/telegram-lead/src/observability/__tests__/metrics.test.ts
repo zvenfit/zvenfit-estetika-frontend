@@ -15,10 +15,15 @@ import type { MetricAttributes } from '@opentelemetry/api';
 
 class TestLogger implements LoggerLike {
   public readonly errors: JsonObject[] = [];
+  public readonly infos: JsonObject[] = [];
   public readonly warnings: JsonObject[] = [];
 
   public error(fields: JsonObject): void {
     this.errors.push(fields);
+  }
+
+  public info(fields: JsonObject): void {
+    this.infos.push(fields);
   }
 
   public warn(fields: JsonObject): void {
@@ -98,6 +103,10 @@ test('records gauges with canonical taxonomy and flushes once', async () => {
     },
   ]);
   assert.equal(flushCalls, 1);
+  assert.equal(logger.infos.length, 1);
+  assert.equal(logger.infos[0]?.event, 'monium_metrics_export_completed');
+  assert.equal(logger.infos[0]?.outcome, 'success');
+  assert.equal(typeof logger.infos[0]?.duration_ms, 'number');
   assert.deepEqual(options, [
     {
       endpoint: 'https://ingest.monium.yandex.cloud/otlp/v1/metrics',
@@ -122,7 +131,12 @@ test('does not propagate initialization or export failures or expose credentials
   });
   assert.doesNotThrow(() => initializationMetrics.recordGauge('queue_health', 0));
   assert.deepEqual(initializationLogger.errors, [
-    { event: 'monium_metrics_init_error', error_code: 'collector_unavailable' },
+    {
+      event: 'monium_metrics_init_error',
+      outcome: 'failure',
+      error_type: 'initialization',
+      error_code: 'collector_unavailable',
+    },
   ]);
 
   const exportLogger = new TestLogger();
@@ -137,10 +151,24 @@ test('does not propagate initialization or export failures or expose credentials
   });
   exportMetrics.recordGauge('queue_health', 0);
   await assert.doesNotReject(exportMetrics.flush());
-  assert.deepEqual(exportLogger.errors, [
-    { event: 'monium_metrics_export_error', error_code: 'export_timeout' },
-  ]);
-  assert.equal(JSON.stringify(exportLogger.errors).includes('monium-api-key'), false);
+  assert.deepEqual(exportLogger.errors, []);
+  assert.equal(exportLogger.warnings.length, 1);
+  assert.deepEqual(
+    {
+      event: exportLogger.warnings[0]?.event,
+      outcome: exportLogger.warnings[0]?.outcome,
+      error_type: exportLogger.warnings[0]?.error_type,
+      error_code: exportLogger.warnings[0]?.error_code,
+    },
+    {
+      event: 'monium_metrics_export_error',
+      outcome: 'failure',
+      error_type: 'timeout',
+      error_code: 'export_timeout',
+    },
+  );
+  assert.equal(typeof exportLogger.warnings[0]?.duration_ms, 'number');
+  assert.equal(JSON.stringify(exportLogger.warnings).includes('monium-api-key'), false);
 });
 
 test('bounds exporter timeout', () => {
@@ -166,7 +194,7 @@ test('bounds exporter timeout', () => {
     });
     metrics.recordGauge('test_gauge', 1);
   }
-  assert.deepEqual(timeouts, [3000, 100, 5000]);
+  assert.deepEqual(timeouts, [5000, 100, 5000]);
 });
 
 test('exports cumulative gauges and surfaces collector rejection', async () => {

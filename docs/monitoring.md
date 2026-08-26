@@ -77,8 +77,10 @@ phases (`session_acquire` / `session_create`) намеренно не собир
 `get_telegram_queue_health` один раз повторяют transient `AbortError`, `TimeoutError`,
 неклассифицированный `ClientError` и известные временные gRPC/transport-коды через новую query.
 Явные постоянные коды, например `PERMISSION_DENIED`, не повторяются; write-path заявок этим
-механизмом не затрагивается. Log heartbeat не имеет paging-alert: он независимо показывает работоспособность
-цепочки Cloud Logging → log metric, а недоступность retry-worker уже покрыта прямым heartbeat.
+механизмом не затрагивается. Log heartbeat — основной paging-сигнал активности retry-worker:
+он строится по `retry_worker_completed` и не зависит от direct OTLP exporter. Direct heartbeat
+остаётся диагностическим вторым сигналом для разбора расхождений между Cloud Logging и Monium
+metrics ingestion.
 
 ## Direct gauges
 
@@ -92,7 +94,7 @@ component="zvenfit-estetika-telegram-lead"
 resource_id="zvenfit-estetika-telegram-lead"
 ```
 
-Timer после успешного retry pass и чтения YDB экспортирует:
+Timer после успешного retry pass и чтения YDB экспортирует диагностические gauges:
 
 - `zvenfit_estetika_retry_worker_heartbeat=1`;
 - `zvenfit_estetika_telegram_pending_notifications` — текущее число уведомлений в transactional outbox;
@@ -101,19 +103,23 @@ Timer после успешного retry pass и чтения YDB экспор�
 - `zvenfit_estetika_telegram_oldest_pending_age_seconds` — возраст старейшей записи.
 
 Явный ноль очереди экспортируется настоящей cumulative-точкой. Если retry pass, чтение YDB или
-экспорт не завершились, heartbeat не записывается. Ошибка OTLP безопасно логируется как
+экспорт не завершились, direct heartbeat не записывается, но отказ OTLP сам по себе больше не
+ломает критичный heartbeat alert. Ошибка OTLP безопасно логируется как
 `monium_metrics_init_error` или `monium_metrics_export_error` и не меняет результат приёма заявки.
-Каждый этап OTLP lifecycle — collect, export, force flush и shutdown — получает собственный
-deadline 3 секунды по умолчанию, жёстко ограниченный диапазоном `100–5000` мс. Последовательные
-этапы не расходуют один общий таймер, поэтому нормальный медленный export не превращается в ложный
-`metrics_flush_timeout`, а зависший cleanup остаётся ограничен по времени.
+Успешный flush пишет диагностическое `monium_metrics_export_completed` с `outcome=success` и
+`duration_ms`; сбой пишет `WARN` с `outcome=failure`, `duration_ms`, безопасными `error_type` и
+`error_code`. Каждый этап OTLP lifecycle — collect, export, force flush и shutdown — получает
+собственный deadline 5 секунд по умолчанию, жёстко ограниченный диапазоном `100–5000` мс.
+Последовательные этапы не расходуют один общий таймер, поэтому нормальный медленный export не
+превращается в ложный `metrics_flush_timeout`, а зависший cleanup остаётся ограничен по времени.
 
 Эти ошибки вместе с `monium_metrics_misconfigured` считаются независимым log aggregate
 `zvenfit_estetika_monium_metrics_failures_5m`: он остаётся видимым при поломке самого direct OTLP
 path. Alert суммирует 5-минутные счётчики за последние 30 минут: три ошибки за 30 минут дают
 `Warning`, шесть — `Alarm`. Поэтому распределённые по разным buckets сбои больше не скрываются
 агрегацией `max`. Задержка вычисления равна 5 минутам и совпадает с окном исходной log metric,
-чтобы поздняя поставка точки не меняла уже вычисленное состояние.
+чтобы поздняя поставка точки не меняла уже вычисленное состояние. Это непейджинговый технический
+alert уровня `Info`: он отправляет одно email-уведомление без Telegram и без повторов.
 
 ## Notification channels
 
@@ -125,7 +131,9 @@ path. Alert суммирует 5-минутные счётчики за посл
 По умолчанию оба канала подключаются к alerts доступности и доставки. Уведомления отправляются
 при переходах `ALARM`, `WARNING` и `OK`, повтор активного состояния — каждые 30 минут.
 Диагностический `zvenfit_estetika_slow_ydb` не пейджит в Telegram: для него остаётся только email
-с повтором раз в сутки. Ошибки YDB, retry и backlog продолжают использовать обычную paging-политику.
+с повтором раз в сутки. `zfe_monium_metrics_failures` также использует только email, но без
+повторной отправки (`0s`, «Никогда» в UI). Ошибки YDB, retry и backlog продолжают использовать
+обычную paging-политику.
 
 ## Alerts
 
@@ -138,8 +146,8 @@ path. Alert суммирует 5-минутные счётчики за посл
 | `zvenfit_estetika_rate_limited` | log count блокировок | `>0` / `>5` | OK |
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
-| `zfe_monium_metrics_failures` | сумма 5m log count сбоев direct metrics exporter за 30m | `>2` / `>5` | OK |
-| `zfe_retry_worker_heartbeat` | direct heartbeat, last | `<0.9` / `<0.5` | ALARM |
+| `zfe_monium_metrics_failures` | сумма 5m log count сбоев exporter за 30m; email only, no repeat | `>2` / `>5` | OK |
+| `zfe_retry_worker_heartbeat` | log aggregate `retry_worker_completed`, max | `<0.9` / `<0.5` | ALARM |
 | `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
 | `zfe_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
 | `zvenfit_estetika_function_throttles` | Cloud Functions `functions_throttles` | `>0` / `>0.5` | OK |
@@ -155,8 +163,9 @@ Managed `functions_errors` — это `DGAUGE`, а не дискретный log
 префиксом проекта Monium иначе превысили бы лимит в 64 символа. Полные display name и
 таксономия `zvenfit-estetika-*` при этом не сокращаются.
 
-Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов. Direct gauges и
-platform metrics используют `30s`. Для `zvenfit_estetika_slow_ydb` учитывается только
+Log aggregate alerts используют delay `3m`, чтобы дождаться поставки логов; exporter alert
+с 5-минутными buckets использует `5m`. Direct gauges и platform metrics используют `30s`.
+Для `zvenfit_estetika_slow_ydb` учитывается только
 `ExecuteQuery` дольше 3 секунд; инициализация YDB-клиента, получение и создание сессии исключены
 из slow-query paging-сигнала. Ошибка подготовки клиента пишет отдельные
 `phase=client_preparation` и `initialization_attempts`; `retry_attempts` остаётся счётчиком
@@ -165,7 +174,7 @@ Transient discovery-сбой при подготовке driver допускае
 exponential backoff `250ms` / `500ms`; постоянные ошибки не повторяются.
 Единичное превышение остаётся диагностикой, `Warning` требует минимум два превышения за 10 минут,
 а `Alarm` — минимум три. Backlog предупреждает после 10
-минут и алармит после 30. Только исчезновение retry heartbeat считается `Alarm`; отсутствие
+минут и алармит после 30. Только исчезновение log-derived retry heartbeat считается `Alarm`; отсутствие
 storage metrics считается `Warning`, остальные no-data состояния — `OK`.
 
 ## Dashboard
@@ -187,14 +196,14 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/dashboards/zve
    `widgetScope: "projectId"` и внешний `widget: "alertList"` не используются, потому что
    с ними Monium игнорировал прикладной selector и смешивал alerts shared project;
 4. ошибки и ограничения запуска единственной Cloud Function;
-5. p95 длительности функции и прямой retry heartbeat;
+5. p95 длительности функции и диагностический direct retry heartbeat;
 6. ошибки хранения/outbox и окончательные сбои Telegram;
 7. сохранённые обращения с разложением `lead` / `newsletter`;
 8. полноширинный размер и возраст Telegram-очереди;
 9. YDB retries и медленные `query_execute` рядом с заполнением отдельной
    `zvenfit-estetika-leads`;
-10. ошибки rate limiter и retry-trigger рядом с диагностическим log-pipeline heartbeat;
-11. независимый log-based график и alert сбоев Monium exporter.
+10. ошибки rate limiter и retry-trigger рядом с основным log-derived paging heartbeat;
+11. независимый log-based график и непейджинговый alert сбоев Monium exporter.
 
 Alert overview и четыре incident-triage графика повторяют operational-путь основной ZvenFit-борды,
 но exact single-function selectors не создают ненужные multialerts. Empty error graph при зелёном
@@ -243,9 +252,10 @@ Smoke всегда пишет `environment=production`, независимо о�
 bash scripts/test-monitoring-alerts.sh --confirm
 ```
 
-Проверьте доставку в Telegram и email, затем уведомления о возврате в `OK`. Runtime, throttling,
-trigger, direct heartbeat и YDB storage проверяются только реальными platform metrics: намеренно
-ронять функцию, timer или заполнять production YDB запрещено.
+Проверьте доставку в Telegram и email, затем уведомления о возврате в `OK`. Для
+`zfe_monium_metrics_failures` ожидается только email без Telegram и повторной отправки. Runtime,
+throttling, trigger, direct gauges и YDB storage проверяются только реальными platform metrics:
+намеренно ронять функцию, timer или заполнять production YDB запрещено.
 
 Контракты runtime/config/drift проверяются командами `npm run test:lead-fn` и
 `npm run test:monitoring`.
