@@ -120,15 +120,17 @@ organization-level variable передала в функцию `1000` мс вм�
 
 ## Verification and delivery state
 
-На момент анализа 26 августа 2026 года:
+Анализ и production-rollout 26 августа 2026 года подтвердили:
 
 - live dashboard: 14 Estetika alerts, 0 ZvenFit alerts;
 - live exporter alert за последний час получил три `metrics_export_timeout` и входил в
   `Warning`, хотя direct retry heartbeat оставался равен `1`;
-- live exporter alert до синхронизации отправлял Telegram и email с повтором каждые 30 минут;
-- целевой exporter alert: `sum`, `30m`, delay `5m`, thresholds `>2` / `>5`,
-  уровень `Info`, только email, без повторов;
-- целевой critical heartbeat: log aggregate по `retry_worker_completed`, `max`, окно `5m`,
-  delay `3m`, `No data = Alarm`;
-- после production deploy и live-синхронизации нужно подтвердить фактический timeout `5000`,
-  появление `monium_metrics_export_completed` и совпадение live alert rules с desired state.
+- до синхронизации exporter alert отправлял Telegram и email с повтором каждые 30 минут;
+- workflow [#32971698420](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32971698420)
+  успешно развернул функцию с timeout `5000` мс и прошёл production smoke;
+- после deploy появился `monium_metrics_export_completed` с `outcome=success` и
+  `duration_ms=1054`; новых exporter timeout/error к моменту проверки не было;
+- live `zfe_monium_metrics_failures` совпадает с desired state: `sum`, `30m`, delay `5m`,
+  thresholds `>2` / `>5`, уровень `Info`, только email, без повторов;
+- live `zfe_retry_worker_heartbeat` использует log aggregate по `retry_worker_completed`, `max`,
+  окно `5m`, delay `3m`, `No data = Alarm`; проверка вернула `1`, статус `OK`.

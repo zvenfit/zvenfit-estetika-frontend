@@ -90,6 +90,13 @@ Metric `zvenfit_estetika_storage_errors_1m` и alert
 `zvenfit_estetika_storage_errors` теперь имеют единое display name
 **ZvenFit Estetika · Хранилище и outbox: ошибки**.
 
+Rollout [#32971698420](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32971698420)
+от 2026-08-26 разделил критичный retry-worker heartbeat и технический OTLP exporter. Paging heartbeat
+теперь строится по log aggregate `retry_worker_completed`; direct gauge остаётся диагностическим.
+Каждая стадия OTLP lifecycle имеет deadline 5 секунд. Технический exporter alert имеет уровень
+`Info`, отправляет только email и не повторяется; Telegram для него отключён. После deploy
+зафиксирован успешный `monium_metrics_export_completed` за `1054` мс без новых exporter timeout.
+
 Функция пока публикует canonical queue gauge
 `zvenfit_estetika_telegram_pending_notifications` и legacy alias
 `zvenfit_estetika_telegram_pending_submissions`. Legacy удаляется отдельным следующим rollout после
