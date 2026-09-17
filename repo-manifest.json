@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "repo_id": "REP-002",
+  "repository_uuid": "db7d831f-9d3a-4368-a026-cc2b0f2695af",
+  "domain": "zvenfit",
+  "product_id": "PROD-002",
+  "project_ids": [],
+  "sensitivity": "sensitive",
+  "environments": ["local", "production"],
+  "data_artifacts": [],
+  "ai_policy": {
+    "policy_version": 1,
+    "root_instructions": "AGENTS.md",
+    "claude_entry": "CLAUDE.md",
+    "checks": "project-checks.json",
+    "live_trading_execution": "deny"
+  }
+}

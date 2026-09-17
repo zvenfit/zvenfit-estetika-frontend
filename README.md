@@ -4,6 +4,14 @@
 
 Продакшен: `https://estetika.zvenfit.ru`.
 
+## Personal AI Workspace
+
+Репозиторий подключён как `REP-002`, продукт «Сайт ZvenFit Estetika» — `PROD-002`,
+домен — `zvenfit`. Продуктовые цели и планы ведутся в Workspace, а техническая
+база `knowledge-base/`, документация и код остаются здесь.
+Локальная связь, правила хранения знаний и проверки описаны в
+[`docs/personal-ai-workspace.md`](docs/personal-ai-workspace.md).
+
 ## Архитектура
 
 ```text
