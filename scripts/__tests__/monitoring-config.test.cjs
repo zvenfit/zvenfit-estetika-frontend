@@ -17,6 +17,7 @@ const source = [
   'functions/telegram-lead/src/telegram/delivery.ts',
   'functions/telegram-lead/src/observability/metrics.ts',
   'functions/telegram-lead/src/observability/ydb.ts',
+  'functions/telegram-lead/src/observability/ydb-diagnostics.ts',
 ]
   .map(filename => fs.readFileSync(path.join(ROOT, filename), 'utf8'))
   .join('\n');
@@ -507,7 +508,7 @@ test('production log source, metric output and provisioning boundary are explici
       'meta.environment': 'production',
       'meta.service': 'zvenfit-estetika-telegram-lead',
     },
-    retentionDays: 3,
+    retentionDays: 14,
   });
   assert.deepEqual(config.metricOutput, {
     cluster: 'default',

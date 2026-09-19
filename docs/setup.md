@@ -375,7 +375,7 @@ CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-rev
 | `TELEGRAM_API_FALLBACK_IPV4S` | 1–5 резервных IPv4 Telegram Bot API через запятую. DNS всегда приоритетен; функция безопасно проверяет маршруты, кэширует здоровый на 5 минут, а TLS `Host`/SNI оставляет `api.telegram.org` |
 | `YC_LEAD_TIMEOUT` | Таймаут Cloud Function; по умолчанию `120s`, должен покрывать retry batch |
 | `YDB_QUERY_TIMEOUT_MS` | Таймаут операции/транзакции YDB; production default `10000`, как в обкатанной конфигурации `zvenfit-frontend` |
-| `YDB_SLOW_OPERATION_MS` | Порог медленного `ExecuteQuery`; по умолчанию `3000`. Инициализация клиента и нестабильные фазы получения/создания YDB-сессии не входят в paging-сигнал и пока не собираются |
+| `ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS` | Проектная GitHub Actions variable для порога медленного `ExecuteQuery`; fallback `3000`. Workflow передаёт в runtime как `YDB_SLOW_OPERATION_MS`. Общее `vars.YDB_SLOW_OPERATION_MS` намеренно не читается: production Environment содержал устаревшее `1000`. Инициализация клиента и нестабильные фазы YDB-сессии не входят в paging-сигнал |
 | `YDB_SESSION_POOL_SIZE` | Максимум YDB-сессий на экземпляр функции; по умолчанию `5` |
 | `MONIUM_METRICS_ENABLED` | Прямой экспорт метрик; production default `true` |
 | `MONIUM_PROJECT` | Проект Monium; по умолчанию `folder__<YC_FOLDER_ID>` |

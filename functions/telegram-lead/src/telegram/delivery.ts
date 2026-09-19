@@ -120,8 +120,9 @@ function telegramError(
   message: string,
   code: string,
   status?: number,
-): Error & { code: string; status?: number } {
-  return Object.assign(new Error(message), { code, name: 'TelegramError', status });
+  phase?: 'route_probe' | 'send_message',
+): Error & { code: string; status?: number; telegram_phase?: 'route_probe' | 'send_message' } {
+  return Object.assign(new Error(message), { code, name: 'TelegramError', status, telegram_phase: phase });
 }
 
 function telegramFallbackIpv4s(): string[] {
@@ -241,6 +242,8 @@ async function chooseTelegramRoute(
   throw telegramError(
     'Telegram is unreachable',
     telegramNetworkErrorCode(results[0]?.error),
+    undefined,
+    'route_probe',
   );
 }
 
@@ -339,7 +342,7 @@ export async function sendTelegram(
     });
   } catch (error) {
     invalidateTelegramRoute(route);
-    throw telegramError('Telegram is unreachable', telegramNetworkErrorCode(error));
+    throw telegramError('Telegram is unreachable', telegramNetworkErrorCode(error), undefined, 'send_message');
   }
 
   let responseBody: unknown = null;
@@ -354,7 +357,7 @@ export async function sendTelegram(
     'ok' in responseBody &&
     responseBody.ok === true;
   if (response.statusCode < 200 || response.statusCode >= 300 || !telegramOk) {
-    throw telegramError('Telegram returned an error', 'telegram_error', response.statusCode);
+    throw telegramError('Telegram returned an error', 'telegram_error', response.statusCode, 'send_message');
   }
 }
 
