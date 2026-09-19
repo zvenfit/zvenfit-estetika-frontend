@@ -8,7 +8,7 @@
       "meta.environment": "production",
       "meta.service": "zvenfit-estetika-telegram-lead"
     },
-    "retentionDays": 3
+    "retentionDays": 14
   },
   "metricOutput": {
     "cluster": "default",

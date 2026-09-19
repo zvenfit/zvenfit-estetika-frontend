@@ -4,8 +4,9 @@
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
 не копируются автоматически.
 
-Текущий аудит выполнен 2026-08-20 до опубликованного commit
-`5c386309a3b84151c0f9aca5454ac7a2c9967c1c`. Перенесены архитектурные изменения production
+Текущий аудит выполнен 2026-09-19 до опубликованного commit
+`8e568f043f415b0b5109663dfa2662a4ff54e58b`. SHA проверен по GitHub `main` и локальному
+`origin/main` основного проекта. Перенесены архитектурные изменения production
 observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
 direct gauges, log-pipeline heartbeat, throttling alert, dashboard desired state, read-only drift
 check, GitHub OIDC/WIF и bucket-scoped ephemeral Object Storage credentials.
@@ -52,6 +53,33 @@ exponential backoff `250ms` / `500ms`, немедленный отказ для 
 восстановления на третьей попытке. Query/session retry Estetika не изменялся: инцидент
 25 августа исчерпал уже существующий read-only query retry и относится к отдельному
 кратковременному сбою выполнения запроса, а не к driver discovery.
+
+Диапазон `6065815a30fa03d4bcb2a05c45ac77967d9031a5..8e568f043f415b0b5109663dfa2662a4ff54e58b`
+проверен полностью:
+
+| Upstream commit | Решение для Estetika |
+|---|---|
+| `7abf056`, `6b30e85` — club card и её navigation | Страницы и продуктового сценария в Estetika нет; не переносились. |
+| `12461d1` — версия club card CSS | Принцип уже реализован: сборка Estetika версионирует site и legal CSS через `ASSET_VERSION`. |
+| `f479c2e` — независимый retry heartbeat | Уже адаптирован в `e09b007`: log-based heartbeat, отдельный deadline каждой OTLP-стадии, email-only exporter alert без повторов и проверка notification drift. |
+| `2c3b608`, `01ca482`, `4863337`, `bd178b4` — цены тренировок и их E2E pins | Контент и тесты основного фитнес-сайта неприменимы. |
+| `772fce1` — staging E2E rate-limit pin | Отдельного staging gateway и этих fixtures в Estetika нет. |
+| `1acdc23` — Personal AI Workspace | Независимо принят для Estetika в `b4b0c6f`; upstream workspace mapping и knowledge base не копировались. |
+| `8e568f0` — причины retry, Telegram phases и retention | Перенесены безопасные причины SDK/read-fallback retry, числовые YDB status codes, Telegram failure phase и desired retention 14 дней. |
+
+В адаптации `8e568f0` сохранён контракт Estetika: наблюдается только `query_execute`;
+неизвестная фаза остаётся `unknown`, без вымышленных session timings. Изоляция concurrent
+операций и retry с нулевым backoff проверены тестами с настоящим `@ydbjs/retry`.
+Число попыток, query timeout, outbox и правило одной отправки Telegram POST не менялись.
+Дополнительно устранён обнаруженный у Estetika источник drift slow-log threshold:
+workflow читает `ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS`, а runtime сохраняет имя
+`YDB_SLOW_OPERATION_MS` и default `3000` мс.
+
+Проверки 19 сентября: lint, TypeScript, тесты функции, monitoring/deploy contracts и сборка
+прошли. Визуальная проверка была запущена, но остановилась до выполнения сценариев:
+локально отсутствует Chromium Headless Shell требуемой версии Playwright. Разметка,
+CSS и клиентский JS в этом переносе не менялись. История live-проверки и границы rollout
+зафиксированы в [разборе мониторинга](monitoring-review-2026-09-18.md#доработка-19-сентября).
 
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а

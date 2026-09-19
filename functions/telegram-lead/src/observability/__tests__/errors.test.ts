@@ -60,3 +60,32 @@ test('does not promote an arbitrary message into the safe error code', () => {
   assert.equal(fields.error_code, 'storage_error');
   assert.doesNotMatch(JSON.stringify(fields), /private_token_123/);
 });
+
+test('preserves numeric YDB status codes without exposing issues', async () => {
+  const { YDBError } = await import('@ydbjs/error');
+  const error = new YDBError(400060, []);
+  error.message = 'private query and parameters';
+
+  const fields = safeErrorFields(error, { fallbackCode: 'ydb_error' });
+
+  assert.equal(fields.error_code, 'OVERLOADED');
+  assert.equal(fields.retriable, true);
+  assert.doesNotMatch(JSON.stringify(fields), /private query|parameters|issues/);
+
+  const aborted = safeErrorFields(new YDBError(400040, []), { fallbackCode: 'ydb_error' });
+  assert.equal(aborted.error_code, 'ABORTED');
+  assert.equal(aborted.retriable, true);
+  const permanent = safeErrorFields(new YDBError(400020, []), { fallbackCode: 'ydb_error' });
+  assert.equal(permanent.error_code, 'UNAUTHORIZED');
+  assert.equal(permanent.retriable, false);
+});
+
+test('logs only known Telegram failure phases', () => {
+  for (const phase of ['route_probe', 'send_message', 'private route details']) {
+    const error = Object.assign(new Error('private token'), { telegram_phase: phase });
+    const fields = safeErrorFields(error, { fallbackCode: 'telegram_timeout' });
+
+    assert.equal(fields.telegram_phase, phase === 'private route details' ? undefined : phase);
+    assert.doesNotMatch(JSON.stringify(fields), /private/);
+  }
+});

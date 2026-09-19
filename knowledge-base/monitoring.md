@@ -1,7 +1,7 @@
 ---
 type: decision
 title: ZvenFit Estetika production monitoring decisions
-updated: 2026-08-26
+updated: 2026-09-19
 ---
 
 # Production monitoring decisions
@@ -117,6 +117,31 @@ organization-level variable передала в функцию `1000` мс вм�
 - после deploy сначала проверяется фактическое значение в логе workflow, затем
   частота новых `metrics_export_timeout`; старое состояние может сохраняться до
   выхода событий из окна `30m` с задержкой `5m`.
+
+## Retry diagnostics and slow-threshold isolation
+
+Успешный повтор YDB должен сохранять безопасную причину сбоя, который привёл к
+повтору. SDK completed channel сообщает только исход и счётчик; причина берётся
+из соответствующего tracing error channel, включая повторы с нулевым backoff.
+Контекст изолируется через AsyncLocalStorage для каждой наблюдаемой операции.
+
+Estetika сохраняет только подтверждённую фазу `query_execute` и её timing.
+Отсутствие trace означает `unknown`, а не предположение о session acquire/create.
+SQL, параметры, SDK context и текст ошибки не включаются в событие. Числовые YDB
+status codes нормализуются отдельно от gRPC codes. Диагностика Telegram различает
+ошибку безопасной route probe и ошибку отправки сообщения; это не добавляет
+немедленный повтор POST с неоднозначным исходом.
+
+GitHub Actions variable для slow-log threshold изолирована аналогично OTLP timeout:
+`ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS` преобразуется в runtime
+`YDB_SLOW_OPERATION_MS`, fallback — `3000` мс. Общее имя больше не читается:
+19 сентября источник прежних `1000` мс подтверждён в GitHub Environment `production`.
+
+Desired retention общей Cloud Logging group — 14 дней, чтобы новый двухнедельный
+разбор мог опираться на raw logs. Изменение config не применяет облачную настройку
+и не восстанавливает уже удалённые записи. Фактическое состояние проверяется отдельно.
+Точные поля и процедуры: [runbook](../docs/monitoring.md), состояние внедрения —
+[разбор сентября](../docs/monitoring-review-2026-09-18.md#доработка-19-сентября).
 
 ## Verification and delivery state
 

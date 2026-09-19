@@ -27,13 +27,36 @@ const GRPC_CODE_NAMES = new Map<number, string>([
   [13, 'INTERNAL'],
   [14, 'UNAVAILABLE'],
 ]);
+// Ydb.StatusIds.StatusCode is separate from gRPC Status. Preserve stable
+// protocol codes even when the SDK message contains private query issues.
+const YDB_CODE_NAMES = new Map<number, string>([
+  [400010, 'BAD_REQUEST'],
+  [400020, 'UNAUTHORIZED'],
+  [400030, 'INTERNAL_ERROR'],
+  [400040, 'ABORTED'],
+  [400050, 'UNAVAILABLE'],
+  [400060, 'OVERLOADED'],
+  [400070, 'SCHEME_ERROR'],
+  [400080, 'GENERIC_ERROR'],
+  [400090, 'TIMEOUT'],
+  [400100, 'BAD_SESSION'],
+  [400120, 'PRECONDITION_FAILED'],
+  [400130, 'ALREADY_EXISTS'],
+  [400140, 'NOT_FOUND'],
+  [400150, 'SESSION_EXPIRED'],
+  [400160, 'CANCELLED'],
+  [400170, 'UNDETERMINED'],
+  [400180, 'UNSUPPORTED'],
+  [400190, 'SESSION_BUSY'],
+  [400200, 'EXTERNAL_ERROR'],
+]);
 const GENERIC_ERROR_NAMES = new Set(['ClientError', 'TransportError']);
 
 function errorRecord(error: unknown): Record<string, unknown> | undefined {
   return error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined;
 }
 
-function errorChain(error: unknown): unknown[] {
+export function errorChain(error: unknown): unknown[] {
   const chain: unknown[] = [];
   const visited = new Set<unknown>();
   let current = error;
@@ -101,14 +124,16 @@ function errorCode(error: unknown, fallback: string): string {
     .find(value => typeof value === 'string' && value.trim());
   const numericCode = chain
     .map(item => errorRecord(item)?.code)
-    .find(value => typeof value === 'number' && GRPC_CODE_NAMES.has(value));
+    .find(value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
   const namedError = error instanceof Error && error.name !== 'Error' ? error.name : undefined;
   const specificNamedError =
     namedError && !GENERIC_ERROR_NAMES.has(namedError) ? namedError : undefined;
 
   return normalizeIdentifier(
     explicitCode ??
-      (typeof numericCode === 'number' ? GRPC_CODE_NAMES.get(numericCode) : undefined) ??
+      (typeof numericCode === 'number'
+        ? (GRPC_CODE_NAMES.get(numericCode) ?? YDB_CODE_NAMES.get(numericCode) ?? String(numericCode))
+        : undefined) ??
       specificNamedError ??
       allowlistedMessageCode(error) ??
       namedError,
@@ -152,6 +177,7 @@ function inferRetriable(error: unknown, status: number | null, code: string): bo
 export function safeErrorFields(error: unknown, options: SafeErrorFieldOptions): JsonObject {
   const code = errorCode(error, options.fallbackCode);
   const status = upstreamStatus(error);
+  const telegramPhase = errorRecord(error)?.telegram_phase;
 
   return {
     error_type: errorType(error),
@@ -159,6 +185,9 @@ export function safeErrorFields(error: unknown, options: SafeErrorFieldOptions):
     retriable: options.retriable ?? inferRetriable(error, status, code),
     upstream_status: status,
     stack_fingerprint: stackFingerprint(error),
+    ...(telegramPhase === 'route_probe' || telegramPhase === 'send_message'
+      ? { telegram_phase: telegramPhase }
+      : {}),
   };
 }
 

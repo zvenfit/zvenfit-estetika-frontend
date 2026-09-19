@@ -23,7 +23,7 @@ provider не покрывают полный жизненный цикл эти
 | Function resource | `zvenfit-estetika-telegram-lead` |
 | YDB | `zvenfit-estetika-leads` |
 | Retry trigger | `a1sc2t1ro4alukatrf99` |
-| Raw logs | `cluster="default"`, `service="default"`, retention 3 дня |
+| Raw logs | `cluster="default"`, `service="default"`, desired retention 14 дней; фактическое значение проверяется у общей Cloud Logging group |
 | Log metric output | `cluster="default"`, `service="logging_aggregates"` |
 | Direct gauges | `cluster="default"`, `service="zvenfit-estetika-frontend"` |
 
@@ -81,6 +81,30 @@ phases (`session_acquire` / `session_create`) намеренно не собир
 он строится по `retry_worker_completed` и не зависит от direct OTLP exporter. Direct heartbeat
 остаётся диагностическим вторым сигналом для разбора расхождений между Cloud Logging и Monium
 metrics ingestion.
+
+`ydb_retry` означает успешное восстановление и содержит безопасные поля последней
+ошибки, приведшей к повтору: `error_type`, `error_code`, `retry_source=sdk|read_fallback`,
+`phase` и, при наличии query trace, `failed_phase_duration_ms`. Общая `duration_ms`
+включает повторы; `query_execute_*` описывают только ExecuteQuery. Без соответствующего
+trace используется `phase=unknown` без предположений о session-фазах. Событие остаётся
+одним на восстановленную операцию; `retry_attempts` показывает число повторов.
+Числовые статусы YDB/gRPC сохраняются как технические коды без SQL, параметров и issues.
+
+Для Telegram поле `telegram_phase=route_probe|send_message` различает проверку маршрута
+и отправку. Неоднозначный таймаут POST не вызывает немедленную отправку по другому
+маршруту; следующая попытка по-прежнему выполняется через transactional outbox.
+
+Порог slow-события в runtime — `YDB_SLOW_OPERATION_MS`, default `3000` мс.
+CI читает только `vars.ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS`, чтобы общая переменная
+Environment/organization не меняла настройку Estetika. Desired Warning остаётся `>1.5`
+(два события за 10 минут), Alarm — `>2.5`; синхронизация live rule выполняется отдельно
+от deploy функции. Изменение порога не является исправлением таймаутов чтения YDB.
+
+Общая группа `default` (`e23fnr42117phjg4r2oe`) должна хранить 14 дней логов в паритете
+с upstream. Проверка: `yc logging group get --id e23fnr42117phjg4r2oe --format json`;
+ожидается `retention_period=1209600s`. Она содержит источники обоих проектов, поэтому
+изменение её политики действует на всю группу. Уже удалённые записи не восстанавливаются.
+Изменение `source.retentionDays` в Git само по себе не меняет retention в облаке.
 
 ## Direct gauges
 
