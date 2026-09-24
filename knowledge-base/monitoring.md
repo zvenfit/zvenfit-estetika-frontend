@@ -1,7 +1,7 @@
 ---
 type: decision
 title: ZvenFit Estetika production monitoring decisions
-updated: 2026-09-19
+updated: 2026-09-25
 ---
 
 # Production monitoring decisions
@@ -125,12 +125,25 @@ organization-level variable передала в функцию `1000` мс вм�
 из соответствующего tracing error channel, включая повторы с нулевым backoff.
 Контекст изолируется через AsyncLocalStorage для каждой наблюдаемой операции.
 
-Estetika сохраняет только подтверждённую фазу `query_execute` и её timing.
+Estetika агрегирует длительность только `query_execute`. Session traces разрешены
+для определения фазы ошибки, без session latency metrics, slow-событий и новых алертов.
 Отсутствие trace означает `unknown`, а не предположение о session acquire/create.
 SQL, параметры, SDK context и текст ошибки не включаются в событие. Числовые YDB
 status codes нормализуются отдельно от gRPC codes. Диагностика Telegram различает
 ошибку безопасной route probe и ошибку отправки сообщения; это не добавляет
 немедленный повтор POST с неоднозначным исходом.
+
+Стандартные `DOMException` от `AbortSignal` имеют legacy-коды `20`/`23`.
+Они нормализуются по именам `AbortError`/`TimeoutError`, а не как протокольные
+статусы. Это исправляет диагностическое `retriable`, не меняя retry policy.
+Локальный тест с установленным SDK также воспроизводит потерю связи ошибок:
+`@ydbjs/retry` возвращает `signal.reason` по deadline, а `nice-grpc` при отмене
+stream создаёт отдельный `AbortError` без `cause`. Совпадения объектов ошибок
+недостаточно: при отмене дополнительно сохраняется снимок активной фазы, принадлежащей
+текущей попытке SDK, с явным `phase_source=active_trace`. Без trace остаётся `unknown`.
+Read-only повторы ограничены числом попыток и общим временем; предыдущая причина
+сохраняется отдельно от текущей ошибки. Точный контракт — в
+[runbook](../docs/monitoring.md#log-metrics).
 
 GitHub Actions variable для slow-log threshold изолирована аналогично OTLP timeout:
 `ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS` преобразуется в runtime
@@ -159,3 +172,31 @@ Desired retention общей Cloud Logging group — 14 дней, чтобы н�
   thresholds `>2` / `>5`, уровень `Info`, только email, без повторов;
 - live `zfe_retry_worker_heartbeat` использует log aggregate по `retry_worker_completed`, `max`,
   окно `5m`, delay `3m`, `No data = Alarm`; проверка вернула `1`, статус `OK`.
+
+Production-rollout 19 сентября 2026 года подтверждён
+[workflow #35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444306516)
+для commit `20af273`: quality checks, YDB verification и read-only production smoke прошли.
+Лог deploy подтверждает `YDB_SLOW_OPERATION_MS=3000` и `MONIUM_METRICS_TIMEOUT_MS=5000`.
+Безопасная retry-диагностика и изоляция slow threshold развёрнуты; запись об их
+исключительно локальной готовности больше не актуальна.
+
+Этот rollout не подтверждает live-retention в 14 дней, новые поля естественного
+`ydb_retry`, исправность p95 selector или полное совпадение всех 14 live-правил с Git.
+Эти проверки остаются открытыми в
+[сентябрьском разборе](../docs/monitoring-review-2026-09-18.md#доработка-19-сентября).
+
+Повторная read-only проверка 24 сентября подтвердила live-retention `1209600s`
+(14 дней) и новые поля диагностики естественных `ydb_retry`. При этом фаза
+ошибки для восстановленных timeout может оставаться `unknown`; это нельзя
+заменять предположением о session acquire/create. Обнаружено расхождение
+диагностического `retriable=false` для DOM `TimeoutError` с числовым кодом `23`
+с фактически выполненным read-only повтором. Оно не меняет retry policy.
+Шесть новых ошибок чтения очереди после rollout подтверждают, что изменение
+порогов не устранило задержки YDB. p95 и полная сверка live-конфигурации остаются
+открытыми. Даты, количество событий и подтверждения восстановления сохранены
+в [разборе 24 сентября](../docs/monitoring-review-2026-09-24.md).
+
+Доработки от 25 сентября остаются локальными: нормализация DOM-кодов, ограниченные
+повторы чтения и корреляция deadline с активной фазой. Они не устанавливают причину
+длительных production-задержек YDB. Сравнение классов сбоев и границы адаптации —
+в [разборе 24 сентября](../docs/monitoring-review-2026-09-24.md#адаптация-стратегии-повторов-25-сентября).

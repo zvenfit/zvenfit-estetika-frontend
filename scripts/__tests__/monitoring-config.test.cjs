@@ -147,17 +147,19 @@ test('direct OTLP is limited to current-state gauges with canonical taxonomy', (
   assert.match(directMetricsSource, /zvenfit_estetika_retry_worker_heartbeat/);
 });
 
-test('YDB monitoring uses only stable query execution timing', () => {
+test('YDB latency aggregates and alerts remain query-only with failure phase diagnostics', () => {
   assert.match(source, /tracing:ydb:query\.execute/);
   assert.match(source, /phase: 'query_execute'/);
-  assert.doesNotMatch(source, /tracing:ydb:query\.session\.(?:acquire|create)/);
+  // Guard the public phaseFields log keys; runtime tests cover phase aggregation behavior.
+  assert.doesNotMatch(source, /session_(?:acquire|create)_(?:attempts|duration_ms|max_duration_ms)\s*:/);
   assert.doesNotMatch(source, /ydb_slow_session_phase/);
   assert.equal('ydbSessionPhases' in config.dashboard, false);
   assert.equal(
     config.logMetrics.some(item => item.id === 'zvenfit_estetika_ydb_slow_session_phases_5m'),
     false,
   );
-  assert.match(docs, /YDB session\s+phases[\s\S]*техдолг/i);
+  assert.match(docs, /\(`session_acquire` \/ `session_create`\) используются только для локализации ошибки/);
+  assert.match(docs, /агрегаты `session_\*`, отдельные slow-события и графики session latency не добавляются/);
 });
 
 test('slow YDB alert ignores one event, warns on two, and alarms on three in ten minutes', () => {

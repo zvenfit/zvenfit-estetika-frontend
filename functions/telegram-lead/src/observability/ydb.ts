@@ -3,49 +3,18 @@ import {
   createOperationState,
   operationStorage,
   phaseFields as queryFields,
+  failurePhaseFields,
   retryErrorFields,
   subscribeToDiagnostics,
 } from './ydb-diagnostics';
 import { initializationAttempts } from '../ydb/initialization-attempts';
 import { slowOperationMs } from '../ydb/config';
+import { isTransientReadError, retryRead } from '../ydb/read-retry';
 
 import type { JsonObject, LoggerLike } from '../types';
 
 interface ObserveYdbOperationOptions {
-  retryTransientOnce?: boolean;
-}
-
-const RETRYABLE_READ_ERROR_NAMES = new Set(['AbortError', 'TimeoutError']);
-const RETRYABLE_GRPC_CODES = new Set([4, 8, 10, 13, 14]);
-const RETRYABLE_ERROR_PATTERN =
-  /ABORTED|DEADLINE_EXCEEDED|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|INTERNAL|RESOURCE_EXHAUSTED|TIMEOUT|UNAVAILABLE/i;
-
-function isTransientReadError(error: unknown): boolean {
-  return errorChain(error).some(item => {
-    const record = item as Record<string, unknown>;
-    const errorName = item instanceof Error ? item.name : record.name;
-
-    if (typeof errorName === 'string' && RETRYABLE_READ_ERROR_NAMES.has(errorName)) {
-      return true;
-    }
-
-    // The YDB SDK uses a bare ClientError for some session-pool transport
-    // failures. Retry an unclassified ClientError once, but let an explicit
-    // permanent code such as PERMISSION_DENIED fall through the checks below.
-    if (errorName === 'ClientError' && record.code === undefined) {
-      return true;
-    }
-
-    if (typeof record.code === 'number' && RETRYABLE_GRPC_CODES.has(record.code)) {
-      return true;
-    }
-
-    const description = [record.code, record.details, record.message]
-      .filter(value => typeof value === 'string')
-      .join(' ');
-
-    return RETRYABLE_ERROR_PATTERN.test(description);
-  });
+  readRetry?: { budgetMs: number };
 }
 
 function writeLog(
@@ -62,7 +31,7 @@ function writeLog(
 export async function observeYdbOperation<T>(
   operationName: string,
   logger: LoggerLike | undefined,
-  callback: () => Promise<T>,
+  callback: (signal: AbortSignal) => Promise<T>,
   options: ObserveYdbOperationOptions = {},
 ): Promise<T> {
   subscribeToDiagnostics();
@@ -71,18 +40,20 @@ export async function observeYdbOperation<T>(
 
   try {
     const result = await operationStorage.run(operation, async () => {
-      try {
-        return await callback();
-      } catch (error) {
-        if (!options.retryTransientOnce || !isTransientReadError(error)) {
-          throw error;
-        }
-
-        operation.retries += 1;
-        operation.retryFailure = retryErrorFields(operation, error, 'read_fallback');
-
-        return callback();
+      if (options.readRetry) {
+        return retryRead(callback, {
+          budgetMs: options.readRetry.budgetMs,
+          onRetryScheduled(error) {
+            operation.priorReadFailure = retryErrorFields(operation, error, 'read_fallback');
+          },
+          onRetry() {
+            operation.retries += 1;
+            operation.retryFailure = operation.priorReadFailure;
+          },
+        });
       }
+
+      return callback(new AbortController().signal);
     });
     const durationMs = Date.now() - startedAt;
     writeLog(logger, 'info', {
@@ -115,6 +86,7 @@ export async function observeYdbOperation<T>(
 
     return result;
   } catch (error) {
+    const priorError = operation.priorReadFailure ?? operation.retryFailure;
     writeLog(logger, 'error', {
       event: 'ydb_operation_failed',
       operation: operationName,
@@ -122,6 +94,8 @@ export async function observeYdbOperation<T>(
       retry_attempts: operation.retries,
       ...queryFields(operation),
       ...safeErrorFields(error, { fallbackCode: 'ydb_error' }),
+      ...failurePhaseFields(operation, error),
+      ...(priorError ? { prior_error: priorError } : {}),
     });
     throw error;
   }
@@ -131,7 +105,7 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
   operationName: string,
   logger: LoggerLike | undefined,
   prepare: () => Promise<TPrepared>,
-  callback: () => Promise<TResult>,
+  callback: (signal: AbortSignal) => Promise<TResult>,
   options: ObserveYdbOperationOptions = {},
 ): Promise<TResult> {
   const startedAt = Date.now();

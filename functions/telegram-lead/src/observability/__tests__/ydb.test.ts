@@ -158,7 +158,7 @@ test('retries one transient error for an explicitly safe read', async () => {
 
       return 'ok';
     },
-    { retryTransientOnce: true },
+    { readRetry: { budgetMs: 2_000 } },
   );
 
   assert.equal(result, 'ok');
@@ -184,7 +184,7 @@ test('retries TimeoutError and ClientError for explicitly safe reads', async () 
 
         return 'ok';
       },
-      { retryTransientOnce: true },
+      { readRetry: { budgetMs: 2_000 } },
     );
 
     assert.equal(result, 'ok');
@@ -210,7 +210,7 @@ test('retries a nested transient gRPC error for an explicitly safe read', async 
 
       return 'ok';
     },
-    { retryTransientOnce: true },
+    { readRetry: { budgetMs: 2_000 } },
   );
 
   assert.equal(result, 'ok');
@@ -244,7 +244,7 @@ test('does not retry a permanent read error', async () => {
         attempts += 1;
         throw namedError('PermissionError', 'PERMISSION_DENIED');
       },
-      { retryTransientOnce: true },
+      { readRetry: { budgetMs: 2_000 } },
     ),
   );
 
@@ -264,14 +264,14 @@ test('does not retry ClientError with an explicit permanent code', async () => {
         attempts += 1;
         throw namedError('ClientError', 'PERMISSION_DENIED');
       },
-      { retryTransientOnce: true },
+      { readRetry: { budgetMs: 2_000 } },
     ),
   );
 
   assert.equal(attempts, 1);
 });
 
-test('stops after one transient retry', async () => {
+test('stops after two transient retries', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
@@ -283,12 +283,12 @@ test('stops after one transient retry', async () => {
         attempts += 1;
         throw abortError();
       },
-      { retryTransientOnce: true },
+      { readRetry: { budgetMs: 2_000 } },
     ),
   );
 
-  assert.equal(attempts, 2);
-  assert.equal(fieldsByEvent(records, 'ydb_operation_failed').retry_attempts, 1);
+  assert.equal(attempts, 3);
+  assert.equal(fieldsByEvent(records, 'ydb_operation_failed').retry_attempts, 2);
 });
 
 test('records query execution duration without logging SQL text or unstable session phases', async () => {

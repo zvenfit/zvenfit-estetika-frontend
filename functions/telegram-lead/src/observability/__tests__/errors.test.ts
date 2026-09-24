@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 
 import { safeErrorFields } from '../errors';
 
@@ -78,6 +79,46 @@ test('preserves numeric YDB status codes without exposing issues', async () => {
   const permanent = safeErrorFields(new YDBError(400020, []), { fallbackCode: 'ydb_error' });
   assert.equal(permanent.error_code, 'UNAUTHORIZED');
   assert.equal(permanent.retriable, false);
+});
+
+test('recognizes native deadline and cancellation errors instead of their legacy DOM codes', async () => {
+  const deadline = AbortSignal.timeout(1);
+  await assert.rejects(setTimeout(60_000, undefined, { signal: deadline }), { name: 'AbortError' });
+  const cancellation = new AbortController();
+  cancellation.abort();
+
+  for (const [error, name, legacyCode] of [
+    [deadline.reason, 'TimeoutError', 23],
+    [cancellation.signal.reason, 'AbortError', 20],
+  ] as const) {
+    assert.ok(error instanceof DOMException);
+    assert.equal(error.code, legacyCode);
+    for (const input of [error, new Error('private wrapper', { cause: error })]) {
+      const fields = safeErrorFields(input, { fallbackCode: 'ydb_error' });
+      assert.equal(fields.error_code, name);
+      assert.equal(fields.retriable, true);
+      assert.doesNotMatch(JSON.stringify(fields), /private wrapper/);
+      assert.equal(safeErrorFields(input, { fallbackCode: 'ydb_error', retriable: false }).retriable, false);
+    }
+  }
+});
+
+test('preserves protocol codes and explicit retry decisions around DOM errors', () => {
+  const cause = new DOMException('private deadline details', 'TimeoutError');
+  for (const [code, expectedCode, retriable] of [
+    ['PERMISSION_DENIED', 'PERMISSION_DENIED', false],
+    [14, 'UNAVAILABLE', true],
+    [400020, 'UNAUTHORIZED', false],
+    [23, '23', false],
+  ] as const) {
+    const error = Object.assign(new Error('private wrapper', { cause }), { code });
+    const fields = safeErrorFields(error, { fallbackCode: 'ydb_error' });
+    assert.equal(fields.error_code, expectedCode);
+    assert.equal(fields.retriable, retriable);
+    assert.doesNotMatch(JSON.stringify(fields), /private/);
+  }
+  const error = Object.assign(new Error('private wrapper', { cause }), { retriable: false });
+  assert.equal(safeErrorFields(error, { fallbackCode: 'ydb_error' }).retriable, false);
 });
 
 test('logs only known Telegram failure phases', () => {

@@ -75,11 +75,19 @@ exponential backoff `250ms` / `500ms`, немедленный отказ для 
 workflow читает `ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS`, а runtime сохраняет имя
 `YDB_SLOW_OPERATION_MS` и default `3000` мс.
 
-Проверки 19 сентября: lint, TypeScript, тесты функции, monitoring/deploy contracts и сборка
-прошли. Визуальная проверка была запущена, но остановилась до выполнения сценариев:
-локально отсутствует Chromium Headless Shell требуемой версии Playwright. Разметка,
-CSS и клиентский JS в этом переносе не менялись. История live-проверки и границы rollout
-зафиксированы в [разборе мониторинга](monitoring-review-2026-09-18.md#доработка-19-сентября).
+Адаптация опубликована в `20af273` (PR #26). На момент повторной проверки 19 сентября
+GitHub `main` upstream точно совпадает с baseline `8e568f0`; локальная проверка и
+[Check upstream parity #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978)
+прошли. [Production deploy #35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444306516)
+завершился успешно, включая YDB verification и read-only production smoke.
+
+Все пять локальных проверок из `project-checks.json` повторно прошли без ошибок и
+пропусков: diff-check, lint, TypeScript, 73 unit-теста функции, тест deploy artifact,
+45 monitoring/deploy contract-тестов и сборка с performance budget. Визуальная
+проверка остаётся неподтверждённой: локально отсутствует Chromium Headless Shell
+требуемой версии Playwright. Разметка, CSS и клиентский JS в этом переносе не менялись.
+Открытые live-проверки зафиксированы в
+[разборе мониторинга](monitoring-review-2026-09-18.md#доработка-19-сентября).
 
 После локального security review WIF-паттерн усилен без смены базовой модели upstream:
 dependency installation/build вынесены из OIDC jobs, live YDB probe получил отдельную identity, а
@@ -107,6 +115,21 @@ npm run check:upstream-parity
 Другой checkout задаётся через
 `ZVENFIT_FRONTEND_DIR`. В GitHub Actions SHA читается через API; для приватного upstream нужен
 repository secret `UPSTREAM_READ_TOKEN` с read-only доступом к contents.
+
+## Локальная адаптация retry — 25 сентября
+
+Сопоставлены локальные доработки read-only retry основного проекта с инцидентами
+Estetika. Перенесены ограниченные повторы, общий deadline и привязка активных фаз
+к попыткам SDK. Адаптация работает только с двумя чтениями `telegram_outbox`;
+запись доменных данных и outbox сохраняет собственную транзакцию. Session traces
+используются лишь для `phase` ошибки, без переноса upstream session aggregates,
+slow events или dashboard. Дополнены `prior_error` и регрессии освобождения сессии
+и независимой транзакции при отмене чтения. Ранее подготовленная нормализация DOM-кодов
+сохранена. Точный контракт — в [runbook](monitoring.md#log-metrics), границы пользы —
+в [разборе инцидентов](monitoring-review-2026-09-24.md#адаптация-стратегии-повторов-25-сентября).
+
+Это адаптация локального кода, а не аудит нового опубликованного upstream commit:
+`scripts/upstream-parity.json` и baseline не изменяются. Production rollout не выполнен.
 
 ## Что сравнивать при каждом новом commit
 
