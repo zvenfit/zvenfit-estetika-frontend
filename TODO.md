@@ -1,6 +1,6 @@
 # ZvenFit Estetika — список задач
 
-Состояние проверено **2026-08-17**: отдельная инфраструктура Estetika создана и развёрнута через
+Исходный production rollout проверен **2026-08-17**: отдельная инфраструктура Estetika создана и развёрнута через
 разделённые deploy/verifier OIDC subjects. Production observability rollout прошёл в
 [run #32030115816](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/32030115816).
 Build/deploy jobs и deploy/verifier/storage/runtime identities разделены, Object Storage получает
@@ -11,6 +11,26 @@ Read-only drift совпал с Git; synthetic smoke
 подтвердил пороги и 13 успешных отправок в Telegram/email. Production-заявки и подписка сохранены
 в YDB и доставлены в Telegram после внедрения DNS-first failover. До приёма реальных заявок
 остаются юридические решения.
+
+Обновление **2026-09-19**: исправления диагностики retry и slow-log threshold из `20af273`
+развёрнуты в [run #35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444306516);
+quality checks, YDB verification и read-only production smoke прошли. Паритет с текущим
+upstream `8e568f0` подтверждён локально и в
+[run #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978).
+Все пять локальных проверок из `project-checks.json` прошли без ошибок и пропусков.
+Live-retention, p95, новые поля естественного retry и полная сверка 14 live-правил остаются
+открытыми; это не отменяет исторических результатов августовского rollout.
+Подробнее — [разбор мониторинга](docs/monitoring-review-2026-09-18.md#доработка-19-сентября).
+
+Проверка **2026-09-24** подтвердила live-retention 14 дней и новые поля
+естественного YDB retry. После rollout остались шесть ошибок чтения очереди;
+после каждой worker восстанавливался через 12–33 секунды с пустой очередью.
+25 сентября локально подготовлены нормализация DOM-кодов, ограниченные повторы
+чтения с backoff/общим бюджетом и корреляция deadline с активной фазой SDK.
+Изменения ещё не развёрнуты. Открыты причина длительных задержек, проверка новой
+диагностики на естественных production-событиях, p95 и полная сверка live-конфигурации.
+Подробнее — [новый разбор алертов](docs/monitoring-review-2026-09-24.md).
+
 Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
 Короткий технический handoff владельцу: [`docs/operator-handoff.md`](docs/operator-handoff.md).
@@ -64,12 +84,15 @@ Read-only drift совпал с Git; synthetic smoke
   системную серию `service="__serverless-functions__"`
 - [ ] **Завершить миграцию queue gauge** — после подтверждённого обновления live dashboard и одного
   стабильного production rollout удалить legacy `zvenfit_estetika_telegram_pending_submissions`
-- [ ] **Вернуться к YDB session phases telemetry** — `session_acquire` / `session_create` пока
-  флапают и намеренно не собираются; повторно оценить после стабилизации diagnostics channels,
-  сохранив `query_execute` единственным paging-сигналом
+- [ ] **Оценить YDB session latency telemetry** — агрегаты session latency отложены;
+  локальная доработка 25 сентября использует session traces только для фазы ошибки.
+  Проверить её на естественных событиях, сохранив `query_execute` единственным paging-сигналом
 - [x] **Проверить synthetic monitoring delivery** — smoke 2026-08-17 дал ожидаемые 6 `Alarm` +
   диагностический `Warning`, 13 отправок завершились `Success`; после выхода точек из окон правила
   вернулись в `OK`, read-only drift snapshot совпал с desired state
+- [ ] **Закрыть live-проверки после rollout 19 сентября** — подтвердить retention общей группы
+  в 14 дней, новые поля естественного `ydb_retry`, p95 selector и выполнить свежую полную сверку
+  live-настроек всех 14 правил с Git; deploy и контрактные тесты уже прошли
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - **Юридическая готовность форм** — решение о способе согласия, история подтверждения
   реквизитов и открытые вопросы перенесены в [план Workspace](docs/personal-ai-workspace.md#перенесённый-продуктовый-контекст).
@@ -217,8 +240,8 @@ Read-only drift совпал с Git; synthetic smoke
 
 ## Чек-лист перед релизом
 
-- [x] `npm test` проходит: линтер, strict TypeScript, 51 unit-тест Cloud Function, проверка CommonJS-артефакта, 43 contract-теста CI/monitoring/parity/smoke и production-сборка (проверено 2026-08-17)
-- [x] `npm run test:visual`: 27 визуальных и функциональных сценариев для desktop, tablet и mobile проходят (проверено 2026-08-13)
+- [x] Все этапы `npm test` прошли через reviewed runner: линтер, strict TypeScript, 73 unit-теста Cloud Function, проверка CommonJS-артефакта, 45 contract-тестов CI/monitoring/parity/smoke и production-сборка с performance budget; отдельно прошёл diff-check (проверено 2026-09-19)
+- [ ] Повторно подтвердить `npm run test:visual`: 19 сентября сценарии не выполнены из-за отсутствия требуемого Chromium Headless Shell Playwright; исторически 27 сценариев для desktop, tablet и mobile прошли 2026-08-13
 - [x] Заявка и рассылка проверены с тестовой UTM-разметкой: YDB и Telegram `sent` (2026-08-17)
 - [x] Метрика загружается в продакшен-сборке с числовым `YANDEX_METRIKA_ID` (проверено без вывода значения 2026-08-13)
 - [x] Все 78 уникальных CDN-ассетов текущей production-сборки, включая IMask, изображения, WOFF2, CSS и JS, отвечают HTTP 200 (проверено 2026-08-08)

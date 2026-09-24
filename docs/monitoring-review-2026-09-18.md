@@ -191,9 +191,11 @@ slow YDB и параметров функции.
 - Источник runtime `YDB_SLOW_OPERATION_MS=1000` найден: переменная GitHub
   Environment `production` этого репозитория, обновлённая 12 августа
   в `21:08:57Z`. Первоначальная проверка repo/org variables не охватывала
-  Environment variables. В локальном workflow теперь используется
+  Environment variables. В production workflow теперь используется
   `vars.ZVENFIT_ESTETIKA_YDB_SLOW_OPERATION_MS` с fallback `3000`;
-  имя runtime-параметра не изменено. Новая версия функции ещё не развёрнута.
+  имя runtime-параметра не изменено. Версия из commit `20af273` развёрнута
+  19 сентября; лог deploy подтверждает `YDB_SLOW_OPERATION_MS=3000` и
+  `MONIUM_METRICS_TIMEOUT_MS=5000`.
 - Live Warning для slow YDB сохранён и проверен в Monium: `>1.5`, то есть два
   события за 10 минут. Alarm `>2.5`, aggregation `sum`, delay `3m`, No data `OK`
   и email-уведомления с повтором раз в день сохранены. Это устраняет drift
@@ -210,12 +212,24 @@ slow YDB и параметров функции.
   Изменение в Git само по себе не меняет Cloud Logging; старые удалённые логи
   восстановлены не будут.
 - Выполнен [аудит паритета](upstream-parity.md) до
-  `8e568f043f415b0b5109663dfa2662a4ff54e58b`; baseline обновлён локально.
-  Lint, TypeScript, 73 unit-теста функции, тест deploy artifact, 45 тестов
-  monitoring/deploy contracts и static build прошли. Visual suite не выполнила
-  сценарии: отсутствует требуемый Chromium Headless Shell Playwright.
+  `8e568f043f415b0b5109663dfa2662a4ff54e58b`; baseline опубликован и совпадает
+  с текущим GitHub `main` upstream на момент проверки 19 сентября. Локальная
+  проверка и [Check upstream parity #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978)
+  прошли.
+- Повторный локальный запуск всех пяти проверок из `project-checks.json`
+  завершился без ошибок и пропусков: diff-check, lint, TypeScript,
+  73 unit-теста функции, тест deploy artifact, 45 тестов monitoring/deploy
+  contracts и static build с performance budget. Visual suite остаётся
+  неподтверждённой: отсутствие требуемого Chromium Headless Shell Playwright
+  повторно проверено 19 сентября.
 
-Код подготовлен локально, без commit/push/deploy. После его развёртывания нужно
-проверить фактический slow threshold и новые поля следующего естественного
-`ydb_retry`, а также retention общей группы. Отдельно остаются проверка p95
-selector и CDN security headers; они не объявляются исправленными этим переносом.
+Исправления слиты в `main` как `20af273` (PR #26) и развёрнуты через
+[Deploy to Production #35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444306516).
+Все семь jobs прошли, включая quality checks, integration-тесты и проверку
+схемы YDB, deploy функции и сайта, read-only production smoke.
+
+Остаются неподтверждёнными live-retention общей группы в 14 дней, новые поля
+следующего естественного `ydb_retry`, p95 selector и свежая полная сверка
+live-настроек всех 14 правил с Git. Успешный deploy и контрактные тесты не
+заменяют эти live-проверки. CDN security headers остаются отдельной открытой
+задачей; их исправление этим переносом не подтверждено.

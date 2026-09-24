@@ -42,6 +42,7 @@ export type SqlRow = Record<string, unknown>;
 export type ResultSets = SqlRow[][];
 
 export interface YdbQuery<T = ResultSets> extends PromiseLike<T> {
+  signal(signal: AbortSignal): YdbQuery<T>;
   timeout(milliseconds: number): YdbQuery<T>;
   idempotent(value: boolean): YdbQuery<T>;
   isolation(level: string): YdbQuery<T>;

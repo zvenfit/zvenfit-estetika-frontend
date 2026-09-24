@@ -53,14 +53,14 @@ export async function observed<T>(
 export async function observedReadOnly<T>(
   operation: string,
   logger: LoggerLike | undefined,
-  callback: () => Promise<T>,
+  callback: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   // Session acquisition and an idempotent query can fail transiently before
   // the SDK retries them. Re-running the callback creates a new Query, so the
   // pool can acquire a fresh session without tearing down the shared driver.
   // This opt-in is intentionally limited to read-only operations.
   return prepareAndObserveYdbOperation(operation, logger, getSql, callback, {
-    retryTransientOnce: true,
+    readRetry: { budgetMs: Math.min(2 * queryTimeoutMs(), 20_000) },
   });
 }
 

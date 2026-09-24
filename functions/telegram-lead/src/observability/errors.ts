@@ -117,23 +117,33 @@ function upstreamStatus(error: unknown): number | null {
     : null;
 }
 
+function numericErrorCode(error: unknown): string | undefined {
+  const code = errorRecord(error)?.code;
+  if (typeof code !== 'number' || !Number.isSafeInteger(code) || code < 0) {
+    return undefined;
+  }
+
+  // AbortSignal uses legacy DOM codes (20/23), not gRPC or YDB statuses.
+  if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+    return error.name;
+  }
+
+  return GRPC_CODE_NAMES.get(code) ?? YDB_CODE_NAMES.get(code) ?? String(code);
+}
+
 function errorCode(error: unknown, fallback: string): string {
   const chain = errorChain(error);
   const explicitCode = chain
     .map(item => errorRecord(item)?.code)
     .find(value => typeof value === 'string' && value.trim());
-  const numericCode = chain
-    .map(item => errorRecord(item)?.code)
-    .find(value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
+  const numericCode = chain.map(numericErrorCode).find(value => value !== undefined);
   const namedError = error instanceof Error && error.name !== 'Error' ? error.name : undefined;
   const specificNamedError =
     namedError && !GENERIC_ERROR_NAMES.has(namedError) ? namedError : undefined;
 
   return normalizeIdentifier(
     explicitCode ??
-      (typeof numericCode === 'number'
-        ? (GRPC_CODE_NAMES.get(numericCode) ?? YDB_CODE_NAMES.get(numericCode) ?? String(numericCode))
-        : undefined) ??
+      numericCode ??
       specificNamedError ??
       allowlistedMessageCode(error) ??
       namedError,

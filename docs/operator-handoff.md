@@ -79,14 +79,14 @@ Workflow [run #32030115816](https://github.com/zvenfit/zvenfit-estetika-frontend
 сборку и bucket-scoped загрузку сайта с негативными access-boundary тестами, затем безопасный
 read-only production smoke без реальной заявки.
 
-Live Monium синхронизирован с Git desired state: 9 log metrics, 14 alerts, два канала,
+На срезе 17 августа live Monium был синхронизирован с Git desired state: 9 log metrics, 14 alerts, два канала,
 12 operational charts, alert overview, памятка **Как читать дашборд** и строка INFO/ERROR
 shortcuts. Борда показывает source
 series для storage/outbox и Telegram failures, YDB retries/slow query, rate limiter/retry-trigger и
 Cloud Function throttling. Runtime-error alert изолирован на
 `zvenfit-estetika-telegram-lead` и использует системную серию
 `cluster="default"`, `service="__serverless-functions__"`; throttling/duration используют
-provider-серию `service="serverless-functions"`. Drift-check совпал. Synthetic smoke 2026-08-17
+provider-серию `service="serverless-functions"`. Drift-check на том срезе совпал. Synthetic smoke 2026-08-17
 подтвердил ожидаемые пороги, 13 успешных отправок (оба канала для paging, только email для slow-YDB)
 и возврат правил в `OK`. YDB session phases отложены как нестабильный техдолг; paging использует
 только `query_execute`.
@@ -102,6 +102,15 @@ Rollout [#32971698420](https://github.com/zvenfit/zvenfit-estetika-frontend/acti
 `Info`, отправляет только email и не повторяется; Telegram для него отключён. После deploy
 зафиксирован успешный `monium_metrics_export_completed` за `1054` мс без новых exporter timeout.
 
+Rollout [#35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444306516)
+от 2026-09-19 развернул `20af273`: безопасную диагностику YDB retry и Telegram failure phase,
+а также изоляцию slow-log threshold. Лог deploy подтверждает `YDB_SLOW_OPERATION_MS=3000`
+и `MONIUM_METRICS_TIMEOUT_MS=5000`. Quality checks, YDB verification и read-only production
+smoke прошли. [Проверка паритета #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978)
+успешна; baseline совпадает с опубликованным upstream `8e568f0` на срезе 19 сентября.
+Полное закрытие live-мониторинга пока не подтверждено; детали — в
+[сентябрьском разборе](monitoring-review-2026-09-18.md#доработка-19-сентября).
+
 Функция пока публикует canonical queue gauge
 `zvenfit_estetika_telegram_pending_notifications` и legacy alias
 `zvenfit_estetika_telegram_pending_submissions`. Legacy удаляется отдельным следующим rollout после
@@ -112,7 +121,9 @@ Rollout [#32971698420](https://github.com/zvenfit/zvenfit-estetika-frontend/acti
 1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 2. включать HSTS только после стабильной проверки HTTPS;
-3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout.
+3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout;
+4. подтвердить live-retention общей группы в 14 дней, новые поля естественного `ydb_retry`,
+   p95 selector и свежую полную сверку live-настроек всех 14 правил с Git.
 
 ## 5. Production-проверка с реальными данными
 

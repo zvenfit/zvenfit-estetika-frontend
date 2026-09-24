@@ -71,23 +71,56 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs
 `telegram_delivery_retry_scheduled`, `ydb_operation_completed` и `ydb_operation_failed` остаются
 диагностическими log-only событиями. `ydb_operation_completed` содержит полную длительность,
 retry count и агрегаты `query_execute_*`, но не SQL, параметры или данные обращения. Alert
-`zvenfit_estetika_slow_ydb` реагирует только на медленный `query_execute`. Нестабильные YDB session
-phases (`session_acquire` / `session_create`) намеренно не собираются и остаются техдолгом до
-стабилизации диагностических каналов. Read-only операции `list_telegram_candidates` и
-`get_telegram_queue_health` один раз повторяют transient `AbortError`, `TimeoutError`,
-неклассифицированный `ClientError` и известные временные gRPC/transport-коды через новую query.
-Явные постоянные коды, например `PERMISSION_DENIED`, не повторяются; write-path заявок этим
-механизмом не затрагивается. Log heartbeat — основной paging-сигнал активности retry-worker:
+`zvenfit_estetika_slow_ydb` реагирует только на медленный `query_execute`. Session traces
+(`session_acquire` / `session_create`) используются только для локализации ошибки:
+агрегаты `session_*`, отдельные slow-события и графики session latency не добавляются.
+
+Read-only операции `list_telegram_candidates` и `get_telegram_queue_health` допускают
+до трёх прикладных попыток при transient `AbortError`, `TimeoutError`, неклассифицированном
+`ClientError` и известных временных YDB/gRPC/transport-кодах. Новая попытка создаёт новую
+query; паузы — 250–374 и 500–749 мс. Один общий AbortSignal ограничивает получение сессии,
+query, внутренние повторы SDK и паузы. Бюджет каждого чтения после подготовки клиента —
+`min(2 × YDB_QUERY_TIMEOUT_MS, 20000)` мс; при default Estetika `10000` это 20 секунд.
+Таймаут отдельной query остаётся 10 секунд. При двух долгих попытках третья может не
+начаться: число попыток и общий бюджет — независимые верхние границы. Если на паузу
+времени не хватает, повтор не запускается. Просроченный результат не принимается даже
+при задержке таймера event loop. Исчерпание бюджета отменяет запрос и даёт
+`ydb_read_budget_exhausted`, `retriable=true` для следующего запуска worker.
+
+Явные постоянные коды, например `PERMISSION_DENIED`, не повторяются даже через wrapper
+с именем `TimeoutError`. `AbortError/ABORT_ERR` от отмены паузы SDK допускает повтор
+только в пределах общего бюджета и при отсутствии постоянного протокольного кода.
+Запись заявки, события согласия рассылки и transactional outbox, claim/mark уведомления
+этим механизмом не повторяются. Log heartbeat — основной paging-сигнал активности retry-worker:
 он строится по `retry_worker_completed` и не зависит от direct OTLP exporter. Direct heartbeat
 остаётся диагностическим вторым сигналом для разбора расхождений между Cloud Logging и Monium
 metrics ingestion.
 
 `ydb_retry` означает успешное восстановление и содержит безопасные поля последней
 ошибки, приведшей к повтору: `error_type`, `error_code`, `retry_source=sdk|read_fallback`,
-`phase` и, при наличии query trace, `failed_phase_duration_ms`. Общая `duration_ms`
-включает повторы; `query_execute_*` описывают только ExecuteQuery. Без соответствующего
-trace используется `phase=unknown` без предположений о session-фазах. Событие остаётся
-одним на восстановленную операцию; `retry_attempts` показывает число повторов.
+`phase` и, при наличии trace, `failed_phase_duration_ms`. `phase_source=error_trace`
+означает точную связь с ошибкой trace; `active_trace` — снимок активной фазы при отмене,
+когда SDK вернул deadline раньше завершения RPC. Это длительность до снимка, а не
+до завершения RPC. Фазы принадлежат попыткам SDK: вложенный retry получения credentials
+не удаляет внешнюю фазу, поздняя отмена старой попытки не описывает следующую.
+Общая `duration_ms` включает повторы; `query_execute_*` описывают только ExecuteQuery.
+Без соответствующего trace используется `phase=unknown`; отсутствие ExecuteQuery
+само по себе не назначает session-фазу. Эти поля доступны также в `ydb_operation_failed`.
+Событие `ydb_retry` остаётся одним на восстановленную операцию; `retry_attempts`
+считает начатые повторы, а не ожидание backoff.
+
+В `ydb_operation_failed.prior_error` сохраняются только безопасные диагностические
+поля предыдущей прикладной ошибки, снятые до backoff; если её нет — последнего повтора
+SDK. Текущая ошибка остаётся в верхних полях. Предыдущая ошибка не подставляется в
+`cause` текущей отмены и не меняет её классификацию. `phase` описывает текущий отказ,
+а `prior_error.phase` — предыдущий; в селекторах используйте полный путь поля.
+`prior_error.retry_source` обозначает механизм, назначивший повтор, и может быть
+`read_fallback` при `retry_attempts=0`, если бюджет закончился до старта повтора.
+Неудачная операция не пишет
+`ydb_retry` и продолжает учитываться runtime/heartbeat alerts. Для сравнения со старыми
+двойными таймаутами используйте также `prior_error.error_code`, `phase` и число попыток:
+общий бюджет включает backoff, поэтому может завершить вторую query раньше её
+собственного deadline. Новое имя ошибки не доказывает новый инцидент или его устранение.
 Числовые статусы YDB/gRPC сохраняются как технические коды без SQL, параметров и issues.
 
 Для Telegram поле `telegram_phase=route_probe|send_message` различает проверку маршрута
