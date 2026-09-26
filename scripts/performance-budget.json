@@ -2,10 +2,10 @@
   "distBytes": 310000,
   "indexHtmlBytes": 90000,
   "formHtmlBytes": 22000,
-  "siteCssBytes": 34000,
+  "siteCssBytes": 35000,
   "localJavaScriptBytes": 23000,
   "fontFaces": 6,
   "fontFormat": "woff2",
-  "serviceImages": 19,
+  "serviceImages": 18,
   "initialServiceImages": 9
 }

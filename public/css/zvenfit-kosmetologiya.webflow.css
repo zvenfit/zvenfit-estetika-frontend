@@ -2572,6 +2572,65 @@ body > .footer {
   }
 }
 
+/* One shared Revixan service with distinct face/body programs. */
+.services-card.revixan-card {
+  max-width: none;
+  overflow: hidden;
+  margin: 30px 0;
+  scroll-margin-top: 100px;
+}
+
+.revixan-intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 30px;
+  background-color: var(--beige);
+}
+
+.revixan-overview,
+.revixan-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.revixan-options {
+  border-top: 1px solid var(--powder);
+}
+
+.revixan-options > section + section {
+  border-left: 1px solid var(--powder);
+}
+
+.services-photo.revixan-photo {
+  align-self: center;
+  border: 0;
+  border-radius: 0;
+  height: auto;
+  object-fit: contain;
+}
+
+.photo-eqiup.pressotop-photo {
+  object-fit: contain;
+}
+
+@media screen and (max-width: 767px) {
+  .revixan-overview,
+  .revixan-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .revixan-options > section + section {
+    border-left: 0;
+    border-top: 1px solid var(--powder);
+  }
+
+  .revixan-intro {
+    padding: 20px;
+  }
+
+}
+
 /* Branded editorial layout for legal documents converted from office files. */
 .legal-page {
   min-width: 280px;
