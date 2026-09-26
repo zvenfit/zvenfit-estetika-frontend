@@ -1,10 +1,17 @@
 # Паритет с zvenfit-frontend
 
+Текущий аудит охватывает опубликованный upstream commit
+`3fe212e813f0d9f117eea14b246e63fc3bf73cdd` от 25 сентября: PR #71 и #72.
+[Сравнение архитектуры и алертов](upstream-review-2026-09-25.md) послужило основой
+адаптации; [ADR-001](decisions/001-queue-read-recovery.md) фиксирует принятое решение.
+Паритет относится к коду и desired state. Новый production rollout и live drift
+пока не подтверждены.
+
 `zvenfit-frontend` — источник переносимых инженерных практик, а не шаблон интерфейса. Архитектура
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
 не копируются автоматически.
 
-Текущий аудит выполнен 2026-09-19 до опубликованного commit
+Предыдущий аудит выполнен 2026-09-19 до опубликованного commit
 `8e568f043f415b0b5109663dfa2662a4ff54e58b`. SHA проверен по GitHub `main` и локальному
 `origin/main` основного проекта. Перенесены архитектурные изменения production
 observability и доступов: event counts через log aggregates, safe error taxonomy, canonical labels
@@ -128,8 +135,31 @@ slow events или dashboard. Дополнены `prior_error` и регресс
 сохранена. Точный контракт — в [runbook](monitoring.md#log-metrics), границы пользы —
 в [разборе инцидентов](monitoring-review-2026-09-24.md#адаптация-стратегии-повторов-25-сентября).
 
-Это адаптация локального кода, а не аудит нового опубликованного upstream commit:
-`scripts/upstream-parity.json` и baseline не изменяются. Production rollout не выполнен.
+Эта первоначальная адаптация опубликована в Estetika PR #27 (`069b804`).
+На её этапе baseline не менялся; состояние production из факта merge не выводится.
+
+## Паритет с опубликованными PR #71 и #72 — 25 сентября
+
+GitHub compare `8e568f0..3fe212e` содержит ровно два commit:
+
+| Upstream commit | Решение для Estetika |
+| --- | --- |
+| `e672ddd` — PR #71, общий бюджет и фазы timeout | Уже адаптирован в PR #27; сохраняются timeout 10 секунд, бюджет чтения 20 секунд, query-only telemetry и отдельный `prior_error`. |
+| `3fe212e` — PR #72, восстановление чтений и deferred worker | Перенесены capped backoff в пределах deadline, разделение retry/observability, типизированный отказ storage port, application worker и согласованное покрытие alerts. |
+
+Adapter переводит в deferred только доказанные временные отказы двух чтений.
+В worker сохранены оба вида уведомлений Estetika, единый outbox, legacy gauge,
+транзакционные записи, consent state и существующая доставка. Неизвестный отказ
+остаётся runtime failure, в том числе при deadline в паузе: исходная причина
+сохраняется в памяти, безопасная диагностика — в `prior_error`. Для текущего
+budget error trace предыдущей попытки не подставляется как текущая фаза.
+
+Desired state содержит 10 log metrics и 15 alerts; добавлены deferred count/alert
+и полный ID в изолированный dashboard allowlist. Retry/slow alerts — INFO, email,
+без повторов. Storage coverage уже включало `telegram_delivery_retry_error`.
+Upstream session aggregates, staging wiring и lead-specific storage не переносились.
+Порядок применения и отката описан в [runbook](monitoring.md#согласованный-rollout-и-откат).
+Baseline продвинут до проверенного merge commit #72, а не до предположительного HEAD.
 
 ## Что сравнивать при каждом новом commit
 

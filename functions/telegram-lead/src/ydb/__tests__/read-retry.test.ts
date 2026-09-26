@@ -3,7 +3,8 @@ import { getEventListeners } from 'node:events';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { isTransientReadError, retryRead } from '../read-retry';
+import { retryRead } from '../read-retry';
+import { isTransientReadError } from '../read-retry-policy';
 import { sdkTestDriver, waitForAbort } from './sdk-test-driver';
 
 function deadlineError(): Error {
@@ -33,8 +34,8 @@ test('recovers two session deadlines with spaced retries and one shared signal',
   assert.equal(starts.length, 3);
   const [first, second, third] = starts;
   assert.ok(first !== undefined && second !== undefined && third !== undefined);
-  assert.ok(second - first >= 240);
-  assert.ok(third - second >= 490);
+  assert.ok(second - first >= 490);
+  assert.ok(third - second >= 990);
   assert.deepEqual(causes, [error, error]);
   assert.equal(new Set(signals).size, 1);
   const signal = signals[0];
@@ -61,7 +62,7 @@ test('one budget cancels an in-flight retry and is not reset per attempt', async
         return new Promise<never>(() => {});
       },
       {
-        budgetMs: 350,
+        budgetMs: 650,
         onRetry: () => {
           retries += 1;
         },
@@ -73,7 +74,7 @@ test('one budget cancels an in-flight retry and is not reset per attempt', async
   assert.equal(attempts, 2);
   assert.equal(retries, 1);
   assert.equal(observedSignal?.aborted, true);
-  assert.ok(performance.now() - startedAt < 550);
+  assert.ok(performance.now() - startedAt < 950);
   assert.ok(observedSignal);
   assert.equal(getEventListeners(observedSignal, 'abort').length, 0);
 });

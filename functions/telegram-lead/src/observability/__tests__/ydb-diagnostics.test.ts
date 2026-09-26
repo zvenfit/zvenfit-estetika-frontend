@@ -5,6 +5,7 @@ import { setTimeout } from 'node:timers/promises';
 import { memoryLogger, namedError, recordByEvent, tracePhase, type TestPhase } from './ydb-test-helpers';
 import { observeYdbOperation } from '../ydb';
 import { sdkTestDriver } from '../../ydb/__tests__/sdk-test-driver';
+import { runReadOnlyYdbOperation } from '../../ydb/read-operation';
 
 test('recovers real SDK CreateSession deadlines and keeps their exact failing trace', async context => {
   context.mock.method(Math, 'random', () => 0);
@@ -15,9 +16,10 @@ test('recovers real SDK CreateSession deadlines and keeps their exact failing tr
     if (creates <= 2) throw namedError('ClientError', 4);
   });
   try {
-    await observeYdbOperation('list_telegram_candidates', logger,
+    await runReadOnlyYdbOperation('list_telegram_candidates', logger,
+      async () => {},
       async signal => fixture.sql`SELECT 1;`.idempotent(true).signal(signal).timeout(1_000),
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     );
     const recovered = recordByEvent(logger.records, 'ydb_retry');
     assert.equal(creates, 3);
@@ -42,9 +44,10 @@ test('final real SDK CreateSession deadlines retain the failure phase without a 
     throw namedError('ClientError', 4);
   });
   try {
-    await assert.rejects(observeYdbOperation('list_telegram_candidates', logger,
+    await assert.rejects(runReadOnlyYdbOperation('list_telegram_candidates', logger,
+      async () => {},
       async signal => fixture.sql`SELECT 1;`.idempotent(true).signal(signal).timeout(1_000),
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     ), { code: 4 });
     const failure = recordByEvent(logger.records, 'ydb_operation_failed');
     assert.equal(creates, 3);
@@ -64,13 +67,13 @@ test('keeps the prior error when a deadline interrupts the next read', async con
   const logger = memoryLogger();
   const prior = namedError('ClientError', 'UNAVAILABLE');
   let attempts = 0;
-  await assert.rejects(observeYdbOperation('list_telegram_candidates', logger, async signal => {
+  await assert.rejects(runReadOnlyYdbOperation('list_telegram_candidates', logger, async () => {}, async signal => {
     attempts += 1;
     if (attempts === 1) throw prior;
     return new Promise<never>((_, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), { once: true });
     });
-  }, { readRetry: { budgetMs: 350 } }), error => {
+  }, 650), error => {
     assert.ok(error instanceof Error);
     assert.equal(error.cause, undefined);
     return true;
@@ -91,12 +94,12 @@ test('keeps the prior error without counting an interrupted backoff as a retry',
   context.mock.method(performance, 'now', () => now);
   context.mock.method(Math, 'random', () => 0);
   let attempts = 0;
-  await assert.rejects(observeYdbOperation('get_telegram_queue_health', logger, async () => {
+  await assert.rejects(runReadOnlyYdbOperation('get_telegram_queue_health', logger, async () => {}, async () => {
     attempts += 1;
     // Simulate the event loop resuming after the shared deadline during backoff.
     setImmediate(() => { now = 2_001; });
     throw namedError('ClientError', 'UNAVAILABLE');
-  }, { readRetry: { budgetMs: 2_000 } }), { code: 'ydb_read_budget_exhausted' });
+  }, 2_000), { code: 'ydb_read_budget_exhausted' });
   const failure = recordByEvent(logger.records, 'ydb_operation_failed');
   assert.equal(attempts, 1);
   assert.equal(failure.retry_attempts, 0);
@@ -107,10 +110,10 @@ test('a prior transient failure cannot change the next permanent error', async c
   context.mock.method(Math, 'random', () => 0);
   const logger = memoryLogger();
   let attempts = 0;
-  await assert.rejects(observeYdbOperation('list_telegram_candidates', logger, async () => {
+  await assert.rejects(runReadOnlyYdbOperation('list_telegram_candidates', logger, async () => {}, async () => {
     attempts += 1;
     throw namedError('ClientError', attempts === 1 ? 'UNAVAILABLE' : 'PERMISSION_DENIED');
-  }, { readRetry: { budgetMs: 2_000 } }), { code: 'PERMISSION_DENIED' });
+  }, 2_000), { code: 'PERMISSION_DENIED' });
   const failure = recordByEvent(logger.records, 'ydb_operation_failed');
   assert.equal(attempts, 2);
   assert.equal(failure.error_code, 'PERMISSION_DENIED');
@@ -126,9 +129,10 @@ test('captures the active query when SDK timeout wins the race against its trace
   let unwind: () => void = () => {};
   let attempts = 0;
   try {
-    await observeYdbOperation(
+    await runReadOnlyYdbOperation(
       'list_telegram_candidates',
       logger,
+      async () => {},
       async () => {
         attempts += 1;
         if (attempts > 1) {
@@ -146,7 +150,7 @@ test('captures the active query when SDK timeout wins the race against its trace
           ),
         );
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     );
 
     const recovered = recordByEvent(logger.records, 'ydb_retry');
@@ -162,15 +166,17 @@ test('captures the active query when SDK timeout wins the race against its trace
   }
 });
 
-test('does not attribute a later session timeout to a cancelled query still unwinding', async () => {
+test('does not attribute a later session timeout to a cancelled query still unwinding', async context => {
+  context.mock.method(Math, 'random', () => 0);
   const { retry } = await import('@ydbjs/retry');
   const logger = memoryLogger();
   const unwinds: (() => void)[] = [];
   let attempts = 0;
   try {
-    await observeYdbOperation(
+    await runReadOnlyYdbOperation(
       'list_telegram_candidates',
       logger,
+      async () => {},
       async () => {
         attempts += 1;
         if (attempts === 3) {
@@ -190,7 +196,7 @@ test('does not attribute a later session timeout to a cancelled query still unwi
           ),
         );
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     );
     const recovered = recordByEvent(logger.records, 'ydb_retry');
     assert.equal(recovered.retry_attempts, 2);
@@ -224,11 +230,12 @@ test('the shared deadline reaches a real SDK query while CreateSession is in fli
   const sql = query(driver as unknown as Parameters<typeof query>[0]);
   try {
     await assert.rejects(
-      observeYdbOperation(
+      runReadOnlyYdbOperation(
         'list_telegram_candidates',
         logger,
+        async () => {},
         async signal => sql`SELECT 1;`.idempotent(true).signal(signal).timeout(1_000),
-        { readRetry: { budgetMs: 30 } },
+        30,
       ),
       { code: 'ydb_read_budget_exhausted' },
     );
@@ -286,11 +293,12 @@ for (const metadataCompletes of [false, true]) {
     const sql = query(driver as unknown as Parameters<typeof query>[0]);
     try {
       await assert.rejects(
-        observeYdbOperation(
+        runReadOnlyYdbOperation(
           'list_telegram_candidates',
           logger,
+          async () => {},
           async signal => sql`SELECT 1;`.idempotent(true).signal(signal).timeout(1_000),
-          { readRetry: { budgetMs: 30 } },
+          30,
         ),
         { code: 'ydb_read_budget_exhausted' },
       );
@@ -306,19 +314,21 @@ for (const metadataCompletes of [false, true]) {
   });
 }
 
-test('final failures retain the innermost phase and never become a recovered event', async () => {
+test('final failures retain the innermost phase and never become a recovered event', async context => {
+  context.mock.method(Math, 'random', () => 0);
   const logger = memoryLogger();
   await assert.rejects(
-    observeYdbOperation(
+    runReadOnlyYdbOperation(
       'list_telegram_candidates',
       logger,
+      async () => {},
       () =>
         tracePhase('query.session.acquire', () =>
           tracePhase('query.session.create', async () => {
             throw namedError('ClientError', 4);
           }),
         ),
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     ),
   );
   const failure = recordByEvent(logger.records, 'ydb_operation_failed');
@@ -342,7 +352,7 @@ test('correlates an SDK deadline with its active trace despite a distinct transp
   let transportError: unknown;
   let transportFinished: Promise<void> | undefined;
 
-  await observeYdbOperation('list_telegram_candidates', logger, async () => {
+  await runReadOnlyYdbOperation('list_telegram_candidates', logger, async () => {}, async () => {
     attempts += 1;
     if (attempts > 1) return;
 
@@ -363,7 +373,7 @@ test('correlates an SDK deadline with its active trace despite a distinct transp
       sdkError = error;
       throw error;
     }
-  }, { readRetry: { budgetMs: 2_000 } });
+  }, 2_000);
   await transportFinished;
 
   assert.equal(attempts, 2);
@@ -425,9 +435,10 @@ test('locates a session failure without adding session latency aggregates', asyn
   const logger = memoryLogger();
   let attempts = 0;
 
-  await observeYdbOperation(
+  await runReadOnlyYdbOperation(
     'list_telegram_candidates',
     logger,
+    async () => {},
     async () => {
       attempts += 1;
       await tracePhase('query.session.acquire', () =>
@@ -438,7 +449,7 @@ test('locates a session failure without adding session latency aggregates', asyn
         }),
       );
     },
-    { readRetry: { budgetMs: 2_000 } },
+    2_000,
   );
 
   const recovered = recordByEvent(logger.records, 'ydb_retry');
@@ -487,7 +498,7 @@ test('preserves the query phase of a wrapped error recovered by the read fallbac
   const logger = memoryLogger();
   let attempts = 0;
 
-  await observeYdbOperation('list_telegram_candidates', logger, async () => {
+  await runReadOnlyYdbOperation('list_telegram_candidates', logger, async () => {}, async () => {
     attempts += 1;
     try {
       await tracePhase('query.execute', async () => {
@@ -496,7 +507,7 @@ test('preserves the query phase of a wrapped error recovered by the read fallbac
     } catch (cause) {
       throw Object.assign(new Error('private wrapper'), { cause });
     }
-  }, { readRetry: { budgetMs: 2_000 } });
+  }, 2_000);
 
   const recovered = recordByEvent(logger.records, 'ydb_retry');
   assert.equal(attempts, 2);

@@ -28,8 +28,8 @@ const ROOT = path.resolve(__dirname, '../..');
 test('normalizes Estetika monitoring resources into a stable read-only contract', () => {
   const normalized = normalizeMonitoringState(config);
 
-  assert.equal(normalized.logMetrics.length, 9);
-  assert.equal(normalized.alerts.length, 14);
+  assert.equal(normalized.logMetrics.length, 10);
+  assert.equal(normalized.alerts.length, 15);
   assert.equal(normalized.notificationChannels.length, 2);
   assert.equal(normalized.dashboard.title, 'ZvenFit Estetika · production');
   assert.deepEqual(diffMonitoringState(config, liveSnapshot()), []);
@@ -88,6 +88,26 @@ test('reports taxonomy, channel and dashboard drift in addition to thresholds', 
   assert.match(output, /dashboard/);
   assert.match(output, /zfe_permanent_telegram_failures: missing/);
   assert.match(output, /zvenfit_estetika_legacy_alert: unexpected/);
+});
+
+test('detects missing deferred coverage and a return to repeated diagnostic paging', () => {
+  const snapshot = liveSnapshot();
+  snapshot.logMetrics = snapshot.logMetrics.filter(item => item.id !== 'zvenfit_estetika_retry_worker_deferred_1m');
+  snapshot.alerts = snapshot.alerts.filter(item => item.id !== 'zfe_retry_worker_deferred');
+  for (const id of ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_slow_ydb']) {
+    const alert = snapshot.alerts.find(item => item.id === id);
+    alert.notificationChannelIds.push('zvenfit_estetika_telegram_alerts');
+    alert.repeatMinutes = 30;
+    alert.level = 'CRITICAL';
+  }
+  const output = diffMonitoringState(config, snapshot).join('\n');
+  assert.match(output, /logMetrics\.zvenfit_estetika_retry_worker_deferred_1m: missing/);
+  assert.match(output, /alerts\.zfe_retry_worker_deferred: missing/);
+  for (const id of ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_slow_ydb']) {
+    assert.ok(output.includes(`alerts.${id}.notificationChannelIds`));
+    assert.ok(output.includes(`alerts.${id}.repeatMinutes`));
+    assert.ok(output.includes(`alerts.${id}.level`));
+  }
 });
 
 test('ignores ordering-only differences in channels, labels and dashboard queries', () => {

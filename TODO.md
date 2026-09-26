@@ -82,6 +82,10 @@ Live-retention, p95, новые поля естественного retry и п�
   YDB retry/slow query, rate limiter/retry-trigger и Cloud Function throttling.
   Runtime-error alert дополнительно изолирован от функций основного ZvenFit и использует фактическую
   системную серию `service="__serverless-functions__"`
+- [ ] **Развернуть deferred worker и согласованный monitoring** — код, ADR и desired state
+  подготовлены: сначала создать новый metric/alert и 15-ID allowlist, затем функция;
+  подтвердить heartbeat, восстановление чтений и INFO/email/no-repeat у retry/slow.
+  [Порядок rollout и отката](docs/monitoring.md#согласованный-rollout-и-откат).
 - [ ] **Завершить миграцию queue gauge** — после подтверждённого обновления live dashboard и одного
   стабильного production rollout удалить legacy `zvenfit_estetika_telegram_pending_submissions`
 - [ ] **Оценить YDB session latency telemetry** — агрегаты session latency отложены;
@@ -125,8 +129,8 @@ Live-retention, p95, новые поля естественного retry и п�
   - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
   - [ ] Проверить заголовки для `/`, `/form/`, `/404.html` и юридических страниц командой `curl -I` после распространения настроек CDN
 - [ ] **Content Security Policy** — вынести исполняемый inline-код, запустить CSP сначала в `Report-Only`, учесть домены Яндекс Метрики, затем включить enforcement с `frame-ancestors 'none'`
-- [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через 9
-  log aggregates; direct OTLP только для outbox gauges/heartbeat; 14 alerts, `query_execute` telemetry,
+- [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через 10
+  log aggregates; direct OTLP только для outbox gauges/heartbeat; 15 desired alerts, `query_execute` telemetry,
   exporter-failure health, dashboard desired state, строгий drift check и безопасный smoke-скрипт
 
 ---

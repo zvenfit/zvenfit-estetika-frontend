@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { intakeForm } from './application/intake-form';
-import {
-  retryPendingNotifications,
-  type RetrySummary,
-} from './application/retry-notifications';
+import { runRetryWorker, type RetryWorkerResult } from './application/retry-worker';
 import {
   allowedOrigins,
   corsHeaders,
@@ -52,7 +49,7 @@ export interface HandlerDependencies extends NotificationDeliveryDependencies {
 
 const TIMER_EVENT_TYPE = 'yandex.cloud.events.serverless.triggers.TimerMessage';
 
-type HandlerResult = HttpResponse | RetrySummary;
+type HandlerResult = HttpResponse | RetryWorkerResult;
 type CloudHandler = (event: HttpEvent, context?: FunctionContext) => Promise<HandlerResult>;
 
 function isTimerEvent(event: HttpEvent): boolean {
@@ -174,38 +171,7 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
 
     try {
       if (isTimerEvent(event)) {
-        const retrySummary = await retryPendingNotifications(dependencies, logger);
-        const queueHealth = await dependencies.outbox.getQueueHealth({
-          now: dependencies.now(),
-          logger,
-        });
-        // Keep the legacy series for one rollout so the current live dashboard does not go blind
-        // between the function deploy and the coordinated Monium dashboard import.
-        metrics.recordGauge(
-          'zvenfit_estetika_telegram_pending_submissions',
-          queueHealth.pendingCount,
-        );
-        metrics.recordGauge(
-          'zvenfit_estetika_telegram_pending_notifications',
-          queueHealth.pendingCount,
-        );
-        metrics.recordGauge(
-          'zvenfit_estetika_telegram_oldest_pending_age_seconds',
-          queueHealth.oldestPendingAgeSeconds,
-        );
-        metrics.recordGauge('zvenfit_estetika_retry_worker_heartbeat', 1);
-        const heartbeatEvent = 'retry_worker_completed';
-        logger.info?.(
-          {
-            event: heartbeatEvent,
-            ...retrySummary,
-            outbox_pending: queueHealth.pendingCount,
-            oldest_pending_age_seconds: queueHealth.oldestPendingAgeSeconds,
-          },
-          heartbeatEvent,
-        );
-
-        return retrySummary;
+        return await runRetryWorker(dependencies, logger, metrics);
       }
 
       const origins = allowedOrigins();

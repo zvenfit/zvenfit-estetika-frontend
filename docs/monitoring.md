@@ -1,8 +1,8 @@
 # Monitoring and alerts
 
 Машиночитаемый desired state находится в
-[`scripts/monitoring.config.json`](../scripts/monitoring.config.json). Он описывает девять log
-metrics, четырнадцать alerts, два notification channels и компактный production dashboard. Эти
+[`scripts/monitoring.config.json`](../scripts/monitoring.config.json). Он описывает десять log
+metrics, пятнадцать alerts, два notification channels и компактный production dashboard. Эти
 ресурсы относятся только к Estetika и не используют функции, YDB или бакеты `zvenfit-frontend`.
 
 Log metrics, alert rules и channels остаются console-managed: публичные `yc` CLI и Terraform
@@ -65,6 +65,7 @@ https://monium.yandex.cloud/projects/folder__b1ge1e4iopttj79hfdfm/logs
 | `zvenfit_estetika_rate_limit_errors_5m` | `submission_rate_limit_error` | 5m |
 | `zvenfit_estetika_rate_limited_5m` | `submission_blocked`, `meta.reason=rate_limit` | 5m |
 | `zvenfit_estetika_submissions_5m` | `submission_persisted`, group by `meta.form_type` | 5m |
+| `zvenfit_estetika_retry_worker_deferred_1m` | `retry_worker_deferred`, временный отказ чтения очереди | 1m |
 | `zvenfit_estetika_retry_worker_log_heartbeat_1m` | `retry_worker_completed`, реальные timer logs | 1m |
 | `zvenfit_estetika_monium_metrics_failures_5m` | ошибки init/config/export direct metrics | 5m |
 
@@ -75,17 +76,18 @@ retry count и агрегаты `query_execute_*`, но не SQL, парамет
 (`session_acquire` / `session_create`) используются только для локализации ошибки:
 агрегаты `session_*`, отдельные slow-события и графики session latency не добавляются.
 
-Read-only операции `list_telegram_candidates` и `get_telegram_queue_health` допускают
-до трёх прикладных попыток при transient `AbortError`, `TimeoutError`, неклассифицированном
-`ClientError` и известных временных YDB/gRPC/transport-кодах. Новая попытка создаёт новую
-query; паузы — 250–374 и 500–749 мс. Один общий AbortSignal ограничивает получение сессии,
-query, внутренние повторы SDK и паузы. Бюджет каждого чтения после подготовки клиента —
+Read-only операции `list_telegram_candidates` и `get_telegram_queue_health` выполняют
+повторы через YDB adapter в пределах общего бюджета, без ограничения тремя попытками.
+Паузы — 500–749 мс, 1000–1499 мс, затем 2000–2999 мс. Каждый повтор создаёт новую
+query. Один общий AbortSignal ограничивает получение сессии, query, внутренние
+повторы SDK и паузы. Бюджет каждого чтения после подготовки клиента —
 `min(2 × YDB_QUERY_TIMEOUT_MS, 20000)` мс; при default Estetika `10000` это 20 секунд.
-Таймаут отдельной query остаётся 10 секунд. При двух долгих попытках третья может не
-начаться: число попыток и общий бюджет — независимые верхние границы. Если на паузу
-времени не хватает, повтор не запускается. Просроченный результат не принимается даже
-при задержке таймера event loop. Исчерпание бюджета отменяет запрос и даёт
-`ydb_read_budget_exhausted`, `retriable=true` для следующего запуска worker.
+Таймаут отдельной query остаётся 10 секунд. Если следующая пауза не помещается,
+возвращается последняя ошибка. Просроченный результат не принимается даже при
+задержке таймера event loop. Исчерпание бюджета отменяет запрос и даёт
+`ydb_read_budget_exhausted`. Подготовка клиента имеет собственную retry policy;
+20 секунд ограничивают одно чтение, не весь worker. Границы модулей и альтернативы —
+[ADR-001](decisions/001-queue-read-recovery.md).
 
 Явные постоянные коды, например `PERMISSION_DENIED`, не повторяются даже через wrapper
 с именем `TimeoutError`. `AbortError/ABORT_ERR` от отмены паузы SDK допускает повтор
@@ -111,13 +113,17 @@ metrics ingestion.
 
 В `ydb_operation_failed.prior_error` сохраняются только безопасные диагностические
 поля предыдущей прикладной ошибки, снятые до backoff; если её нет — последнего повтора
-SDK. Текущая ошибка остаётся в верхних полях. Предыдущая ошибка не подставляется в
-`cause` текущей отмены и не меняет её классификацию. `phase` описывает текущий отказ,
-а `prior_error.phase` — предыдущий; в селекторах используйте полный путь поля.
+SDK. Текущая ошибка остаётся в верхних полях. При отмене во время backoff исходная
+ошибка также сохраняется в `cause` только в памяти: это не позволяет превратить
+неизвестный сбой в известный timeout. Перед началом следующей query `cause`
+сбрасывается, а безопасный `prior_error` остаётся. При отмене в backoff `phase`
+остаётся `unknown`, trace предыдущего RPC находится в `prior_error.phase`;
+в селекторах используйте полный путь поля.
 `prior_error.retry_source` обозначает механизм, назначивший повтор, и может быть
 `read_fallback` при `retry_attempts=0`, если бюджет закончился до старта повтора.
 Неудачная операция не пишет
-`ydb_retry` и продолжает учитываться runtime/heartbeat alerts. Для сравнения со старыми
+`ydb_retry`: явно временный отказ чтения учитывается deferred/heartbeat alerts,
+неизвестная или постоянная ошибка — runtime alert. Для сравнения со старыми
 двойными таймаутами используйте также `prior_error.error_code`, `phase` и число попыток:
 общий бюджет включает backoff, поэтому может завершить вторую query раньше её
 собственного deadline. Новое имя ошибки не доказывает новый инцидент или его устранение.
@@ -187,10 +193,11 @@ alert уровня `Info`: он отправляет одно email-уведом
 
 По умолчанию оба канала подключаются к alerts доступности и доставки. Уведомления отправляются
 при переходах `ALARM`, `WARNING` и `OK`, повтор активного состояния — каждые 30 минут.
-Диагностический `zvenfit_estetika_slow_ydb` не пейджит в Telegram: для него остаётся только email
-с повтором раз в сутки. `zfe_monium_metrics_failures` также использует только email, но без
-повторной отправки (`0s`, «Никогда» в UI). Ошибки YDB, retry и backlog продолжают использовать
-обычную paging-политику.
+Диагностические `zvenfit_estetika_ydb_retries` и `zvenfit_estetika_slow_ydb` имеют
+уровень INFO: только email без повторной отправки. `zfe_monium_metrics_failures`
+также использует только email без повторов (`0s`, «Никогда» в UI).
+Повторные deferred-проходы, storage errors, отсутствие heartbeat, backlog,
+окончательные сбои доставки и неизвестные runtime failures сохраняют paging-политику.
 
 ## Alerts
 
@@ -204,6 +211,7 @@ alert уровня `Info`: он отправляет одно email-уведом
 | `zvenfit_estetika_submission_volume` | log count lead + newsletter | `>10` / `>20` | OK |
 | `zvenfit_estetika_rate_limit_health` | log count fail-open ошибок | `>0` / `>2` | OK |
 | `zfe_monium_metrics_failures` | сумма 5m log count сбоев exporter за 30m; email only, no repeat | `>2` / `>5` | OK |
+| `zfe_retry_worker_deferred` | sum отложенных проходов за 10m | `>2` / `>2.5` | OK |
 | `zfe_retry_worker_heartbeat` | log aggregate `retry_worker_completed`, max | `<0.9` / `<0.5` | ALARM |
 | `zvenfit_estetika_telegram_backlog` | direct oldest pending age | `>600` / `>1800` | OK |
 | `zfe_function_runtime_errors` | Cloud Functions `functions_errors` | `>0` / `>0.5` | OK |
@@ -233,6 +241,45 @@ exponential backoff `250ms` / `500ms`; постоянные ошибки не п
 а `Alarm` — минимум три. Backlog предупреждает после 10
 минут и алармит после 30. Только исчезновение log-derived retry heartbeat считается `Alarm`; отсутствие
 storage metrics считается `Warning`, остальные no-data состояния — `OK`.
+
+### Повторные отложенные проходы
+
+YDB adapter переводит в `QueueReadUnavailableError` только доказанный transient-код,
+DOM `TimeoutError` или собственный deadline без неизвестной причины. Обычный
+`ClientError`, generic `TimeoutError`, текст ошибки и постоянные коды не дают
+основания для deferred. При отмене в backoff неизвестная причина остаётся runtime
+failure. Классификация для deferred строже разрешения попробовать SELECT снова.
+
+Timer пишет `retry_worker_deferred` и возвращает `{deferred: true, stage}`;
+`stage=delivery` означает сбой выборки до доставки, `queue_health` — сбой последующего
+чтения состояния. Успешный heartbeat и queue gauges не публикуются. Уже сохранённая
+доставка не откатывается и не отправляется заново из-за отказа health. Доменные
+записи, состояния согласий рассылки, lease и delivery token не меняются от чтения.
+HTTP storage failures по-прежнему возвращают 503; ошибки обработки отдельной записи
+outbox сохраняют `telegram_delivery_retry_error` и критический storage alert.
+
+Алерт `zfe_retry_worker_deferred`: count за 1 минуту, `sum > 2.5` за 10 минут,
+delay 3 минуты, `No data = OK`, CRITICAL, Telegram/email. Три прохода в окне,
+не обязательно подряд, дают Alarm; один-два остаются логами. Warning `>2` при
+целочисленном count достигается одновременно с Alarm. Полная остановка дополнительно
+покрывается log heartbeat (`5m`, delay `3m`, `No data = ALARM`). Backlog с `No data = OK`
+не заменяет эти сигналы, если health невозможно прочитать.
+
+Deferred-result успешен на уровне платформы: восстановление ожидается на следующем
+минутном timer, а не через настроенные повторы неуспешного invocation через 30 секунд.
+Уведомление по deferred alert учитывает задержку поставки логов и не мгновенно.
+
+### Согласованный rollout и откат
+
+Desired state содержит 10 log metrics и 15 alerts. Сначала создать deferred metric/alert
+и включить его в 15-ID dashboard allowlist, проверить каналы и selectors. Затем
+развернуть функцию и подтвердить успешные heartbeat, gauges и восстановление worker.
+Сверить live INFO/email/no-repeat у retry/slow alerts. До внедрения новый event metric
+может быть пустым; это не проверка доставки. JSON в Git сам настройки Monium не меняет.
+
+При откате вернуть предыдущую версию функции; runtime, storage, heartbeat и backlog
+продолжают покрывать отказы. Deferred metric можно оставить пустой (`No data = OK`).
+Первопричина длинных YDB-задержек, p95 и live drift проверяются отдельно.
 
 ## Dashboard
 
@@ -310,7 +357,9 @@ bash scripts/test-monitoring-alerts.sh --confirm
 ```
 
 Проверьте доставку в Telegram и email, затем уведомления о возврате в `OK`. Для
-`zfe_monium_metrics_failures` ожидается только email без Telegram и повторной отправки. Runtime,
+`zfe_monium_metrics_failures`, `zvenfit_estetika_ydb_retries` и `zvenfit_estetika_slow_ydb`
+ожидается только email без Telegram и повторной отправки. Новый deferred alert
+проверяется естественными событиями; синтетический smoke его не генерирует. Runtime,
 throttling, trigger, direct gauges и YDB storage проверяются только реальными platform metrics:
 намеренно ронять функцию, timer или заполнять production YDB запрещено.
 
