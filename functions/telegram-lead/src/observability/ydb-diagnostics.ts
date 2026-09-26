@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { channel, tracingChannel } from 'node:diagnostics_channel';
 
-import { errorChain, safeErrorFields } from './errors';
+import { safeErrorFields } from './errors';
+import { errorChain } from '../error-chain';
 
 import type { JsonObject } from '../types';
 
@@ -217,6 +218,14 @@ export function retryErrorFields(
 }
 
 export function failurePhaseFields(operation: OperationState, error: unknown): JsonObject {
+  if (
+    isTraceContext(error) && 'code' in error && error.code === 'ydb_read_budget_exhausted' &&
+    'cause' in error && error.cause !== undefined
+  ) {
+    // A budget error retains a cause only between application attempts. Its
+    // preceding RPC trace belongs to prior_error, not to a currently active read.
+    return { phase: 'unknown' };
+  }
   let failure = errorChain(error)
     .map(item => operation.phaseFailures.get(item as object))
     .find(item => item !== undefined);

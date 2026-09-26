@@ -1,4 +1,5 @@
-import { errorChain, safeErrorFields } from './errors';
+import { safeErrorFields } from './errors';
+import { errorChain } from '../error-chain';
 import {
   createOperationState,
   operationStorage,
@@ -9,12 +10,12 @@ import {
 } from './ydb-diagnostics';
 import { initializationAttempts } from '../ydb/initialization-attempts';
 import { slowOperationMs } from '../ydb/config';
-import { isTransientReadError, retryRead } from '../ydb/read-retry';
 
 import type { JsonObject, LoggerLike } from '../types';
 
-interface ObserveYdbOperationOptions {
-  readRetry?: { budgetMs: number };
+export interface YdbOperationObserver {
+  onReadRetryScheduled(error: unknown): void;
+  onReadRetry(error: unknown): void;
 }
 
 function writeLog(
@@ -31,30 +32,24 @@ function writeLog(
 export async function observeYdbOperation<T>(
   operationName: string,
   logger: LoggerLike | undefined,
-  callback: (signal: AbortSignal) => Promise<T>,
-  options: ObserveYdbOperationOptions = {},
+  callback: (observer: YdbOperationObserver) => Promise<T>,
 ): Promise<T> {
   subscribeToDiagnostics();
   const startedAt = Date.now();
   const operation = createOperationState();
 
   try {
-    const result = await operationStorage.run(operation, async () => {
-      if (options.readRetry) {
-        return retryRead(callback, {
-          budgetMs: options.readRetry.budgetMs,
-          onRetryScheduled(error) {
-            operation.priorReadFailure = retryErrorFields(operation, error, 'read_fallback');
-          },
-          onRetry() {
-            operation.retries += 1;
-            operation.retryFailure = operation.priorReadFailure;
-          },
-        });
-      }
-
-      return callback(new AbortController().signal);
-    });
+    const result = await operationStorage.run(operation, () =>
+      callback({
+        onReadRetryScheduled(error) {
+          operation.priorReadFailure = retryErrorFields(operation, error, 'read_fallback');
+        },
+        onReadRetry() {
+          operation.retries += 1;
+          operation.retryFailure = operation.priorReadFailure;
+        },
+      }),
+    );
     const durationMs = Date.now() - startedAt;
     writeLog(logger, 'info', {
       event: 'ydb_operation_completed',
@@ -105,8 +100,7 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
   operationName: string,
   logger: LoggerLike | undefined,
   prepare: () => Promise<TPrepared>,
-  callback: (signal: AbortSignal) => Promise<TResult>,
-  options: ObserveYdbOperationOptions = {},
+  callback: (observer: YdbOperationObserver) => Promise<TResult>,
 ): Promise<TResult> {
   const startedAt = Date.now();
   try {
@@ -125,13 +119,12 @@ export async function prepareAndObserveYdbOperation<TPrepared, TResult>(
     throw error;
   }
 
-  return observeYdbOperation(operationName, logger, callback, options);
+  return observeYdbOperation(operationName, logger, callback);
 }
 
 export const _private = {
   createOperationState,
   errorChain,
-  isTransientReadError,
   queryFields,
   subscribeToDiagnostics,
   writeLog,

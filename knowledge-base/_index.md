@@ -23,6 +23,7 @@ title: ZvenFit Estetika project knowledge base
 
 ## Operations
 
+- [ADR-001: восстановление чтений outbox и отложенный проход worker](../docs/decisions/001-queue-read-recovery.md)
 - [Production monitoring decisions](monitoring.md)
 - [Полный monitoring runbook](../docs/monitoring.md)
 - [Operator handoff](../docs/operator-handoff.md)

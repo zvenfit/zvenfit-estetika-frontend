@@ -8,7 +8,7 @@
     "build": "rm -rf build && tsc --project tsconfig.build.json",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "npm run typecheck && npm run test:unit && npm run test:artifact",
-    "test:unit": "node --import tsx --test src/__tests__/*.test.ts src/telegram/__tests__/*.test.ts src/ydb/__tests__/*.test.ts src/observability/__tests__/*.test.ts",
+    "test:unit": "node --import tsx --test src/__tests__/*.test.ts src/application/__tests__/*.test.ts src/telegram/__tests__/*.test.ts src/ydb/__tests__/*.test.ts src/observability/__tests__/*.test.ts",
     "test:artifact": "npm run build && node --test src/__tests__/deployment.test.cjs",
     "test:integration": "npm run typecheck && node --import tsx --test src/ydb/__tests__/integration/*.test.ts",
     "bootstrap:schema": "npm run build && node build/cli/bootstrap-schema.js",

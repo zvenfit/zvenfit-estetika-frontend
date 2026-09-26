@@ -3,6 +3,7 @@ import { tracingChannel } from 'node:diagnostics_channel';
 import test from 'node:test';
 
 import { observeYdbOperation, prepareAndObserveYdbOperation } from '../ydb';
+import { runReadOnlyYdbOperation } from '../../ydb/read-operation';
 import { recordInitializationAttempts } from '../../ydb/initialization-attempts';
 
 import type { JsonObject, LoggerLike } from '../../types';
@@ -147,9 +148,10 @@ test('retries one transient error for an explicitly safe read', async () => {
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
-  const result = await observeYdbOperation(
+  const result = await runReadOnlyYdbOperation(
     'list_telegram_candidates',
     recordingLogger(records),
+    async () => {},
     async () => {
       attempts += 1;
       if (attempts === 1) {
@@ -158,7 +160,7 @@ test('retries one transient error for an explicitly safe read', async () => {
 
       return 'ok';
     },
-    { readRetry: { budgetMs: 2_000 } },
+    2_000,
   );
 
   assert.equal(result, 'ok');
@@ -173,9 +175,10 @@ test('retries TimeoutError and ClientError for explicitly safe reads', async () 
     const records: Array<{ level: string; fields: JsonObject }> = [];
     let attempts = 0;
 
-    const result = await observeYdbOperation(
+    const result = await runReadOnlyYdbOperation(
       'list_telegram_candidates',
       recordingLogger(records),
+      async () => {},
       async () => {
         attempts += 1;
         if (attempts === 1) {
@@ -184,7 +187,7 @@ test('retries TimeoutError and ClientError for explicitly safe reads', async () 
 
         return 'ok';
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     );
 
     assert.equal(result, 'ok');
@@ -197,9 +200,10 @@ test('retries a nested transient gRPC error for an explicitly safe read', async 
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
-  const result = await observeYdbOperation(
+  const result = await runReadOnlyYdbOperation(
     'get_telegram_queue_health',
     recordingLogger(records),
+    async () => {},
     async () => {
       attempts += 1;
       if (attempts === 1) {
@@ -210,7 +214,7 @@ test('retries a nested transient gRPC error for an explicitly safe read', async 
 
       return 'ok';
     },
-    { readRetry: { budgetMs: 2_000 } },
+    2_000,
   );
 
   assert.equal(result, 'ok');
@@ -237,14 +241,15 @@ test('does not retry a permanent read error', async () => {
   let attempts = 0;
 
   await assert.rejects(() =>
-    observeYdbOperation(
+    runReadOnlyYdbOperation(
       'get_telegram_queue_health',
       recordingLogger(records),
+      async () => {},
       async () => {
         attempts += 1;
         throw namedError('PermissionError', 'PERMISSION_DENIED');
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     ),
   );
 
@@ -257,33 +262,36 @@ test('does not retry ClientError with an explicit permanent code', async () => {
   let attempts = 0;
 
   await assert.rejects(() =>
-    observeYdbOperation(
+    runReadOnlyYdbOperation(
       'get_telegram_queue_health',
       recordingLogger(records),
+      async () => {},
       async () => {
         attempts += 1;
         throw namedError('ClientError', 'PERMISSION_DENIED');
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     ),
   );
 
   assert.equal(attempts, 1);
 });
 
-test('stops after two transient retries', async () => {
+test('stops when the next retry delay would exceed the remaining budget', async context => {
+  context.mock.method(Math, 'random', () => 0);
   const records: Array<{ level: string; fields: JsonObject }> = [];
   let attempts = 0;
 
   await assert.rejects(() =>
-    observeYdbOperation(
+    runReadOnlyYdbOperation(
       'get_telegram_queue_health',
       recordingLogger(records),
+      async () => {},
       async () => {
         attempts += 1;
         throw abortError();
       },
-      { readRetry: { budgetMs: 2_000 } },
+      2_000,
     ),
   );
 

@@ -118,12 +118,15 @@ smoke прошли. [Проверка паритета #35444430978](https://git
 
 Осталось:
 
+0. выполнить согласованный [rollout deferred worker](monitoring.md#согласованный-rollout-и-откат):
+   сначала новый log metric/alert и 15-ID allowlist, затем функция; сверить INFO/email
+   без повторов для retries/slow query и выполнить live drift. Код не применяет Monium JSON автоматически;
 1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 2. включать HSTS только после стабильной проверки HTTPS;
 3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout;
 4. подтвердить live-retention общей группы в 14 дней, новые поля естественного `ydb_retry`,
-   p95 selector и свежую полную сверку live-настроек всех 14 правил с Git.
+   p95 selector и свежую полную сверку live-настроек с Git (15 правил после нового rollout).
 
 ## 5. Production-проверка с реальными данными
 

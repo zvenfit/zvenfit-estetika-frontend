@@ -1,3 +1,4 @@
+import { errorChain } from '../error-chain';
 import { normalizeConnectionString, queryTimeoutMs, sessionPoolSize } from './config';
 import { recordInitializationAttempts } from './initialization-attempts';
 
@@ -20,19 +21,6 @@ const TRANSIENT_GRPC_CODES = new Set([4, 8, 10, 13, 14]);
 const TRANSIENT_ERROR_PATTERN =
   /ABORTED|DEADLINE_EXCEEDED|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|INTERNAL|RESOURCE_EXHAUSTED|TIMEOUT|UNAVAILABLE/i;
 
-function errorChain(error: unknown): unknown[] {
-  const chain: unknown[] = [];
-  const visited = new Set<unknown>();
-  let current = error;
-
-  while (current && typeof current === 'object' && !visited.has(current) && chain.length < 4) {
-    chain.push(current);
-    visited.add(current);
-    current = (current as Record<string, unknown>).cause;
-  }
-
-  return chain;
-}
 
 function isTransientInitializationError(error: unknown): boolean {
   return errorChain(error).some(item => {

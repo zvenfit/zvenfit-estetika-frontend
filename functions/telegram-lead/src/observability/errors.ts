@@ -1,3 +1,4 @@
+import { errorChain } from '../error-chain';
 import { createHash } from 'node:crypto';
 
 import type { JsonObject } from '../types';
@@ -56,19 +57,6 @@ function errorRecord(error: unknown): Record<string, unknown> | undefined {
   return error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined;
 }
 
-export function errorChain(error: unknown): unknown[] {
-  const chain: unknown[] = [];
-  const visited = new Set<unknown>();
-  let current = error;
-
-  while (current && typeof current === 'object' && !visited.has(current) && chain.length < 4) {
-    chain.push(current);
-    visited.add(current);
-    current = errorRecord(current)?.cause;
-  }
-
-  return chain;
-}
 
 function allowlistedMessageCode(error: unknown): string | undefined {
   for (const item of errorChain(error)) {

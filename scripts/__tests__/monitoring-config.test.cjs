@@ -13,6 +13,7 @@ const operatorHandoff = fs.readFileSync(path.join(ROOT, 'docs/operator-handoff.m
 const smokeScript = fs.readFileSync(path.join(ROOT, 'scripts/test-monitoring-alerts.sh'), 'utf8');
 const source = [
   'functions/telegram-lead/src/handler.ts',
+  'functions/telegram-lead/src/application/retry-worker.ts',
   'functions/telegram-lead/src/application/retry-notifications.ts',
   'functions/telegram-lead/src/telegram/delivery.ts',
   'functions/telegram-lead/src/observability/metrics.ts',
@@ -23,6 +24,7 @@ const source = [
   .join('\n');
 const directMetricsSource = [
   'functions/telegram-lead/src/handler.ts',
+  'functions/telegram-lead/src/application/retry-worker.ts',
   'functions/telegram-lead/src/observability/metrics.ts',
   'functions/telegram-lead/src/observability/otel-transport.ts',
 ]
@@ -70,7 +72,7 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
     alertIds.add(alert.id);
   }
 
-  assert.equal(alertIds.size, 14);
+  assert.equal(alertIds.size, 15);
   assert.deepEqual(config.notificationChannels.map(channel => channel.id), [
     'zvenfit_estetika_telegram_alerts',
     'zvenfit_estetika_email_alerts',
@@ -82,7 +84,7 @@ test('alert taxonomy, thresholds and notification policy are fully tracked in Gi
   });
   const slowYdbAlert = config.alerts.find(alert => alert.id === 'zvenfit_estetika_slow_ydb');
   assert.deepEqual(slowYdbAlert.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
-  assert.equal(slowYdbAlert.repeatMinutes, 24 * 60);
+  assert.equal(slowYdbAlert.repeatMinutes, 0);
 });
 
 test('count-sensitive and caught events use true log aggregates', () => {
@@ -93,6 +95,7 @@ test('count-sensitive and caught events use true log aggregates', () => {
     ['zvenfit_estetika_slow_ydb', 'zvenfit_estetika_ydb_slow_5m', '3m'],
     ['zvenfit_estetika_rate_limited', 'zvenfit_estetika_rate_limited_5m', '3m'],
     ['zvenfit_estetika_submission_volume', 'zvenfit_estetika_submissions_5m', '3m'],
+    ['zfe_retry_worker_deferred', 'zvenfit_estetika_retry_worker_deferred_1m', '3m'],
     ['zfe_retry_worker_heartbeat', 'zvenfit_estetika_retry_worker_log_heartbeat_1m', '3m'],
     ['zvenfit_estetika_rate_limit_health', 'zvenfit_estetika_rate_limit_errors_5m', '3m'],
     ['zfe_monium_metrics_failures', 'zvenfit_estetika_monium_metrics_failures_5m', '5m'],
@@ -119,6 +122,26 @@ test('count-sensitive and caught events use true log aggregates', () => {
     assert.deepEqual(metric.groupBy, expectedGroupBy);
     assert.ok(metric.groupBy.length <= 4, `${metricId} exceeds Monium groupBy limit`);
   }
+});
+
+test('three deferred passes page while recovered and slow reads remain email diagnostics', () => {
+  const alert = config.alerts.find(item => item.id === 'zfe_retry_worker_deferred');
+  assert.deepEqual(
+    [alert.aggregation, alert.operator, alert.warning, alert.alarm, alert.window, alert.delay, alert.noData, alert.level],
+    ['sum', '>', 2, 2.5, '10m', '3m', 'OK', 'CRITICAL'],
+  );
+  assert.deepEqual(alert.notificationChannelIds, [
+    'zvenfit_estetika_telegram_alerts', 'zvenfit_estetika_email_alerts',
+  ]);
+  for (const id of ['zvenfit_estetika_ydb_retries', 'zvenfit_estetika_slow_ydb']) {
+    const diagnostic = config.alerts.find(item => item.id === id);
+    assert.equal(diagnostic.level, 'INFO');
+    assert.equal(diagnostic.repeatMinutes, 0);
+    assert.deepEqual(diagnostic.notificationChannelIds, ['zvenfit_estetika_email_alerts']);
+    assert.deepEqual(diagnostic.notificationStatuses, ['ALARM', 'WARNING', 'OK']);
+  }
+  const storage = config.logMetrics.find(item => item.id === 'zvenfit_estetika_storage_errors_1m');
+  assert.deepEqual(storage.events, ['submission_storage_error', 'telegram_delivery_retry_error']);
 });
 
 test('direct OTLP is limited to current-state gauges with canonical taxonomy', () => {

@@ -1,3 +1,5 @@
+import { readQueue } from './queue-read';
+import { runReadOnlyYdbOperation } from './read-operation';
 import { prepareAndObserveYdbOperation } from '../observability/ydb';
 import type { ClaimedTelegramNotification } from '../domain/telegram-notification';
 import type { Utm } from '../domain/shared';
@@ -59,9 +61,9 @@ export async function observedReadOnly<T>(
   // the SDK retries them. Re-running the callback creates a new Query, so the
   // pool can acquire a fresh session without tearing down the shared driver.
   // This opt-in is intentionally limited to read-only operations.
-  return prepareAndObserveYdbOperation(operation, logger, getSql, callback, {
-    readRetry: { budgetMs: Math.min(2 * queryTimeoutMs(), 20_000) },
-  });
+  return readQueue(() =>
+    runReadOnlyYdbOperation(operation, logger, getSql, callback, Math.min(2 * queryTimeoutMs(), 20_000)),
+  );
 }
 
 export function firstResultSet(resultSets: unknown): SqlRow[] {
