@@ -50,7 +50,7 @@
 - **Сборка:** `scripts/build-static.cjs` → `dist/`, который исключён из Git
 - **Клиентский JS:** чистый JavaScript в `public/js/`
 - **Бэкенд:** одна TypeScript-функция Yandex Cloud в `functions/telegram-lead/` для заявок и рассылки; компилируется в CommonJS
-- **CI:** `.github/workflows/main.yml` — деплой функции → линтер и модульные тесты → проверка сборки → S3
+- **CI:** `.github/workflows/main.yml` — проверки → YDB verification → деплой функции и сайта → production smoke → тег и GitHub Release
 
 React, Vite и Next не используются. TypeScript применяется только в Cloud Function; клиентский код остаётся на чистом JavaScript.
 
@@ -116,6 +116,7 @@ React, Vite и Next не используются. TypeScript применяет
 | Визуальные тесты | `tests/visual/`, `playwright.config.js` |
 | Версии CDN-библиотек | `package.json`, `scripts/build-static.cjs`; файлы публикуются напрямую в Object Storage |
 | Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |
+| Автоматические релизы | `scripts/publish-production-release.cjs`, `docs/releases.md` |
 
 ## Локальная разработка
 

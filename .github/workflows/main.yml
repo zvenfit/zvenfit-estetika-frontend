@@ -87,7 +87,7 @@ jobs:
 
   deploy-preflight:
     needs: quality-checks
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -404,3 +404,30 @@ jobs:
           SITE_URL: https://estetika.zvenfit.ru
           LEAD_API_URL: ${{ needs.deploy-function.outputs.function_url }}
         run: node scripts/smoke-production.cjs
+
+  release:
+    name: Publish production release
+    needs: smoke-production
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout deployed commit and version tags
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Publish tag and release for the verified deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: node scripts/publish-production-release.cjs

@@ -137,7 +137,13 @@ npm run check:upstream-parity # есть ли новые неразобранн�
 4. под deploy SA разворачивает готовый CommonJS artifact функции и использует заранее созданный минутный retry timer;
 5. в job без OIDC собирает сайт с URL функции, проверяет `dist/` и performance-budget;
 6. под deploy SA доказывает запрет выпуска ephemeral key для runtime SA, выпускает одночасовой key для отдельного storage SA и проверяет доступ только к `zvenfit-estetika-frontend`;
-7. синхронизирует готовый site artifact и отдельным job без cloud credentials выполняет безопасный production smoke без создания реальной заявки.
+7. синхронизирует готовый site artifact и отдельным job без cloud credentials выполняет безопасный production smoke без создания реальной заявки;
+8. после успешного smoke создаёт тег версии на точном SHA этого запуска и GitHub Release с автоматическим описанием изменений.
+
+Ручной запуск деплоя разрешён только для `main`; в PR выполняются quality checks.
+Первый автоматический релиз — `v0.1.0`, последующие версии определяются по
+сообщениям коммитов. Порядок повышения версии и повтор публикации без нового
+деплоя описаны в [релизном runbook](docs/releases.md).
 
 Production dashboard восстанавливается через нативный Monium JSON artifact
 `scripts/monitoring.dashboard.json`; semantic selectors, alerts и read-only drift contract остаются

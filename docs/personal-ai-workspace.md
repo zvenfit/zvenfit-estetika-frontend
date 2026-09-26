@@ -117,7 +117,8 @@ python3 scripts/check.py --execute-reviewed <review_digest> --check lint-public
 python3 scripts/check.py --execute-reviewed <review_digest> --allow-writes
 ```
 
-Build и тесты функции создают локальные артефакты и требуют `--allow-writes`.
+Build, тесты функции и monitoring/CI-тесты создают локальные артефакты
+(включая временные Git-репозитории для проверки релизов) и требуют `--allow-writes`.
 Текущий набор не требует сети. Runner фильтрует окружение, но не является
 sandbox: команды запускаются в отдельном tool/OS sandbox.
 Визуальные Playwright-тесты остаются необязательной локальной проверкой по README.
