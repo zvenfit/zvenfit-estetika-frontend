@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const timeoutMs = 15000;
+  const timeoutMs = 45000;
   const successMs = 5000;
   function attribution() {
     const source = window.__ZVENFIT_ATTRIBUTION;

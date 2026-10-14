@@ -1,0 +1,35 @@
+name: Telegram delivery backup
+
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-delivery-backup-production
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    if: github.repository == 'zvenfit/zvenfit-estetika-frontend' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Retry delivery and check queue health
+        env:
+          YC_DEPLOY_SERVICE_ACCOUNT_ID: ${{ vars.YC_DEPLOY_SERVICE_ACCOUNT_ID }}
+          LEAD_FUNCTION_ID: 'd4eo2hs99oj4tv1cn0d8'
+        run: node scripts/retry-delivery-backup.cjs

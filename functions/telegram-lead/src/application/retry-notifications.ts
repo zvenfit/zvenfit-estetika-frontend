@@ -21,7 +21,9 @@ export async function deliverNotification(
   notificationId: string,
   dependencies: NotificationDeliveryDependencies,
   logger: LoggerLike,
+  options: { signal?: AbortSignal } = {},
 ): Promise<'sent' | 'pending' | 'failed' | 'skipped'> {
+  options.signal?.throwIfAborted();
   const now = dependencies.now();
   const deliveryToken = dependencies.uuid();
   const claimed = await dependencies.outbox.claim({
@@ -30,13 +32,17 @@ export async function deliverNotification(
     leaseUntil: new Date(now.getTime() + TELEGRAM_LEASE_MS),
     deliveryToken,
     logger,
+    signal: options.signal,
   });
   if (!claimed) {
     return 'skipped';
   }
 
   try {
-    await dependencies.telegramSender(claimed);
+    options.signal?.throwIfAborted();
+    await dependencies.telegramSender(claimed, options);
+    // Once Telegram has acknowledged, record it using the normal bounded DB
+    // timeout even if the immediate send deadline has just elapsed.
     await dependencies.outbox.markDelivered({
       notificationId,
       deliveryToken,

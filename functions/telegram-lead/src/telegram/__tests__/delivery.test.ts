@@ -411,3 +411,48 @@ test('Telegram HTTP failures preserve a safe type and upstream status', async ()
     }
   }
 });
+
+test('an expired immediate deadline never starts a Telegram request', async () => {
+  let requests = 0;
+  const requestFactory = (() => { requests++; throw new Error('unexpected request'); }) as Parameters<typeof sendTelegram>[1];
+  await assert.rejects(sendTelegram(leadNotification(), requestFactory, { signal: AbortSignal.abort() }));
+  assert.equal(requests, 0);
+});
+
+test('the immediate deadline aborts an in-flight Telegram POST without retrying it', async () => {
+  const keys = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'TELEGRAM_API_FALLBACK_IPV4S', 'TELEGRAM_API_IPV4'];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  process.env.TELEGRAM_BOT_TOKEN = 'synthetic-token';
+  process.env.TELEGRAM_CHAT_ID = 'synthetic-chat';
+  delete process.env.TELEGRAM_API_FALLBACK_IPV4S;
+  delete process.env.TELEGRAM_API_IPV4;
+  const controller = new AbortController();
+  let posts = 0;
+  const requestFactory = ((_url: URL, options: Record<string, unknown>, callback: (response: Readable) => void) => {
+    const request = new EventEmitter() as EventEmitter & { end(): void };
+    request.end = () => {
+      if (options.method === 'POST') {
+        posts++;
+        const signal = options.signal as AbortSignal;
+        signal.addEventListener('abort', () => request.emit('error', signal.reason), { once: true });
+        controller.abort();
+      } else {
+        const response = new Readable({ read() {} });
+        callback(response);
+        response.push(null);
+      }
+    };
+    return request;
+  }) as never;
+  try {
+    _private.resetTelegramRouteCache();
+    await assert.rejects(sendTelegram(leadNotification(), requestFactory, { signal: controller.signal }), { code: 'telegram_timeout' });
+    assert.equal(posts, 1);
+  } finally {
+    _private.resetTelegramRouteCache();
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+});

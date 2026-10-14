@@ -54,6 +54,7 @@ export interface TelegramOutbox {
     leaseUntil: Date;
     deliveryToken: string;
     logger?: LoggerLike;
+    signal?: AbortSignal;
   }): Promise<ClaimedTelegramNotification | null>;
   markDelivered(args: {
     notificationId: string;
@@ -90,6 +91,6 @@ export interface NotificationDeliveryDependencies {
       retriable: boolean;
     },
   ): void;
-  telegramSender(notification: ClaimedTelegramNotification): Promise<void>;
+  telegramSender(notification: ClaimedTelegramNotification, options?: { signal?: AbortSignal }): Promise<void>;
   uuid(): string;
 }

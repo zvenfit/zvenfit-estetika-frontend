@@ -97,18 +97,20 @@ export async function claim({
   leaseUntil,
   deliveryToken,
   logger,
+  signal,
 }: {
   notificationId: string;
   now: Date;
   leaseUntil: Date;
   deliveryToken: string;
   logger?: LoggerLike;
+  signal?: AbortSignal;
 }): Promise<ClaimedTelegramNotification | null> {
   return observed('claim_for_telegram', logger, async () => {
     const sql = await getSql();
     const outboxTable = sql.identifier(telegramOutboxTableName());
 
-    return sql.begin(transactionOptions(), async transaction => {
+    return sql.begin(transactionOptions(signal), async transaction => {
       const rows = firstResultSet(
         await transaction`
           SELECT

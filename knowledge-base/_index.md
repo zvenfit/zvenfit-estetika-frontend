@@ -29,3 +29,5 @@ title: ZvenFit Estetika project knowledge base
 - [Production monitoring decisions](monitoring.md)
 - [Полный monitoring runbook](../docs/monitoring.md)
 - [Operator handoff](../docs/operator-handoff.md)
+
+- [Immediate Telegram delivery and independent retry](../docs/decisions/003-immediate-and-independent-delivery.md).

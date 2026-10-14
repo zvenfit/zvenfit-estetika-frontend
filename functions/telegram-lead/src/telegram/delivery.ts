@@ -299,7 +299,9 @@ function resetTelegramRouteCache(): void {
 export async function sendTelegram(
   notification: ClaimedTelegramNotification,
   requestFactory: RequestFactory = httpsRequest,
+  options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  options.signal?.throwIfAborted();
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) {
@@ -307,6 +309,7 @@ export async function sendTelegram(
   }
 
   const route = await selectTelegramRoute(requestFactory);
+  options.signal?.throwIfAborted();
   const body = JSON.stringify({ chat_id: chatId, text: buildMessage(notification) });
   let response: { body: string; statusCode: number };
   try {
@@ -321,7 +324,9 @@ export async function sendTelegram(
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(body),
           },
-          signal: AbortSignal.timeout(telegramTimeoutMs()),
+          signal: options.signal
+            ? AbortSignal.any([options.signal, AbortSignal.timeout(telegramTimeoutMs())])
+            : AbortSignal.timeout(telegramTimeoutMs()),
         },
         incoming => {
           let responseBody = '';

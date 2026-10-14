@@ -33,8 +33,10 @@ export async function getSql(): Promise<YdbClient['sql']> {
   return (await getClient()).sql;
 }
 
-export function transactionOptions(): { idempotent: boolean; signal: AbortSignal } {
-  return { idempotent: true, signal: AbortSignal.timeout(queryTimeoutMs()) };
+export function transactionOptions(signal?: AbortSignal): { idempotent: boolean; signal: AbortSignal } {
+  const timeout = AbortSignal.timeout(queryTimeoutMs());
+
+  return { idempotent: true, signal: signal ? AbortSignal.any([signal, timeout]) : timeout };
 }
 
 export function timed<T>(query: YdbQuery<T>): YdbQuery<T> {
