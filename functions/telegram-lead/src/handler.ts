@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { intakeForm } from './application/intake-form';
+import { deliverNotification } from './application/retry-notifications';
 import { runRetryWorker, type RetryWorkerResult } from './application/retry-worker';
 import {
   allowedOrigins,
@@ -75,7 +76,7 @@ function createDependencies(overrides: Partial<HandlerDependencies>): HandlerDep
     rateLimiter: consumeFormRateLimit,
     reportDeliveryFailure: logDeliveryFailure,
     retryBatchSize,
-    telegramSender: sendTelegram,
+    telegramSender: (notification, options) => sendTelegram(notification, undefined, options),
     uuid: randomUUID,
     ...overrides,
   };
@@ -121,9 +122,28 @@ async function persistForm(
       const event = 'submission_persisted';
       logger.info?.({ event, form_type: saved.kind }, event);
     }
+    let notificationStatus = saved.notificationStatus;
+    if (saved.created && notificationStatus === 'pending') {
+      try {
+        const outcome = await deliverNotification(saved.requestId, dependencies, logger, {
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (outcome !== 'skipped') {
+          notificationStatus = outcome;
+        }
+      } catch (error) {
+        // Persistence already succeeded. A delivery/claim failure must not turn
+        // this accepted submission into a storage error or a duplicate form post.
+        logDeliveryFailure(logger, 'telegram_delivery_immediate_error', saved.requestId, error, {
+          attempts: 0,
+          fallbackCode: 'immediate_delivery_error',
+          retriable: true,
+        });
+      }
+    }
     const newsletterState =
       saved.kind === 'newsletter' ? { confirmation_required: true } : {};
-    if (saved.notificationStatus === 'sent') {
+    if (notificationStatus === 'sent') {
       return jsonResponse(
         200,
         {
@@ -141,7 +161,7 @@ async function persistForm(
       {
         ok: true,
         submission_id: saved.requestId,
-        notification: saved.notificationStatus,
+        notification: notificationStatus,
         ...newsletterState,
       },
       headers,
@@ -213,7 +233,7 @@ function createHandler(overrides: Partial<HandlerDependencies> = {}): CloudHandl
         return jsonResponse(200, { ok: true }, headers);
       }
 
-      return persistForm(body, dependencies, logger, headers, requestIp(event));
+      return await persistForm(body, dependencies, logger, headers, requestIp(event));
     } finally {
       await metrics.flush();
     }

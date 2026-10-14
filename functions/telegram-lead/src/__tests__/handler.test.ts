@@ -125,7 +125,7 @@ test.beforeEach(() => {
   process.env.ALLOWED_ORIGINS = ORIGIN;
 });
 
-test('POST persists a lead through the lead repository and returns before Telegram delivery', async () => {
+test('POST preserves the accepted lead when another worker owns delivery', async () => {
   let saved: Lead | undefined;
   let telegramCalled = false;
   const handler = _private.createHandler(
@@ -225,7 +225,7 @@ test('timer keeps an outbox notification pending when Telegram is unavailable', 
     ],
   });
 
-  assert.deepEqual(result, { processed: 1, sent: 0, pending: 1, failed: 0, skipped: 0 });
+  assert.deepEqual(result, { processed: 1, sent: 0, pending: 1, failed: 0, skipped: 0, queue_pending: 0, oldest_pending_age_seconds: 0 });
   assert.equal(failedDelivery?.errorCode, 'telegram_unreachable');
   assert.equal(failedDelivery?.terminal, false);
   assert.equal(failedDelivery?.failedAt.toISOString(), '2026-08-09T00:01:00.000Z');
@@ -298,7 +298,7 @@ test('timer claims and delivers pending outbox notifications', async () => {
     ],
   });
 
-  assert.deepEqual(result, { processed: 1, sent: 1, pending: 0, failed: 0, skipped: 0 });
+  assert.deepEqual(result, { processed: 1, sent: 1, pending: 0, failed: 0, skipped: 0, queue_pending: 0, oldest_pending_age_seconds: 0 });
   assert.deepEqual(delivered, [REQUEST_ID]);
 });
 
@@ -370,4 +370,66 @@ test('rate-limits trusted request-context IP and fails open without exposing it'
     }),
   );
   assert.equal(httpResponse(await failOpen(postEvent())).statusCode, 200);
+});
+
+test('POST saves before sending and a concurrent timer cannot claim the same notification', async () => {
+  const order: string[] = [];
+  let claimed = false;
+  const handler = _private.createHandler(dependencies({
+    lead: { async recordLead() { order.push('save'); return { created: true, notificationStatus: 'pending' }; } },
+    outbox: {
+      async claim({ signal }) {
+        if (claimed) return null;
+        assert.ok(signal);
+        claimed = true;
+        order.push('claim');
+        return claimedNotification();
+      },
+      async listCandidates() { return [REQUEST_ID]; },
+      async markDelivered() { order.push('mark'); },
+    },
+  }, {
+    async telegramSender(_notification, options) {
+      assert.ok(options?.signal);
+      order.push('send');
+      const timer = await handler({ messages: [{ event_metadata: { event_type: 'yandex.cloud.events.serverless.triggers.TimerMessage' } }] });
+      assert.ok('skipped' in timer);
+      assert.equal(timer.skipped, 1);
+    },
+    metricsFactory: () => ({ recordGauge() {}, async flush() { order.push('flush'); } }),
+  }));
+  const response = httpResponse(await handler(postEvent()));
+  assert.equal(response.statusCode, 200);
+  assert.equal(JSON.parse(response.body).notification, 'sent');
+  assert.deepEqual(order, ['save', 'claim', 'send', 'flush', 'mark', 'flush']);
+});
+
+test('delivery failures after saving never turn an accepted form into HTTP 503', async t => {
+  for (const stage of ['claim', 'send', 'mark'] as const) await t.test(stage, async () => {
+    let saved = false;
+    let retryScheduled = false;
+    const handler = _private.createHandler(dependencies({
+      lead: { async recordLead() { saved = true; return { created: true, notificationStatus: 'pending' }; } },
+      outbox: {
+        async claim() { if (stage === 'claim') throw new Error('claim unavailable'); return claimedNotification(); },
+        async markDelivered() { if (stage === 'mark') throw new Error('write unavailable'); },
+        async markFailed() { retryScheduled = true; },
+      },
+    }, { async telegramSender() { if (stage === 'send') throw new Error('telegram unavailable'); } }));
+    const response = httpResponse(await handler(postEvent()));
+    assert.equal(saved, true);
+    assert.equal(response.statusCode, 202);
+    assert.equal(JSON.parse(response.body).ok, true);
+    assert.equal(retryScheduled, stage !== 'claim');
+  });
+});
+
+test('reposting a pending submission does not bypass its retry schedule', async () => {
+  let claims = 0;
+  const handler = _private.createHandler(dependencies({
+    lead: { async recordLead() { return { created: false, notificationStatus: 'pending' }; } },
+    outbox: { async claim() { claims++; return claimedNotification(); } },
+  }));
+  assert.equal(httpResponse(await handler(postEvent())).statusCode, 202);
+  assert.equal(claims, 0);
 });
