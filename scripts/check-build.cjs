@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { Script } = require('node:vm');
 
 const rootDir = path.join(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
@@ -38,6 +39,39 @@ for (const rel of [
 ]) read(rel);
 
 const files = walk(distDir);
+const gtmContainerId = 'GTM-KQT53D6V';
+const gtmEnabled = (process.env.NODE_ENV || 'production') === 'production';
+const gtmExcludedPages = new Set(['404.html', 'privacy/index.html', 'personal-data-processing/index.html']);
+for (const rel of files.filter(file => file.endsWith('.html'))) {
+  const html = read(rel);
+  if (html.includes('__GTM_CONTAINER_ID__')) {
+    throw new Error(`check-build: unresolved GTM placeholder in ${rel}`);
+  }
+  if (!gtmEnabled || gtmExcludedPages.has(rel)) {
+    if (/googletagmanager\.com|Google Tag Manager|GTM-[A-Z0-9]+/.test(html)) {
+      throw new Error(`check-build: unexpected GTM in ${rel}`);
+    }
+    continue;
+  }
+
+  const ids = html.match(/GTM-[A-Z0-9]+/g) || [];
+  if (
+    ids.length !== 2 || ids.some(id => id !== gtmContainerId) ||
+    (html.match(/googletagmanager\.com\/gtm\.js\?id=/g) || []).length !== 1 ||
+    (html.match(/googletagmanager\.com\/ns\.html\?id=/g) || []).length !== 1
+  ) {
+    throw new Error(`check-build: ${rel} must contain one GTM loader and one fallback with the configured ID`);
+  }
+  const loader = html.match(/<head\b[^>]*>\s*<meta\s+charset=[^>]+>\s*<!-- Google Tag Manager -->\s*<script>([\s\S]*?)<\/script>/i);
+  if (!loader || !loader[1].includes('https://www.googletagmanager.com/gtm.js?id=')) {
+    throw new Error(`check-build: GTM loader must follow the charset in ${rel}`);
+  }
+  new Script(loader[1], { filename: `${rel}:gtm` });
+  if (!/<body\b[^>]*>\s*<!-- Google Tag Manager \(noscript\) -->\s*<noscript><iframe src="https:\/\/www\.googletagmanager\.com\/ns\.html\?id=GTM-[A-Z0-9]+"\s+height="0" width="0" style="display:none;visibility:hidden"><\/iframe><\/noscript>/i.test(html)) {
+    throw new Error(`check-build: GTM fallback must be hidden and immediately follow body in ${rel}`);
+  }
+}
+
 const publicEmail = 'zvenfit.estetika@yandex.ru';
 for (const rel of files.filter(file => file.endsWith('.html'))) {
   const emailAddresses = read(rel).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
