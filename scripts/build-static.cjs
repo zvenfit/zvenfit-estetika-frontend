@@ -254,6 +254,14 @@ function walkFiles(dir, files = []) {
   return files;
 }
 
+// Match within a single element so adjacent Webflow scripts and metadata survive.
+function stripGoogleTagManager(html) {
+  return html
+    .replace(/\s*<script\b[^>]*>(?:(?!<\/script>)[\s\S])*?googletagmanager\.com\/gtm\.js(?:(?!<\/script>)[\s\S])*?<\/script>/gi, '\n')
+    .replace(/\s*<noscript>(?:(?!<\/noscript>)[\s\S])*?googletagmanager\.com\/ns\.html(?:(?!<\/noscript>)[\s\S])*?<\/noscript>/gi, '\n')
+    .replace(/\s*<!--\s*(?:End )?Google Tag Manager(?: \(noscript\))?\s*-->/gi, '\n');
+}
+
 function injectHeadSnippets(html, assetVersion, metrikaId) {
   if (!html.includes('</head>')) {
     return html;
@@ -403,6 +411,9 @@ function runBuild() {
     html = normalizeRootRelativePaths(html);
     html = stripWebflowGenerator(html);
     html = applyPageMeta(html, pageMeta);
+    if (nodeEnv !== 'production') {
+      html = stripGoogleTagManager(html);
+    }
     const beforeSnippets = html;
     const withHeadSnippets = isNotFoundPage
       ? html
@@ -446,8 +457,9 @@ function runBuild() {
   }
 
   if (!metrikaId) {
-    console.warn('build-static: YANDEX_METRIKA_ID is empty — analytics not injected');
+    console.warn('build-static: YANDEX_METRIKA_ID is empty — Metrika not injected');
   }
+  console.log(`build-static: GTM=${nodeEnv === 'production' ? 'preserved from HTML' : 'disabled'} (NODE_ENV=${nodeEnv})`);
 
   if (!leadApiUrl) {
     console.warn('build-static: LEAD_API_URL is empty — forms will fail until it is set');

@@ -84,6 +84,11 @@ React, Vite и Next не используются. TypeScript применяет
 
 ## Процесс сборки
 
+GTM `GTM-KQT53D6V` записан стандартными блоками в `public/index.html` и
+`public/form/index.html`: загрузчик после `<meta charset>`, `noscript` сразу
+после `<body>`. Production-сборка сохраняет их, development и staging удаляют.
+Юридические страницы и `/404.html` исключены. Теги и цели ведёт маркетолог в GTM.
+
 `build-static.cjs` добавляет перед `</head>` следующие данные; специальные маркеры в исходном HTML не нужны:
 
 | Инъекция | Источник |
