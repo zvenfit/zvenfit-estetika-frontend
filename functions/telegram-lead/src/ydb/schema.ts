@@ -7,6 +7,7 @@ import {
   queryTimeoutMs,
   queueHealthIndexName,
   rateLimitsTableName,
+  schemaTimeoutMs,
   telegramOutboxTableName,
 } from './config';
 
@@ -26,8 +27,12 @@ function timed<T>(query: YdbQuery<T>): YdbQuery<T> {
   return query.timeout(queryTimeoutMs());
 }
 
+function schemaTimed<T>(query: YdbQuery<T>): YdbQuery<T> {
+  return query.timeout(schemaTimeoutMs());
+}
+
 async function createLeadsTable({ sql, leadsTable }: SchemaContext): Promise<void> {
-  await timed(
+  await schemaTimed(
     sql`
       CREATE TABLE IF NOT EXISTS ${leadsTable} (
         lead_id Utf8 NOT NULL,
@@ -50,7 +55,7 @@ async function createNewsletterSubscriptionsTable({
   sql,
   newsletterSubscriptionsTable,
 }: SchemaContext): Promise<void> {
-  await timed(
+  await schemaTimed(
     sql`
       CREATE TABLE IF NOT EXISTS ${newsletterSubscriptionsTable} (
         phone_normalized Utf8 NOT NULL,
@@ -77,7 +82,7 @@ async function createNewsletterConsentEventsTable({
   sql,
   newsletterConsentEventsTable,
 }: SchemaContext): Promise<void> {
-  await timed(
+  await schemaTimed(
     sql`
       CREATE TABLE IF NOT EXISTS ${newsletterConsentEventsTable} (
         event_id Utf8 NOT NULL,
@@ -100,7 +105,7 @@ async function createTelegramOutboxTable({
   sql,
   telegramOutboxTable,
 }: SchemaContext): Promise<void> {
-  await timed(
+  await schemaTimed(
     sql`
       CREATE TABLE IF NOT EXISTS ${telegramOutboxTable} (
         notification_id Utf8 NOT NULL,
@@ -126,7 +131,7 @@ async function createTelegramOutboxTable({
 }
 
 async function createRateLimitsTable({ sql, rateLimitsTable }: SchemaContext): Promise<void> {
-  await timed(
+  await schemaTimed(
     sql`
       CREATE TABLE IF NOT EXISTS ${rateLimitsTable} (
         rate_key Utf8 NOT NULL,

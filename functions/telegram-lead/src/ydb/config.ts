@@ -91,6 +91,11 @@ export function queryTimeoutMs(): number {
   return parsePositiveInt(process.env.YDB_QUERY_TIMEOUT_MS, DEFAULT_QUERY_TIMEOUT_MS);
 }
 
+// CREATE/DROP run in provisioning and tests, with a separate budget from form queries.
+export function schemaTimeoutMs(): number {
+  return parsePositiveInt(process.env.YDB_SCHEMA_TIMEOUT_MS, 3 * queryTimeoutMs());
+}
+
 export function slowOperationMs(): number {
   return parsePositiveInt(process.env.YDB_SLOW_OPERATION_MS, DEFAULT_SLOW_OPERATION_MS);
 }

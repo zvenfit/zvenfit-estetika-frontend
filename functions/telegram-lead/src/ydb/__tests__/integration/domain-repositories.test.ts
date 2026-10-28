@@ -19,6 +19,7 @@ import {
   newsletterSubscriptionsTableName,
   queryTimeoutMs,
   rateLimitsTableName,
+  schemaTimeoutMs,
   telegramOutboxTableName,
 } from '../../config';
 import { close, firstResultSet } from '../../context';
@@ -88,7 +89,7 @@ async function dropTable(sql: YdbSql, name: string): Promise<void> {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await sql`DROP TABLE ${sql.identifier(name)};`.timeout(queryTimeoutMs());
+      await sql`DROP TABLE ${sql.identifier(name)};`.timeout(schemaTimeoutMs());
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -136,7 +137,7 @@ async function dropTemporaryTables(names: string[]): Promise<void> {
 test(
   'greenfield domain repositories and transactional outbox work together',
   { skip: !TEST_CONNECTION_STRING },
-  async () => {
+  async t => {
     if (!TEST_CONNECTION_STRING) {
       return;
     }
@@ -159,10 +160,21 @@ test(
     process.env.YDB_RATE_LIMITS_TABLE = `limits_it_${suffix}`;
     process.env.LEAD_RATE_LIMIT_SECRET = 'integration-test-secret-not-production-32';
 
+    let phase = 'setup';
+    let phaseStartedAt = Date.now();
+    const enter = (name: string): void => {
+      t.diagnostic(`integration phase ${phase} took ${Date.now() - phaseStartedAt} ms`);
+      phase = name;
+      phaseStartedAt = Date.now();
+    };
+
     try {
+      enter('bootstrap-schema');
       await bootstrapSchema();
+      enter('bootstrap-schema-rerun');
       await bootstrapSchema();
 
+      enter('rate-limit');
       const rateLimitResults = await Promise.all(
         Array.from({ length: 10 }, () =>
           consumeFormRateLimit({ sourceIp: '203.0.113.10', now: new Date() }),
@@ -170,6 +182,7 @@ test(
       );
       assert.equal(rateLimitResults.filter(Boolean).length, 5);
 
+      enter('save-lead');
       const now = new Date();
       const newLead = lead(randomUUID(), now);
       const savedLeads = await Promise.all([
@@ -179,6 +192,7 @@ test(
       assert.deepEqual(savedLeads.map(result => result.created).sort(), [false, true]);
       assert.deepEqual(await outbox.listCandidates({ now, limit: 10 }), [newLead.requestId]);
 
+      enter('deliver-lead');
       const deliveryToken = randomUUID();
       const claimed = await outbox.claim({
         notificationId: newLead.requestId,
@@ -198,6 +212,7 @@ test(
         notificationStatus: 'sent',
       });
 
+      enter('newsletter-opt-in');
       const firstRequest = optInRequest(randomUUID(), new Date(now.getTime() + 60_000));
       const firstResults = await Promise.all([
         newsletterRepository.recordOptInRequest(
@@ -216,6 +231,7 @@ test(
       );
       assert.equal(await newsletterRepository.isSuppressed({ phone: firstRequest.phone }), true);
 
+      enter('newsletter-confirmation');
       const firstConfirmationId = randomUUID();
       const firstConfirmedAt = new Date(now.getTime() + 90_000);
       assert.deepEqual(
@@ -245,6 +261,7 @@ test(
       assert.equal(firstSubscription?.lastConsentEventId, firstConfirmationId);
       assert.equal(await newsletterRepository.isSuppressed({ phone: firstRequest.phone }), false);
 
+      enter('newsletter-reconfirmation');
       const secondRequest = optInRequest(randomUUID(), new Date(now.getTime() + 120_000));
       await newsletterRepository.recordOptInRequest(
         secondRequest,
@@ -279,6 +296,7 @@ test(
       assert.equal(afterReconfirm?.subscribedAt.getTime(), firstConfirmedAt.getTime());
       assert.equal(afterReconfirm?.lastConfirmedAt.getTime(), secondConfirmedAt.getTime());
 
+      enter('newsletter-unsubscribe');
       const unsubscribeEventId = randomUUID();
       const unsubscribedAt = new Date(now.getTime() + 180_000);
       assert.deepEqual(
@@ -301,6 +319,7 @@ test(
         { eventCreated: false, stateChanged: false },
       );
 
+      enter('newsletter-resubscribe');
       const resubscribeRequest = optInRequest(randomUUID(), new Date(now.getTime() + 240_000));
       await newsletterRepository.recordOptInRequest(
         resubscribeRequest,
@@ -353,6 +372,7 @@ test(
         'active',
       );
 
+      enter('newsletter-suppression');
       const tombstonePhone = '+7 (999) 765-43-21';
       const tombstoneEventId = randomUUID();
       assert.deepEqual(
@@ -399,6 +419,7 @@ test(
       );
       assert.equal(await newsletterRepository.isSuppressed({ phone: 'invalid' }), true);
 
+      enter('terminal-delivery');
       const terminalDeliveryToken = randomUUID();
       const terminalClaimedAt = new Date(now.getTime() + 500_000);
       const terminalNotification = await outbox.claim({
@@ -416,6 +437,7 @@ test(
         terminal: true,
       });
 
+      enter('verify-persisted-state');
       const client = await createYdbClient();
       try {
         const leadRows = firstResultSet(
@@ -480,7 +502,12 @@ test(
       } finally {
         await client.close();
       }
+    } catch (error) {
+      throw new Error(`integration phase "${phase}" failed after ${Date.now() - phaseStartedAt} ms`, {
+        cause: error,
+      });
     } finally {
+      enter('cleanup');
       const cleanupErrors: unknown[] = [];
 
       try {

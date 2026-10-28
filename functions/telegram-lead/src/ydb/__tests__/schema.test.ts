@@ -1,7 +1,43 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { YdbClient } from '../../types';
+import { queryTimeoutMs, schemaTimeoutMs } from '../config';
 import { _private } from '../schema';
+
+test('table creation has its own timeout while schema verification keeps the query budget', async () => {
+  const { Timestamp, Uint32 } = await import('@ydbjs/value/primitive');
+  const calls: Array<{ operation: string; timeout: number }> = [];
+  const sql = Object.assign((strings: TemplateStringsArray) => {
+    const operation = strings.join('').trim().split(/\s+/)[0];
+    assert.ok(operation);
+    return Object.assign(Promise.resolve([]), {
+      idempotent() { return this; },
+      isolation() { return this; },
+      timeout(milliseconds: number) {
+        calls.push({ operation, timeout: milliseconds });
+        return this;
+      },
+    });
+  }, { identifier: (name: string) => name });
+  const context = _private.schemaContext({ sql, types: { Timestamp, Uint32 } } as unknown as YdbClient);
+
+  for (const create of [
+    _private.createLeadsTable,
+    _private.createNewsletterSubscriptionsTable,
+    _private.createNewsletterConsentEventsTable,
+    _private.createTelegramOutboxTable,
+    _private.createRateLimitsTable,
+  ]) {
+    await create(context);
+  }
+  await _private.verifySchemaContext(context);
+
+  assert.deepEqual(calls, [
+    ...Array.from({ length: 5 }, () => ({ operation: 'CREATE', timeout: schemaTimeoutMs() })),
+    ...Array.from({ length: 7 }, () => ({ operation: 'SELECT', timeout: queryTimeoutMs() })),
+  ]);
+});
 
 test('greenfield schema separates business domains, consent history and delivery', () => {
   const leads = _private.createLeadsTable.toString();
