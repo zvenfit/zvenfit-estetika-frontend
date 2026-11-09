@@ -56,6 +56,7 @@
     const defaultLabel = submitButton?.value || 'Отправить';
     let submissionId = '';
     let successTimer;
+    let requestPending = false;
 
     function state(next, message) {
       clearTimeout(successTimer);
@@ -76,6 +77,7 @@
     }
 
     function submitting(active) {
+      requestPending = active;
       form.setAttribute('aria-busy', String(active));
       if (submitButton) {
         submitButton.disabled = active;
@@ -83,11 +85,37 @@
       }
     }
 
+    function trackFormEvent(event) {
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ event, form_type: options.kind });
+      } catch {
+        // Analytics must not interrupt form handling.
+      }
+    }
+
+    function trackSubmission(data) {
+      // Honeypot responses have ok: true but no persisted submission ID.
+      if (data.ok === true && typeof data.submission_id === 'string' && data.submission_id.trim()) {
+        trackFormEvent('form_submitted');
+      }
+    }
+
+    // Enter also activates this button; click precedes native validation.
+    submitButton?.addEventListener('click', function () {
+      if (!requestPending && !submitButton.disabled) {
+        trackFormEvent('form_submit_attempt');
+      }
+    });
+
     state(null);
     options.ready?.();
     form.addEventListener('submit', async function (event) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (requestPending) {
+        return;
+      }
       state(null);
 
       const payload = options.payload(
@@ -132,6 +160,7 @@
         submissionId = '';
         options.afterReset?.();
         state('success');
+        trackSubmission(data);
         successTimer = setTimeout(function () {
           state(null);
         }, successMs);
