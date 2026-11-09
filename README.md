@@ -106,6 +106,8 @@ npm run build
 
 Сборка также минифицирует CSS сайта, выносит стили после маркера юридического шаблона в отдельный `legal-documents.min.css`, добавляет UTM-атрибуцию, Open Graph, canonical и JSON-LD, нормализует ссылки Webflow и удаляет ассеты, которые должны отдаваться из CDN. В юридические страницы инъекции лендинга не добавляются; их CSS получает только версию кеша. Страница `/404.html` остаётся с `noindex` и не получает ни аналитику, ни JSON-LD.
 
+События форм и переключение тегов: [`docs/form-analytics.md`](docs/form-analytics.md).
+
 Google Tag Manager `GTM-KQT53D6V` подключён стандартными блоками непосредственно
 в `public/index.html` и `public/form/index.html`, как на основном ZvenFit:
 загрузчик в `<head>` (после `<meta charset>`), `noscript` сразу после `<body>`.
