@@ -25,6 +25,7 @@ const CDN_VENDOR_JS = [
   'webflow.js',
 ];
 const CACHE_BUST_SCRIPTS = [
+  'analytics.js',
   'utm-attribution.js',
   'lead-config.js',
   'submission-id.js',
@@ -422,7 +423,12 @@ function runBuild() {
       ? withHeadSnippets
       : injectOpenGraphHead(withHeadSnippets, pagePath, config, pageMeta);
     const withStructuredData = injectStructuredData(withOpenGraph, pagePath, config, pageMeta);
-    html = bustAssetUrls(withStructuredData, assetVersion, assetsCdnBase);
+    const engagement = pagePath === '/' ? ' data-analytics-timer="true" data-analytics-scroll="true"' : '';
+    const withAnalyticsEvents = isNotFoundPage ? withStructuredData : withStructuredData.replace(
+      '</head>',
+      `<script src="/js/analytics.js"${engagement} defer></script>\n</head>`,
+    );
+    html = bustAssetUrls(withAnalyticsEvents, assetVersion, assetsCdnBase);
 
     if (withHeadSnippets !== beforeSnippets) {
       headSnippetsInjected += 1;

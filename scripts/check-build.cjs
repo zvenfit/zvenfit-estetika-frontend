@@ -254,3 +254,5 @@ if (notFound.includes('ZvenFit Estetika: analytics') || notFound.includes('appli
 }
 
 console.log(`check-build: OK (${files.length} dist files)`);
+
+require('./check-analytics.cjs').checkAnalytics(distDir, ['404.html', 'privacy/index.html', 'personal-data-processing/index.html']);

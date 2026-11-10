@@ -87,8 +87,7 @@
 
     function trackFormEvent(event) {
       try {
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({ event, form_type: options.kind });
+        window.__ZVENFIT_ANALYTICS?.track(event, { form_type: options.kind });
       } catch {
         // Analytics must not interrupt form handling.
       }
