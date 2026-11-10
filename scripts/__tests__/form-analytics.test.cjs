@@ -9,7 +9,7 @@ const vm = require('node:vm');
 
 const KINDS = ['lead', 'newsletter'];
 const ID_KEY = 'submission_id';
-const runtimeFiles = kind => ['form-client.js', `${kind}-form.js`];
+const runtimeFiles = kind => ['analytics.js', 'form-client.js', `${kind}-form.js`];
 
 function response(status = 202, data = { ok: true, [ID_KEY]: 'saved-submission' }) {
   return { ok: status >= 200 && status < 300, status, json: async () => data };
