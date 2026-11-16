@@ -329,6 +329,7 @@ function injectStructuredData(html, pagePath, config, pageMeta) {
     description: pageMeta.description || org.description,
     url: pagePath === '/' ? `${siteUrl}/` : `${siteUrl}${pagePath}`,
     telephone: org.telephone,
+    email: org.email,
     image: resolveSiteUrl(org.logo, siteUrl),
     address: org.address,
     openingHours: org.openingHours,
