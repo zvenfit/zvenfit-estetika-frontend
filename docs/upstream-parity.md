@@ -4,8 +4,9 @@
 `3fe212e813f0d9f117eea14b246e63fc3bf73cdd` от 25 сентября: PR #71 и #72.
 [Сравнение архитектуры и алертов](upstream-review-2026-09-25.md) послужило основой
 адаптации; [ADR-001](decisions/001-queue-read-recovery.md) фиксирует принятое решение.
-Паритет относится к коду и desired state. Новый production rollout и live drift
-пока не подтверждены.
+Паритет относится к коду и desired state. Rollout адаптации `93fdf51` выполнен
+26 сентября и [подтверждён через GitHub Actions 27 сентября](../knowledge-base/monitoring.md#rollout-evidence).
+Применение нового Monium desired state и live drift пока не подтверждены.
 
 `zvenfit-frontend` — источник переносимых инженерных практик, а не шаблон интерфейса. Архитектура
 Estetika остаётся статическим Webflow-сайтом, а косметологический бренд, контент и визуальная система
@@ -136,7 +137,8 @@ slow events или dashboard. Дополнены `prior_error` и регресс
 в [разборе инцидентов](monitoring-review-2026-09-24.md#адаптация-стратегии-повторов-25-сентября).
 
 Эта первоначальная адаптация опубликована в Estetika PR #27 (`069b804`).
-На её этапе baseline не менялся; состояние production из факта merge не выводится.
+На её этапе baseline не менялся. Rollout `069b804` от 25 сентября отдельно
+подтверждён GitHub Actions при [проверке 27 сентября](../knowledge-base/monitoring.md#rollout-evidence).
 
 ## Паритет с опубликованными PR #71 и #72 — 25 сентября
 

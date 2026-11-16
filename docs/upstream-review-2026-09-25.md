@@ -4,8 +4,9 @@
 По его результатам реализована адаптация: [ADR-001](decisions/001-queue-read-recovery.md),
 [актуальный паритет](upstream-parity.md).
 Ниже «сейчас» и результаты проверок относятся к исходному срезу до реализации.
-Новый runtime-код и desired state подготовлены в репозитории; production rollout
-пока не подтверждён.
+Дополнение 27 сентября: runtime-код `93fdf51` развёрнут 26 сентября;
+[deployment jobs и production smoke подтверждены](../knowledge-base/monitoring.md#rollout-evidence).
+Применение нового Monium desired state и live drift остаются неподтверждёнными.
 
 ## Источники и вывод
 

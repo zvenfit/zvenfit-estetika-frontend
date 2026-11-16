@@ -18,18 +18,24 @@ quality checks, YDB verification и read-only production smoke прошли. П�
 upstream `8e568f0` подтверждён локально и в
 [run #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978).
 Все пять локальных проверок из `project-checks.json` прошли без ошибок и пропусков.
-Live-retention, p95, новые поля естественного retry и полная сверка 14 live-правил остаются
-открытыми; это не отменяет исторических результатов августовского rollout.
+На срезе 19 сентября live-retention, p95, новые поля естественного retry и полная
+сверка 14 live-правил оставались открытыми; последующие проверки описаны ниже.
 Подробнее — [разбор мониторинга](docs/monitoring-review-2026-09-18.md#доработка-19-сентября).
 
 Проверка **2026-09-24** подтвердила live-retention 14 дней и новые поля
 естественного YDB retry. После rollout остались шесть ошибок чтения очереди;
 после каждой worker восстанавливался через 12–33 секунды с пустой очередью.
-25 сентября локально подготовлены нормализация DOM-кодов, ограниченные повторы
-чтения с backoff/общим бюджетом и корреляция deadline с активной фазой SDK.
-Изменения ещё не развёрнуты. Открыты причина длительных задержек, проверка новой
-диагностики на естественных production-событиях, p95 и полная сверка live-конфигурации.
 Подробнее — [новый разбор алертов](docs/monitoring-review-2026-09-24.md).
+
+Проверка публикаций **2026-09-27** подтвердила: исправления DOM-кодов, повторы
+чтения и корреляция deadline (`069b804`) развёрнуты 25 сентября; восстановление
+чтений и deferred worker (`93fdf51`) — 26 сентября. Деплой функции и сайта,
+YDB verification и production smoke успешны. Также опубликованы изменения
+контента и изображений и первые релизы `v0.1.0` / `v0.1.1`.
+[Даты, commits и workflow runs](knowledge-base/monitoring.md#rollout-evidence).
+Открыты применение новых настроек Monium, причина длительных задержек,
+проверка новой диагностики и восстановления на естественных production-событиях,
+p95 и полная сверка live-конфигурации.
 
 Руководство для агентов: [`AGENTS.md`](AGENTS.md).
 
@@ -82,21 +88,28 @@ Live-retention, p95, новые поля естественного retry и п�
   YDB retry/slow query, rate limiter/retry-trigger и Cloud Function throttling.
   Runtime-error alert дополнительно изолирован от функций основного ZvenFit и использует фактическую
   системную серию `service="__serverless-functions__"`
-- [ ] **Развернуть deferred worker и согласованный monitoring** — код, ADR и desired state
-  подготовлены: сначала создать новый metric/alert и 15-ID allowlist, затем функция;
-  подтвердить heartbeat, восстановление чтений и INFO/email/no-repeat у retry/slow.
+- [x] **Развернуть исправления чтений и deferred worker** — `069b804` опубликован
+  25 сентября, `93fdf51` — 26 сентября; deployment jobs и production smoke
+  подтверждены [проверкой 27 сентября](knowledge-base/monitoring.md#rollout-evidence).
+- [ ] **Завершить согласованный monitoring deferred worker** — проверить применение
+  нового metric/alert и 15-ID allowlist, INFO/email/no-repeat у retry/slow;
+  подтвердить heartbeat, восстановление чтений и выполнить live drift.
+  Деплой функции не применяет Monium JSON и не подтверждает порядок внедрения настроек.
   [Порядок rollout и отката](docs/monitoring.md#согласованный-rollout-и-откат).
 - [ ] **Завершить миграцию queue gauge** — после подтверждённого обновления live dashboard и одного
   стабильного production rollout удалить legacy `zvenfit_estetika_telegram_pending_submissions`
 - [ ] **Оценить YDB session latency telemetry** — агрегаты session latency отложены;
-  локальная доработка 25 сентября использует session traces только для фазы ошибки.
+  развёрнутая доработка 25 сентября использует session traces только для фазы ошибки.
   Проверить её на естественных событиях, сохранив `query_execute` единственным paging-сигналом
 - [x] **Проверить synthetic monitoring delivery** — smoke 2026-08-17 дал ожидаемые 6 `Alarm` +
   диагностический `Warning`, 13 отправок завершились `Success`; после выхода точек из окон правила
   вернулись в `OK`, read-only drift snapshot совпал с desired state
-- [ ] **Закрыть live-проверки после rollout 19 сентября** — подтвердить retention общей группы
-  в 14 дней, новые поля естественного `ydb_retry`, p95 selector и выполнить свежую полную сверку
-  live-настроек всех 14 правил с Git; deploy и контрактные тесты уже прошли
+- [x] **Подтвердить retention и retry-диагностику после rollout 19 сентября** —
+  [проверка 24 сентября](docs/monitoring-review-2026-09-24.md) подтвердила 14 дней
+  хранения логов и новые поля естественного `ydb_retry` той версии
+- [ ] **Закрыть оставшиеся live-проверки мониторинга** — исправить p95 selector,
+  проверить диагностику и восстановление после rollout 25–26 сентября и выполнить
+  полную сверку с текущим desired state (10 log metrics / 15 alerts)
 - [x] **Определиться с `www`** — проект постоянно использует только `estetika.zvenfit.ru`; адрес `www.estetika.zvenfit.ru` не поддерживается и не должен добавляться в DNS, TLS, CORS или CI
 - **Юридическая готовность форм** — решение о способе согласия, история подтверждения
   реквизитов и открытые вопросы перенесены в [план Workspace](docs/personal-ai-workspace.md#перенесённый-продуктовый-контекст).

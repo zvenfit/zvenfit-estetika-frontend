@@ -108,8 +108,17 @@ Rollout [#35444306516](https://github.com/zvenfit/zvenfit-estetika-frontend/acti
 и `MONIUM_METRICS_TIMEOUT_MS=5000`. Quality checks, YDB verification и read-only production
 smoke прошли. [Проверка паритета #35444430978](https://github.com/zvenfit/zvenfit-estetika-frontend/actions/runs/35444430978)
 успешна; baseline совпадает с опубликованным upstream `8e568f0` на срезе 19 сентября.
-Полное закрытие live-мониторинга пока не подтверждено; детали — в
-[сентябрьском разборе](monitoring-review-2026-09-18.md#доработка-19-сентября).
+Read-only [проверка 24 сентября](monitoring-review-2026-09-24.md) подтвердила
+live-retention 14 дней и новые поля естественного retry этой версии.
+
+Проверка GitHub Actions 27 сентября подтвердила rollout `069b804` от 25 сентября
+(нормализация DOM-кодов, ограниченные чтения и фазы timeout) и `93fdf51` от
+26 сентября (восстановление чтений и deferred worker). Deployment jobs, YDB
+verification и production smoke успешны. Публикации контента и изображений
+26–27 сентября также подтверждены; автоматические релизы создали `v0.1.0` и
+`v0.1.1`. [Точные commits и запуски](../knowledge-base/monitoring.md#rollout-evidence).
+Это подтверждение выкладки кода; новые live-настройки Monium и поведение
+после rollout на естественных событиях здесь не проверялись.
 
 Функция пока публикует canonical queue gauge
 `zvenfit_estetika_telegram_pending_notifications` и legacy alias
@@ -118,15 +127,17 @@ smoke прошли. [Проверка паритета #35444430978](https://git
 
 Осталось:
 
-0. выполнить согласованный [rollout deferred worker](monitoring.md#согласованный-rollout-и-откат):
-   сначала новый log metric/alert и 15-ID allowlist, затем функция; сверить INFO/email
-   без повторов для retries/slow query и выполнить live drift. Код не применяет Monium JSON автоматически;
+0. завершить проверку [monitoring для deferred worker](monitoring.md#согласованный-rollout-и-откат):
+   подтвердить применение нового log metric/alert, 15-ID allowlist и INFO/email
+   без повторов для retries/slow query, выполнить live drift. Функция уже развёрнута;
+   порядок внедрения настроек не подтверждён, CI не применяет Monium JSON автоматически;
 1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
    `Referrer-Policy` из `TODO.md`;
 2. включать HSTS только после стабильной проверки HTTPS;
 3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout;
-4. подтвердить live-retention общей группы в 14 дней, новые поля естественного `ydb_retry`,
-   p95 selector и свежую полную сверку live-настроек с Git (15 правил после нового rollout).
+4. проверить новые поля естественного `ydb_retry` и восстановление worker после
+   rollout 25–26 сентября, исправить p95 selector. Retention 14 дней и диагностика
+   версии от 19 сентября уже подтверждены проверкой 24 сентября.
 
 ## 5. Production-проверка с реальными данными
 
