@@ -315,7 +315,7 @@ function injectOpenGraphHead(html, pagePath, config, pageMeta) {
   return html.replace('</head>', `${openGraphMarker}\n  ${tags.join('\n  ')}\n</head>`);
 }
 
-function injectStructuredData(html, pagePath, config, pageMeta) {
+function injectStructuredData(html, pagePath, config) {
   if (html.includes(structuredDataMarker) || !html.includes('</head>') || pagePath === '/404.html') {
     return html;
   }
@@ -327,8 +327,8 @@ function injectStructuredData(html, pagePath, config, pageMeta) {
     '@type': org['@type'] || 'BeautySalon',
     '@id': `${siteUrl}/#organization`,
     name: org.name,
-    description: pageMeta.description || org.description,
-    url: pagePath === '/' ? `${siteUrl}/` : `${siteUrl}${pagePath}`,
+    description: org.description,
+    url: `${siteUrl}/`,
     telephone: org.telephone,
     email: org.email,
     image: resolveSiteUrl(org.logo, siteUrl),
@@ -336,7 +336,6 @@ function injectStructuredData(html, pagePath, config, pageMeta) {
     geo: org.geo,
     hasMap: org.hasMap,
     areaServed: org.areaServed,
-    inLanguage: org.inLanguage,
     openingHours: org.openingHours,
     sameAs: org.sameAs || [],
   };
@@ -428,7 +427,7 @@ function runBuild() {
     const withOpenGraph = isNotFoundPage
       ? withHeadSnippets
       : injectOpenGraphHead(withHeadSnippets, pagePath, config, pageMeta);
-    const withStructuredData = injectStructuredData(withOpenGraph, pagePath, config, pageMeta);
+    const withStructuredData = injectStructuredData(withOpenGraph, pagePath, config);
     const engagement = pagePath === '/' ? ' data-analytics-timer="true" data-analytics-scroll="true"' : '';
     const withAnalyticsEvents = isNotFoundPage ? withStructuredData : withStructuredData.replace(
       '</head>',
