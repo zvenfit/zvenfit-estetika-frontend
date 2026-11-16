@@ -76,18 +76,36 @@ for (const rel of files.filter(file => file.endsWith('.html'))) {
 const receptionEmail = 'zvenfit-reception@yandex.ru';
 const ownerEmail = 'zvenfit.estetika@yandex.ru';
 const allowedEmailsByPage = {
-  'index.html': [receptionEmail, ownerEmail],
   'privacy/index.html': [ownerEmail],
   'personal-data-processing/index.html': [ownerEmail],
 };
+const revokeLinkPattern = /<a\b[^>]*\bhref="mailto:([^"?]+)[^"]*"[^>]*>\s*Отозвать[^<]*<\/a>/gi;
 for (const rel of files.filter(file => file.endsWith('.html'))) {
+  let html = read(rel);
+  if (rel === 'index.html') {
+    // Ссылка отзыва согласия ведёт к владельцу; вне неё на главной допустим только ресепшен.
+    const revokeEmails = [...html.matchAll(revokeLinkPattern)].map(match => match[1].toLowerCase());
+    if (!revokeEmails.length || revokeEmails.some(email => email !== ownerEmail)) {
+      throw new Error(`check-build: the consent revocation link in ${rel} must use ${ownerEmail}`);
+    }
+    html = html.replace(revokeLinkPattern, '');
+  }
   const allowedEmails = allowedEmailsByPage[rel] || [receptionEmail];
-  const emailAddresses = read(rel).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  const emailAddresses = html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
   const unexpectedEmails = emailAddresses.filter(email => !allowedEmails.includes(email.toLowerCase()));
   if (unexpectedEmails.length) {
     throw new Error(
       `check-build: unexpected public email in ${rel}: ${[...new Set(unexpectedEmails)].join(', ')}`,
     );
+  }
+  if (rel === 'index.html' || rel === 'form/index.html') {
+    if (!html.includes(`href="mailto:${receptionEmail}"`)) {
+      throw new Error(`check-build: ${rel} must link to the reception email ${receptionEmail}`);
+    }
+    const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    if (!jsonLd || JSON.parse(jsonLd[1]).email !== receptionEmail) {
+      throw new Error(`check-build: JSON-LD email in ${rel} must be ${receptionEmail}`);
+    }
   }
 }
 
