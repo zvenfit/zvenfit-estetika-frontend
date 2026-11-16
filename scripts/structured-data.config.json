@@ -13,9 +13,24 @@
       "addressLocality": "Звенигород",
       "addressCountry": "RU"
     },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 55.743773,
+      "longitude": 36.865287
+    },
+    "hasMap": "https://yandex.com/maps/org/zvenfit/46426452607/",
+    "areaServed": {
+      "@type": "City",
+      "name": "Звенигород"
+    },
+    "inLanguage": "ru",
     "openingHours": "Mo-Su 08:00-22:00",
     "logo": "https://storage.yandexcloud.net/zvenfit-estetika/images/logo/apple-touch-180.png",
-    "sameAs": ["https://vk.com/zvenfit.estetika"]
+    "sameAs": [
+      "https://vk.com/zvenfit.estetika",
+      "https://t.me/zvenfit",
+      "https://max.ru/u/f9LHodD0cOKxYlj8JiMiyhIXm9Oc4olk2yK0whp7ysUGrHXWY-X64succW0"
+    ]
   },
   "openGraph": {
     "image": "https://storage.yandexcloud.net/zvenfit-estetika/images/hero/home-photo.webp",

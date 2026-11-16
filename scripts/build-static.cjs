@@ -325,6 +325,7 @@ function injectStructuredData(html, pagePath, config, pageMeta) {
   const structured = {
     '@context': 'https://schema.org',
     '@type': org['@type'] || 'BeautySalon',
+    '@id': `${siteUrl}/#organization`,
     name: org.name,
     description: pageMeta.description || org.description,
     url: pagePath === '/' ? `${siteUrl}/` : `${siteUrl}${pagePath}`,
@@ -332,6 +333,10 @@ function injectStructuredData(html, pagePath, config, pageMeta) {
     email: org.email,
     image: resolveSiteUrl(org.logo, siteUrl),
     address: org.address,
+    geo: org.geo,
+    hasMap: org.hasMap,
+    areaServed: org.areaServed,
+    inLanguage: org.inLanguage,
     openingHours: org.openingHours,
     sameAs: org.sameAs || [],
   };
