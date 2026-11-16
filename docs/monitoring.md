@@ -271,6 +271,12 @@ Deferred-result успешен на уровне платформы: восст�
 
 ### Согласованный rollout и откат
 
+Статус на **27 сентября 2026 года**: runtime-код `93fdf51` уже развёрнут
+26 сентября; [GitHub Actions подтверждает деплой и production smoke](../knowledge-base/monitoring.md#rollout-evidence).
+Применение нового Monium desired state и порядок его внедрения не подтверждены.
+Следующий шаг — сверить live metric/alert, dashboard и каналы, затем проверить
+естественные события worker. Повторный деплой функции сам по себе этот пробел не закрывает.
+
 Desired state содержит 10 log metrics и 15 alerts. Сначала создать deferred metric/alert
 и включить его в 15-ID dashboard allowlist, проверить каналы и selectors. Затем
 развернуть функцию и подтвердить успешные heartbeat, gauges и восстановление worker.
