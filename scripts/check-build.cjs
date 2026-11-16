@@ -72,10 +72,18 @@ for (const rel of files.filter(file => file.endsWith('.html'))) {
   }
 }
 
-const publicEmail = 'zvenfit.estetika@yandex.ru';
+// Контакт для клиентов — ресепшен; юридические страницы и ссылки отзыва согласия — владелец (оператор ПДн).
+const receptionEmail = 'zvenfit-reception@yandex.ru';
+const ownerEmail = 'zvenfit.estetika@yandex.ru';
+const allowedEmailsByPage = {
+  'index.html': [receptionEmail, ownerEmail],
+  'privacy/index.html': [ownerEmail],
+  'personal-data-processing/index.html': [ownerEmail],
+};
 for (const rel of files.filter(file => file.endsWith('.html'))) {
+  const allowedEmails = allowedEmailsByPage[rel] || [receptionEmail];
   const emailAddresses = read(rel).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
-  const unexpectedEmails = emailAddresses.filter(email => email.toLowerCase() !== publicEmail);
+  const unexpectedEmails = emailAddresses.filter(email => !allowedEmails.includes(email.toLowerCase()));
   if (unexpectedEmails.length) {
     throw new Error(
       `check-build: unexpected public email in ${rel}: ${[...new Set(unexpectedEmails)].join(', ')}`,
