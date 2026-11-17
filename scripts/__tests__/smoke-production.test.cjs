@@ -5,6 +5,8 @@ const test = require('node:test');
 
 const {
   expectedSecurityHeaders,
+  fetchWithRetry,
+  hstsProblems,
   normalizeSiteUrl,
   runSmoke,
   securityHeaderProblems,
@@ -113,14 +115,41 @@ test('production smoke fails when the CDN omits or alters security headers', asy
   );
 });
 
-test('security header expectations include HSTS only when it is enabled in the config', () => {
-  const disabled = { ...securityConfig, hsts: { ...securityConfig.hsts, enabled: false } };
-  const enabled = { ...securityConfig, hsts: { ...securityConfig.hsts, enabled: true } };
+test('HSTS is checked as a rule only when it is enabled in the config', () => {
+  const config = enabled => ({ ...securityConfig, hsts: { ...securityConfig.hsts, enabled } });
+  const withHsts = value => response(200, '', { 'strict-transport-security': value });
 
-  assert.equal(expectedSecurityHeaders(disabled)['Strict-Transport-Security'], undefined);
-  assert.equal(expectedSecurityHeaders(enabled)['Strict-Transport-Security'], 'max-age=31536000');
-  assert.deepEqual(securityHeaderProblems('/', response(200, '', SECURITY_HEADERS), expectedSecurityHeaders(disabled)), []);
-  assert.deepEqual(securityHeaderProblems('/', response(200, '', SECURITY_HEADERS), expectedSecurityHeaders(enabled)), [
-    '/: missing Strict-Transport-Security',
-  ]);
+  assert.equal(expectedSecurityHeaders(config(true))['Strict-Transport-Security'], undefined);
+  assert.deepEqual(hstsProblems('/', withHsts('max-age=1'), config(false)), []);
+  assert.deepEqual(hstsProblems('/', withHsts('max-age=31536000'), config(true)), []);
+  assert.deepEqual(hstsProblems('/', withHsts('max-age=99999999'), config(true)), []);
+  assert.deepEqual(hstsProblems('/', response(200, ''), config(true)), ['/: missing Strict-Transport-Security']);
+  assert.match(hstsProblems('/', withHsts('max-age=300'), config(true))[0], /below 31536000/);
+  assert.match(hstsProblems('/', withHsts('max-age=31536000; includeSubDomains'), config(true))[0], /must not include/);
+  assert.match(hstsProblems('/', withHsts('max-age=31536000; preload'), config(true))[0], /must not include/);
+  assert.match(hstsProblems('/', withHsts('includeSubDomains'), config(true))[0], /has no max-age/);
+});
+
+test('a header mismatch is retried and only a consistent response passes', async () => {
+  const bad = response(200, '', {});
+  const good = response(200, '', SECURITY_HEADERS);
+  const sequence = [bad, bad, good];
+  const waits = [];
+  const found = await fetchWithRetry('https://estetika.zvenfit.ru/', {}, [200], {
+    fetchImpl: async () => sequence.shift(),
+    waitImpl: async ms => waits.push(ms),
+    validate: res => securityHeaderProblems('/', res),
+  });
+
+  assert.equal(found, good);
+  assert.equal(waits.length, 2);
+
+  await assert.rejects(
+    fetchWithRetry('https://estetika.zvenfit.ru/', {}, [200], {
+      fetchImpl: async () => bad,
+      waitImpl: async () => {},
+      validate: res => securityHeaderProblems('/', res),
+    }),
+    /CDN security headers mismatch[\s\S]*missing X-Content-Type-Options/,
+  );
 });

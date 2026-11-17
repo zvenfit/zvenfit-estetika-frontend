@@ -3,9 +3,17 @@
 #
 # Source of truth: scripts/cdn-security-headers.json (also read by smoke-production).
 # Default is a dry run that only reads the resource; pass --apply to change it.
-# The CLI flag --static-headers splits values on commas, so Permissions-Policy cannot
-# be set through `yc cdn resource update`; this script PATCHes the CDN REST API instead.
-# Headers already present on the resource that are not listed in the config are kept.
+#
+# Notes:
+# - `yc cdn resource update --static-headers` splits values on commas, so Permissions-Policy
+#   cannot be set through it; this script PATCHes the CDN REST API instead.
+# - The PATCH names its field mask (options.static_headers): without a mask the API resets the
+#   fields that are not sent. The full resource is saved first and every other option is compared
+#   after the update; the script fails if any of them changed.
+# - Header names are matched case-insensitively. Headers on the resource that the config does not
+#   manage are kept. Removing a header from the config does not remove it from the CDN.
+# - HSTS: hsts.enabled=false removes the header from the CDN, which does NOT revoke the policy in
+#   browsers that already stored it. To revoke, keep enabled=true and set value "max-age=0".
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,23 +52,34 @@ if [[ -z "${RESOURCE_ID}" ]]; then
   exit 1
 fi
 
-CURRENT="$(yc cdn resource get "${RESOURCE_ID}" --format=json | jq -c '.options.static_headers.value // {}')"
-# Keep unrelated headers, always (re)set ours; HSTS is added only when enabled in the config
-# and removed otherwise, so flipping hsts.enabled to false is the rollback path.
+# Everything below that holds a token or a resource snapshot lives in 0600 temp files.
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/zvenfit-estetika-cdn-headers.XXXXXX")"
+trap 'rm -rf -- "${WORK_DIR}"' EXIT
+chmod 700 "${WORK_DIR}"
+
+BEFORE_FILE="${WORK_DIR}/resource-before.json"
+yc cdn resource get "${RESOURCE_ID}" --format=json >"${BEFORE_FILE}"
+
+CURRENT="$(jq -c '.options.static_headers.value // {}' "${BEFORE_FILE}")"
+CURRENT_ENABLED="$(jq -r '.options.static_headers.enabled // false' "${BEFORE_FILE}")"
+
+# Drop existing keys that collide (case-insensitively) with managed headers, then add ours.
+# HSTS is added only when enabled in the config and otherwise removed from the CDN.
 DESIRED="$(jq -c --argjson current "${CURRENT}" '
   . as $cfg
-  | ($current | del(.[$cfg.hsts.header]))
+  | ([$cfg.headers | keys[] | ascii_downcase] + [$cfg.hsts.header | ascii_downcase]) as $managed
+  | ($current | with_entries(select((.key | ascii_downcase) as $k | ($managed | index($k)) == null)))
     + $cfg.headers
     + (if $cfg.hsts.enabled then {($cfg.hsts.header): $cfg.hsts.value} else {} end)
 ' "${CONFIG_FILE}")"
 
 echo "Resource: ${RESOURCE_ID} (${CNAME})"
-echo "Current static headers:"
+echo "Current static headers (enabled=${CURRENT_ENABLED}):"
 jq . <<<"${CURRENT}"
 echo "Desired static headers:"
 jq . <<<"${DESIRED}"
 
-if [[ "$(jq -S -c . <<<"${CURRENT}")" == "$(jq -S -c . <<<"${DESIRED}")" ]]; then
+if [[ "${CURRENT_ENABLED}" == "true" && "$(jq -S -c . <<<"${CURRENT}")" == "$(jq -S -c . <<<"${DESIRED}")" ]]; then
   echo "configure-cdn-headers: already up to date"
   exit 0
 fi
@@ -70,20 +89,64 @@ if [[ "${APPLY}" != "true" ]]; then
   exit 0
 fi
 
-REQUEST_BODY="$(mktemp "${TMPDIR:-/tmp}/zvenfit-estetika-cdn-headers.XXXXXX")"
-AUTH_HEADER="$(mktemp "${TMPDIR:-/tmp}/zvenfit-estetika-cdn-auth.XXXXXX")"
-trap 'rm -f -- "${REQUEST_BODY}" "${AUTH_HEADER}"' EXIT
-chmod 600 "${REQUEST_BODY}" "${AUTH_HEADER}"
+REQUEST_BODY="${WORK_DIR}/request.json"
+AUTH_HEADER="${WORK_DIR}/auth-header.txt"
+RESPONSE_BODY="${WORK_DIR}/response.json"
+umask 077
 
-jq -n --argjson value "${DESIRED}" '{options: {staticHeaders: {enabled: true, value: $value}}}' >"${REQUEST_BODY}"
-printf 'Authorization: Bearer %s\n' "$(yc iam create-token)" >"${AUTH_HEADER}"
+# Assign the token first so a failed `yc iam create-token` aborts instead of sending an empty one.
+IAM_TOKEN="$(yc iam create-token)"
+printf 'Authorization: Bearer %s\n' "${IAM_TOKEN}" >"${AUTH_HEADER}"
+unset IAM_TOKEN
+
+jq -n --argjson value "${DESIRED}" '{
+  updateMask: "options.static_headers",
+  options: {staticHeaders: {enabled: true, value: $value}}
+}' >"${REQUEST_BODY}"
 
 curl --silent --show-error --fail-with-body \
   --request PATCH \
   --header 'Content-Type: application/json' \
   --header "@${AUTH_HEADER}" \
   --data "@${REQUEST_BODY}" \
-  "${API_BASE}/${RESOURCE_ID}" | jq '{id, done, error}'
+  --output "${RESPONSE_BODY}" \
+  "${API_BASE}/${RESOURCE_ID}"
 
-echo "configure-cdn-headers: submitted; CDN may need up to 15 minutes to propagate."
-echo "Then purge the cache and verify: curl -sI https://${CNAME}/"
+OPERATION_ID="$(jq -r '.id // empty' "${RESPONSE_BODY}")"
+if [[ -z "${OPERATION_ID}" ]]; then
+  echo "configure-cdn-headers: no operation id in the API response" >&2
+  exit 1
+fi
+
+# Wait for the operation and fail on an error instead of reporting a submitted request as success.
+for _ in $(seq 1 30); do
+  OPERATION="$(yc operation get "${OPERATION_ID}" --format=json)"
+  if [[ "$(jq -r '.done // false' <<<"${OPERATION}")" == "true" ]]; then
+    break
+  fi
+  sleep 2
+done
+if [[ "$(jq -r '.done // false' <<<"${OPERATION}")" != "true" ]]; then
+  echo "configure-cdn-headers: operation ${OPERATION_ID} did not finish in time" >&2
+  exit 1
+fi
+if [[ "$(jq -r '.error // empty' <<<"${OPERATION}")" != "" ]]; then
+  echo "configure-cdn-headers: operation ${OPERATION_ID} failed:" >&2
+  jq '.error' <<<"${OPERATION}" >&2
+  exit 1
+fi
+
+# Guard against a reset of anything other than static_headers.
+AFTER_FILE="${WORK_DIR}/resource-after.json"
+yc cdn resource get "${RESOURCE_ID}" --format=json >"${AFTER_FILE}"
+OTHERS='del(.options.static_headers) | del(.updated_at) | .options'
+if [[ "$(jq -S -c "${OTHERS}" "${BEFORE_FILE}")" != "$(jq -S -c "${OTHERS}" "${AFTER_FILE}")" ]]; then
+  echo "configure-cdn-headers: WARNING other CDN options changed; compare these (before / after):" >&2
+  jq -S "${OTHERS}" "${BEFORE_FILE}" >&2
+  jq -S "${OTHERS}" "${AFTER_FILE}" >&2
+  exit 1
+fi
+
+echo "configure-cdn-headers: applied (operation ${OPERATION_ID}); other options unchanged."
+echo "CDN edge nodes pick the change up gradually (about 20 minutes observed); check with repeated"
+echo "requests, e.g. for p in / /form/ /404.html; do curl -sI https://${CNAME}\$p; done"

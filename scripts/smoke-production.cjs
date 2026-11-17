@@ -20,11 +20,19 @@ function wait(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
+async function discardBody(response) {
+  try {
+    await response.body?.cancel?.();
+  } catch {
+    // The discarded response is already unusable; nothing to clean up.
+  }
+}
+
 async function fetchWithRetry(
   url,
   options = {},
   expectedStatuses = [200],
-  { fetchImpl = globalThis.fetch, waitImpl = wait } = {},
+  { fetchImpl = globalThis.fetch, waitImpl = wait, validate = null } = {},
 ) {
   let lastError;
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
@@ -33,8 +41,16 @@ async function fetchWithRetry(
         ...options,
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      if (expectedStatuses.includes(response.status)) return response;
-      lastError = new Error(`${url} returned ${response.status}, expected ${expectedStatuses.join('/')}`);
+      if (expectedStatuses.includes(response.status)) {
+        // Edge nodes pick up CDN option changes at different times, so a header
+        // mismatch is retried like a bad status; only the last attempt's problems are kept.
+        const problems = validate ? validate(response) : [];
+        if (!problems.length) return response;
+        lastError = new Error(`smoke-production: CDN security headers mismatch:\n  ${problems.join('\n  ')}`);
+      } else {
+        lastError = new Error(`${url} returned ${response.status}, expected ${expectedStatuses.join('/')}`);
+      }
+      await discardBody(response);
     } catch (error) {
       lastError = error;
     }
@@ -44,9 +60,7 @@ async function fetchWithRetry(
 }
 
 function expectedSecurityHeaders(config = securityHeadersConfig) {
-  const expected = { ...config.headers };
-  if (config.hsts && config.hsts.enabled) expected[config.hsts.header] = config.hsts.value;
-  return expected;
+  return { ...config.headers };
 }
 
 // Compares response headers with the CDN contract; returns human-readable problems.
@@ -58,6 +72,27 @@ function securityHeaderProblems(pathname, response, expected = expectedSecurityH
     else if (actual.trim().toLowerCase() !== value.toLowerCase()) {
       problems.push(`${pathname}: ${name} is "${actual}", expected "${value}"`);
     }
+  }
+  return problems;
+}
+
+// HSTS is a rule, not an exact match, so a staged max-age ramp or a max-age=0 rollback
+// only needs the config value changed. includeSubDomains/preload are never accepted.
+function hstsProblems(pathname, response, config = securityHeadersConfig) {
+  const hsts = config.hsts;
+  if (!hsts || !hsts.enabled) return [];
+  const actual = response.headers.get(hsts.header.toLowerCase());
+  if (!actual) return [`${pathname}: missing ${hsts.header}`];
+
+  const problems = [];
+  const minimum = Number((/max-age=(\d+)/i.exec(hsts.value) || [])[1]);
+  const seen = (/max-age=(\d+)/i.exec(actual) || [])[1];
+  if (seen === undefined) problems.push(`${pathname}: ${hsts.header} "${actual}" has no max-age`);
+  else if (Number(seen) < minimum) {
+    problems.push(`${pathname}: ${hsts.header} max-age ${seen} is below ${minimum}`);
+  }
+  if (/includesubdomains|preload/i.test(actual)) {
+    problems.push(`${pathname}: ${hsts.header} "${actual}" must not include includeSubDomains or preload`);
   }
   return problems;
 }
@@ -75,10 +110,14 @@ async function runSmoke({
   const apiUrl = String(leadApiUrl).trim();
   if (!apiUrl) throw new Error('smoke-production: LEAD_API_URL is required');
 
-  const fetchChecked = (url, options, statuses) =>
-    fetchWithRetry(url, options, statuses, { fetchImpl, waitImpl });
+  const fetchChecked = (url, options, statuses, validate) =>
+    fetchWithRetry(url, options, statuses, { fetchImpl, waitImpl, validate });
+  const withSecurityHeaders = label => response => [
+    ...securityHeaderProblems(label, response, securityHeaders),
+    ...hstsProblems(label, response),
+  ];
   const assertPage = async (pathname, pattern) => {
-    const response = await fetchChecked(`${origin}${pathname}`);
+    const response = await fetchChecked(`${origin}${pathname}`, {}, [200], withSecurityHeaders(pathname));
     const body = await response.text();
     if (!pattern.test(body)) throw new Error(`${pathname} does not contain the expected page marker`);
     return response;
@@ -91,24 +130,15 @@ async function runSmoke({
     }
   };
 
-  const headerProblems = [];
-  const checkHeaders = (pathname, response) =>
-    headerProblems.push(...securityHeaderProblems(pathname, response, securityHeaders));
-
-  const home = await assertPage('/', /<main[\s>]/i);
-  checkHeaders('/', home);
-  const form = await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
-  checkHeaders('/form/', form);
-  const privacy = await assertPage('/privacy/', /<html/i);
-  checkHeaders('/privacy/', privacy);
-  const personalData = await assertPage('/personal-data-processing/', /<html/i);
-  checkHeaders('/personal-data-processing/', personalData);
-  const notFoundPage = await assertPage('/404.html', /<html/i);
-  checkHeaders('/404.html', notFoundPage);
+  await assertPage('/', /<main[\s>]/i);
+  await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
+  await assertPage('/privacy/', /<html/i);
+  await assertPage('/personal-data-processing/', /<html/i);
+  await assertPage('/404.html', /<html/i);
   await assertRedirect('/documents/privacy-policy.html', '/privacy/');
   await assertRedirect('/documents/personal-data-processing.html', '/personal-data-processing/');
-  const notFound = await fetchChecked(`${origin}/codex-production-smoke-not-found`, {}, [404]);
-  checkHeaders('/codex-production-smoke-not-found (404)', notFound);
+  const notFoundPath = '/codex-production-smoke-not-found';
+  await fetchChecked(`${origin}${notFoundPath}`, {}, [404], withSecurityHeaders(`${notFoundPath} (404)`));
 
   const robots = await fetchChecked(`${origin}/robots.txt`);
   if (!/Sitemap:/i.test(await robots.text())) throw new Error('robots.txt has no Sitemap directive');
@@ -135,10 +165,7 @@ async function runSmoke({
     throw new Error(`smoke-production: lead API CORS allows ${allowedOrigin || 'nothing'} instead of ${origin}`);
   }
 
-  if (headerProblems.length) {
-    throw new Error(`smoke-production: CDN security headers mismatch:\n  ${headerProblems.join('\n  ')}`);
-  }
-  if (!securityHeaders['Strict-Transport-Security']) {
+  if (!securityHeadersConfig.hsts.enabled) {
     warn('smoke-production: HSTS is not enabled yet (hsts.enabled=false in scripts/cdn-security-headers.json)');
   }
 
@@ -156,6 +183,7 @@ if (require.main === module) {
 module.exports = {
   expectedSecurityHeaders,
   fetchWithRetry,
+  hstsProblems,
   normalizeSiteUrl,
   runSmoke,
   securityHeaderProblems,
