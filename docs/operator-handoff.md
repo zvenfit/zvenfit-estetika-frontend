@@ -131,9 +131,10 @@ verification и production smoke успешны. Публикации конте
    подтвердить применение нового log metric/alert, 15-ID allowlist и INFO/email
    без повторов для retries/slow query, выполнить live drift. Функция уже развёрнута;
    порядок внедрения настроек не подтверждён, CI не применяет Monium JSON автоматически;
-1. добавить на CDN `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
-   `Referrer-Policy` из `TODO.md`;
-2. включать HSTS только после стабильной проверки HTTPS;
+1. CDN-заголовки `X-Content-Type-Options`, `X-Frame-Options`, `Permissions-Policy` и
+   `Referrer-Policy` применены 2026-11-17 ([runbook](setup.md#заголовки-безопасности));
+2. включать HSTS только после стабильной проверки HTTPS (`hsts.enabled` в
+   `scripts/cdn-security-headers.json`);
 3. после стабильного периода dual-publish удалить legacy queue gauge отдельным rollout;
 4. проверить новые поля естественного `ydb_retry` и восстановление worker после
    rollout 25–26 сентября, исправить p95 selector. Retention 14 дней и диагностика
@@ -159,7 +160,7 @@ failover [deploy #32052911717](https://github.com/zvenfit/zvenfit-estetika-front
 Осталось:
 
 1. проверить production-визит в Яндекс Метрике; цели включать после реализации `reachGoal` из `TODO.md`;
-2. проверить security headers командой `curl -I` после распространения CDN-настроек.
+2. security headers на CDN проверены `curl -I` и `smoke-production` 2026-11-17; HSTS остаётся отложенным.
 
 Read-only проверка страниц прошла в deploy #32052911717. До пилотного приёма реальных заявок
 остаётся юридическая проверка форм. API Gateway + Smart Web Security, CSP и budget alerts остаются
