@@ -7,7 +7,7 @@
 # Notes:
 # - `yc cdn resource update --static-headers` splits values on commas, so Permissions-Policy
 #   cannot be set through it; this script PATCHes the CDN REST API instead.
-# - The PATCH names its field mask (options.static_headers): without a mask the API resets the
+# - The PATCH names its field mask (options.staticHeaders; the REST JSON form is camelCase): without a mask the API resets the
 #   fields that are not sent. The full resource is saved first and every other option is compared
 #   after the update; the script fails if any of them changed.
 # - Header names are matched case-insensitively. Headers on the resource that the config does not
@@ -20,12 +20,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${CDN_HEADERS_CONFIG:-${SCRIPT_DIR}/cdn-security-headers.json}"
 API_BASE="https://cdn.api.cloud.yandex.net/cdn/v1/resources"
 APPLY=false
+FORCE=false
 
 for arg in "$@"; do
   case "${arg}" in
     --apply) APPLY=true ;;
+    --force) FORCE=true ;; # re-send identical headers, e.g. to verify the PATCH path
     -h | --help)
-      echo "Usage: bash scripts/configure-cdn-headers.sh [--apply]"
+      echo "Usage: bash scripts/configure-cdn-headers.sh [--apply [--force]]"
       exit 0
       ;;
     *)
@@ -79,7 +81,7 @@ jq . <<<"${CURRENT}"
 echo "Desired static headers:"
 jq . <<<"${DESIRED}"
 
-if [[ "${CURRENT_ENABLED}" == "true" && "$(jq -S -c . <<<"${CURRENT}")" == "$(jq -S -c . <<<"${DESIRED}")" ]]; then
+if [[ "${FORCE}" != "true" && "${CURRENT_ENABLED}" == "true" && "$(jq -S -c . <<<"${CURRENT}")" == "$(jq -S -c . <<<"${DESIRED}")" ]]; then
   echo "configure-cdn-headers: already up to date"
   exit 0
 fi
@@ -100,17 +102,21 @@ printf 'Authorization: Bearer %s\n' "${IAM_TOKEN}" >"${AUTH_HEADER}"
 unset IAM_TOKEN
 
 jq -n --argjson value "${DESIRED}" '{
-  updateMask: "options.static_headers",
+  updateMask: "options.staticHeaders",
   options: {staticHeaders: {enabled: true, value: $value}}
 }' >"${REQUEST_BODY}"
 
-curl --silent --show-error --fail-with-body \
+if ! curl --silent --show-error --fail-with-body \
   --request PATCH \
   --header 'Content-Type: application/json' \
   --header "@${AUTH_HEADER}" \
   --data "@${REQUEST_BODY}" \
   --output "${RESPONSE_BODY}" \
-  "${API_BASE}/${RESOURCE_ID}"
+  "${API_BASE}/${RESOURCE_ID}"; then
+  echo "configure-cdn-headers: API request failed:" >&2
+  cat "${RESPONSE_BODY}" >&2 || true
+  exit 1
+fi
 
 OPERATION_ID="$(jq -r '.id // empty' "${RESPONSE_BODY}")"
 if [[ -z "${OPERATION_ID}" ]]; then
