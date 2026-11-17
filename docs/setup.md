@@ -333,6 +333,39 @@ npm run deploy:yc
 7. Добавьте query-параметр `v` в whitelist ключа кеша, чтобы `app.js?v=1` и `app.js?v=2` считались разными объектами.
 8. Проверьте, что неизвестные пути отдают `/404.html` с HTTP 404 и `Cache-Control: no-cache, must-revalidate`.
 9. Проверьте HTTP 301 со старых `/documents/*.html` на `/privacy/` и `/personal-data-processing/`.
+10. Примените заголовки безопасности ответа (см. ниже).
+
+### Заголовки безопасности
+
+CDN-ресурс настраивается вручную и из CI не меняется; исключение — статические заголовки ответа. Их источник — `scripts/cdn-security-headers.json` (тот же файл читает `smoke-production`):
+
+| Заголовок | Значение |
+|-----------|----------|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
+| `Strict-Transport-Security` | `max-age=31536000` — только когда `hsts.enabled=true`; без `includeSubDomains` и `preload` |
+
+```bash
+yc init                                    # нужен доступ к CDN каталога
+bash scripts/configure-cdn-headers.sh          # dry run: показывает текущие и желаемые заголовки
+bash scripts/configure-cdn-headers.sh --apply  # применяет через REST API CDN
+```
+
+Скрипт использует REST API, а не `yc cdn resource update --static-headers`: CLI делит значения по запятым и ломает `Permissions-Policy`. Заголовки ресурса, которых нет в конфиге, сохраняются. Изменения распространяются до 15 минут; затем очистите кеш CDN и проверьте:
+
+```bash
+for p in / /form/ /404.html /privacy/ /personal-data-processing/; do
+  curl -sI "https://estetika.zvenfit.ru$p" | grep -iE '^HTTP|x-content|x-frame|referrer|permissions|strict'
+done
+```
+
+Применяйте изменения на CDN **до** мержа PR, который меняет `cdn-security-headers.json`: `smoke-production` сравнивает ответы с этим файлом и роняет деплой при расхождении (пять страниц и 404 неизвестного пути).
+
+Включение HSTS: убедитесь, что HTTPS стабилен (сертификат, редирект HTTP→HTTPS), поставьте `hsts.enabled=true`, выполните `--apply`, проверьте `curl -I`, затем мержите PR. Браузеры запоминают HSTS на год, поэтому быстрый откат невозможен: чтобы отозвать политику, нужно отдавать `max-age=0` и ждать, пока клиенты сделают запрос; не заходившие на сайт браузеры будут считать его HTTPS-only до истечения срока. Откат остальных заголовков: `yc cdn resource update <id> --clear-static-headers`.
+
+CSP в этот набор не входит (отдельный пункт `TODO.md`): сайт использует Яндекс Метрику и GTM `GTM-KQT53D6V`, их домены нужно учесть в политике.
 
 CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-revalidate`, а версионированные CSS/JS — с `public, max-age=31536000, immutable`. После изменения CDN-настроек или первого деплоя очистите кеш ресурса. Значение `ASSET_VERSION`, переданное через окружение или GitHub Variables, должно меняться при каждом релизе с изменениями CSS/JS.
 

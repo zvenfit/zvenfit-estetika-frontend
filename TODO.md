@@ -133,14 +133,12 @@ p95 и полная сверка live-конфигурации.
   - [ ] Поставить перед функцией API Gateway + Smart Web Security Advanced Rate Limiter с лимитами на POST по IP и общим аварийным лимитом
   - [ ] Закрыть прямой публичный вызов функции, чтобы Gateway/SWS нельзя было обойти
   - [ ] Настроить бюджет и уведомления расходов
-- [ ] **HTTP-заголовки безопасности на Cloud CDN** — добавить как статические заголовки ответов клиентам на CDN, а не через HTML `<meta>` ([документация Yandex Cloud CDN](https://yandex.cloud/ru/docs/cdn/operations/resources/configure-headers))
+- [ ] **HTTP-заголовки безопасности на Cloud CDN** — статические заголовки ответа на CDN-ресурсе, а не HTML `<meta>` ([документация Yandex Cloud CDN](https://yandex.cloud/ru/docs/cdn/operations/resources/configure-headers)); конфигурация — `scripts/cdn-security-headers.json`, применение — `scripts/configure-cdn-headers.sh`, runbook — `docs/setup.md`
   - Порядок внедрения: сначала обратимые заголовки; HSTS — только после проверки стабильного HTTPS.
-  - [ ] `Strict-Transport-Security: max-age=31536000` — включать после восстановления production и проверки HTTPS; пока без `includeSubDomains` и `preload`
-  - [ ] `X-Content-Type-Options: nosniff`
-  - [ ] `X-Frame-Options: DENY`
-  - [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
-  - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
-  - [ ] Проверить заголовки для `/`, `/form/`, `/404.html` и юридических страниц командой `curl -I` после распространения настроек CDN
+  - [x] `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`, `Referrer-Policy: strict-origin-when-cross-origin` применены к ресурсу 2026-11-17; распространение по узлам заняло около 20 минут
+  - [x] Заголовки проверены `curl -I` для `/`, `/form/`, `/404.html`, `/privacy/`, `/personal-data-processing/` и 404 неизвестного пути (60 запросов без пропусков)
+  - [x] `smoke-production` проверяет значения заголовков на этих страницах и падает при расхождении
+  - [ ] `Strict-Transport-Security: max-age=31536000` — отложен: включать (`hsts.enabled=true` в `scripts/cdn-security-headers.json` + `configure-cdn-headers.sh --apply`) после наблюдения за стабильным HTTPS; пока без `includeSubDomains` и `preload`, потому что отозвать выданный HSTS у браузеров нельзя
 - [ ] **Content Security Policy** — вынести исполняемый inline-код, запустить CSP сначала в `Report-Only`, учесть домены Яндекс Метрики, затем включить enforcement с `frame-ancestors 'none'`
 - [x] **Код и контракт monitoring** — Pino/redaction и safe error taxonomy; event counts через 10
   log aggregates; direct OTLP только для outbox gauges/heartbeat; 15 desired alerts, `query_execute` telemetry,

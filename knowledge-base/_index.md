@@ -26,6 +26,7 @@ title: ZvenFit Estetika project knowledge base
 - [ADR-002: автоматические версии проверенных production-деплоев](../docs/decisions/002-automated-production-releases.md)
 - [Релизный runbook](../docs/releases.md)
 - [ADR-001: восстановление чтений outbox и отложенный проход worker](../docs/decisions/001-queue-read-recovery.md)
+- [CDN security headers](cdn-security-headers.md)
 - [Production monitoring decisions](monitoring.md)
 - [Полный monitoring runbook](../docs/monitoring.md)
 - [Operator handoff](../docs/operator-handoff.md)

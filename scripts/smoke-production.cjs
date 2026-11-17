@@ -1,5 +1,7 @@
 'use strict';
 
+const securityHeadersConfig = require('./cdn-security-headers.json');
+
 const DEFAULT_SITE_URL = 'https://estetika.zvenfit.ru';
 const ATTEMPTS = 6;
 const RETRY_MS = 5000;
@@ -41,6 +43,25 @@ async function fetchWithRetry(
   throw lastError;
 }
 
+function expectedSecurityHeaders(config = securityHeadersConfig) {
+  const expected = { ...config.headers };
+  if (config.hsts && config.hsts.enabled) expected[config.hsts.header] = config.hsts.value;
+  return expected;
+}
+
+// Compares response headers with the CDN contract; returns human-readable problems.
+function securityHeaderProblems(pathname, response, expected = expectedSecurityHeaders()) {
+  const problems = [];
+  for (const [name, value] of Object.entries(expected)) {
+    const actual = response.headers.get(name.toLowerCase());
+    if (!actual) problems.push(`${pathname}: missing ${name}`);
+    else if (actual.trim().toLowerCase() !== value.toLowerCase()) {
+      problems.push(`${pathname}: ${name} is "${actual}", expected "${value}"`);
+    }
+  }
+  return problems;
+}
+
 async function runSmoke({
   siteUrl = process.env.SITE_URL || DEFAULT_SITE_URL,
   leadApiUrl = process.env.LEAD_API_URL || '',
@@ -48,6 +69,7 @@ async function runSmoke({
   waitImpl = wait,
   log = console.log,
   warn = console.warn,
+  securityHeaders = expectedSecurityHeaders(),
 } = {}) {
   const origin = normalizeSiteUrl(siteUrl);
   const apiUrl = String(leadApiUrl).trim();
@@ -69,13 +91,24 @@ async function runSmoke({
     }
   };
 
+  const headerProblems = [];
+  const checkHeaders = (pathname, response) =>
+    headerProblems.push(...securityHeaderProblems(pathname, response, securityHeaders));
+
   const home = await assertPage('/', /<main[\s>]/i);
-  await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
-  await assertPage('/privacy/', /<html/i);
-  await assertPage('/personal-data-processing/', /<html/i);
+  checkHeaders('/', home);
+  const form = await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
+  checkHeaders('/form/', form);
+  const privacy = await assertPage('/privacy/', /<html/i);
+  checkHeaders('/privacy/', privacy);
+  const personalData = await assertPage('/personal-data-processing/', /<html/i);
+  checkHeaders('/personal-data-processing/', personalData);
+  const notFoundPage = await assertPage('/404.html', /<html/i);
+  checkHeaders('/404.html', notFoundPage);
   await assertRedirect('/documents/privacy-policy.html', '/privacy/');
   await assertRedirect('/documents/personal-data-processing.html', '/personal-data-processing/');
-  await fetchChecked(`${origin}/codex-production-smoke-not-found`, {}, [404]);
+  const notFound = await fetchChecked(`${origin}/codex-production-smoke-not-found`, {}, [404]);
+  checkHeaders('/codex-production-smoke-not-found (404)', notFound);
 
   const robots = await fetchChecked(`${origin}/robots.txt`);
   if (!/Sitemap:/i.test(await robots.text())) throw new Error('robots.txt has no Sitemap directive');
@@ -102,15 +135,11 @@ async function runSmoke({
     throw new Error(`smoke-production: lead API CORS allows ${allowedOrigin || 'nothing'} instead of ${origin}`);
   }
 
-  const recommendedHeaders = [
-    'x-content-type-options',
-    'x-frame-options',
-    'referrer-policy',
-    'permissions-policy',
-  ];
-  const missingHeaders = recommendedHeaders.filter(name => !home.headers.get(name));
-  if (missingHeaders.length) {
-    warn(`smoke-production: CDN security headers not configured: ${missingHeaders.join(', ')}`);
+  if (headerProblems.length) {
+    throw new Error(`smoke-production: CDN security headers mismatch:\n  ${headerProblems.join('\n  ')}`);
+  }
+  if (!securityHeaders['Strict-Transport-Security']) {
+    warn('smoke-production: HSTS is not enabled yet (hsts.enabled=false in scripts/cdn-security-headers.json)');
   }
 
   log('smoke-production: OK');
@@ -124,4 +153,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { fetchWithRetry, normalizeSiteUrl, runSmoke };
+module.exports = {
+  expectedSecurityHeaders,
+  fetchWithRetry,
+  normalizeSiteUrl,
+  runSmoke,
+  securityHeaderProblems,
+};
