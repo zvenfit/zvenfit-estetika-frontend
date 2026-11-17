@@ -345,31 +345,42 @@ CDN-ресурс настраивается вручную и из CI не ме�
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
-| `Strict-Transport-Security` | `max-age=31536000` — только когда `hsts.enabled=true`; без `includeSubDomains` и `preload` |
+| `Strict-Transport-Security` | только при `hsts.enabled=true`; без `includeSubDomains` и `preload` |
 
 ```bash
-yc init                                    # нужен доступ к CDN каталога
-bash scripts/configure-cdn-headers.sh          # dry run: показывает текущие и желаемые заголовки
+bash scripts/configure-cdn-headers.sh          # dry run: только читает ресурс, показывает текущие и желаемые заголовки
 bash scripts/configure-cdn-headers.sh --apply  # применяет через REST API CDN
+bash scripts/configure-cdn-headers.sh --apply --force  # повторно отправляет те же значения (проверка пути PATCH)
 ```
 
-Скрипт использует REST API, а не `yc cdn resource update --static-headers`: CLI делит значения по запятым и ломает `Permissions-Policy`. Заголовки ресурса, которых нет в конфиге, сохраняются. Изменения распространяются до 15 минут; затем очистите кеш CDN и проверьте:
+Нужен авторизованный профиль `yc` (роль `cdn.viewer` для dry run, `cdn.editor` для `--apply`). Скрипт использует REST API, а не `yc cdn resource update --static-headers`: CLI делит значения по запятым и ломает `Permissions-Policy`. Запрос меняет только `options.staticHeaders` (`updateMask` в REST-форме camelCase; `options.static_headers` API отклоняет с 400), перед этим сохраняет снимок ресурса и после операции сверяет остальные опции; при расхождении завершается с ошибкой. Имена заголовков сравниваются без учёта регистра, посторонние заголовки ресурса сохраняются.
+
+Edge-узлы CDN подхватывают изменение постепенно (2026-11-17 заняло около 20 минут): часть узлов долго отвечает без заголовков, поэтому проверять нужно серией запросов, а не одним `curl`. Очистка кеша для заголовков не потребовалась (ответы шли от источника, `cache-status: MISS`); имеет смысл только если через 30–40 минут заголовков всё ещё нет.
 
 ```bash
-for p in / /form/ /404.html /privacy/ /personal-data-processing/; do
-  curl -sI "https://estetika.zvenfit.ru$p" | grep -iE '^HTTP|x-content|x-frame|referrer|permissions|strict'
-done
+for p in / /form/ /404.html /privacy/ /personal-data-processing/ /does-not-exist; do
+  for i in 1 2 3 4 5; do
+    curl -sI "https://estetika.zvenfit.ru$p" | grep -ciE '^(x-content-type-options|x-frame-options|referrer-policy|permissions-policy):'
+  done
+done | sort | uniq -c   # ожидается только значение 4
 ```
 
-Применяйте изменения на CDN **до** мержа PR, который меняет `cdn-security-headers.json`: `smoke-production` сравнивает ответы с этим файлом и роняет деплой при расхождении (пять страниц и 404 неизвестного пути).
+**Порядок.** Сначала примените изменение на CDN и дождитесь стабильных ответов, потом мержите PR, который меняет `cdn-security-headers.json`: `smoke-production` сравнивает ответы с этим файлом и роняет деплой при расхождении (пять страниц и 404 неизвестного пути; несовпадение заголовков повторяется в рамках общего ретрая smoke). Если smoke упал только на заголовках, достаточно «Re-run failed jobs» после распространения.
 
-Включение HSTS: убедитесь, что HTTPS стабилен (сертификат, редирект HTTP→HTTPS), поставьте `hsts.enabled=true`, выполните `--apply`, проверьте `curl -I`, затем мержите PR. Браузеры запоминают HSTS на год, поэтому быстрый откат невозможен: чтобы отозвать политику, нужно отдавать `max-age=0` и ждать, пока клиенты сделают запрос; не заходившие на сайт браузеры будут считать его HTTPS-only до истечения срока. Откат остальных заголовков: `yc cdn resource update <id> --clear-static-headers`.
+**Откат.** Откатывайте через PR, который возвращает прежнее содержимое JSON, и `--apply`. Экстренно `yc cdn resource update bc8r47oycehdovofnwph --clear-static-headers` убирает все статические заголовки сразу, но следующий deploy-smoke станет красным, пока JSON не приведён в соответствие.
+
+**HSTS.** Не включён. Браузеры запоминают политику на срок `max-age`, а отозвать её можно только отдачей `max-age=0` по рабочему HTTPS, поэтому `hsts.enabled=false` не отзывает политику (заголовок просто перестаёт отдаваться). План:
+
+1. дождитесь первого автообновления сертификата (текущий Let's Encrypt действует до 2027-01-04) и добавьте оповещение об истечении сертификата;
+2. поднимайте `max-age` ступенями `300` → `86400` → `604800` → `2592000` → `31536000`: меняйте `hsts.value`, выполняйте `--apply`, затем мерж; smoke принимает `max-age` не меньше значения из конфига;
+3. не добавляйте `includeSubDomains` и `preload` (smoke их отклоняет): они распространили бы политику на весь `zvenfit.ru`;
+4. отзыв: `hsts.enabled=true` и `hsts.value="max-age=0"`.
+
+Заголовки не покрывают прямые адреса бакета (`*.website.yandexcloud.net`, `storage.yandexcloud.net/<bucket>`): они отвечают без заголовков. Заявки с этих origin отклоняет проверка `Origin` в функции; закрытие прямого доступа — отдельный пункт `TODO.md`.
+
+Нельзя добавлять `Cross-Origin-Embedder-Policy` (ломает Метрику, GTM и ассеты бакета) и `Cross-Origin-Opener-Policy: same-origin` (рвёт связь GTM Tag Assistant с окном-источником).
 
 CSP в этот набор не входит (отдельный пункт `TODO.md`): сайт использует Яндекс Метрику и GTM `GTM-KQT53D6V`, их домены нужно учесть в политике.
-
-CI загружает HTML, `robots.txt` и `sitemap.xml` с `no-cache, must-revalidate`, а версионированные CSS/JS — с `public, max-age=31536000, immutable`. После изменения CDN-настроек или первого деплоя очистите кеш ресурса. Значение `ASSET_VERSION`, переданное через окружение или GitHub Variables, должно меняться при каждом релизе с изменениями CSS/JS.
-
-Бакет ассетов используется напрямую по адресу `https://storage.yandexcloud.net/zvenfit-estetika`. То же значение записано в `assetsCdnBase` файла `scripts/structured-data.config.json`.
 
 ## 5. Настройка GitHub
 

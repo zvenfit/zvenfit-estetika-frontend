@@ -392,6 +392,7 @@ jobs:
   smoke-production:
     needs: [deploy-function, deploy-site]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
 
