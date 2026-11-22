@@ -27,6 +27,7 @@ title: ZvenFit Estetika project knowledge base
 - [Релизный runbook](../docs/releases.md)
 - [ADR-001: восстановление чтений outbox и отложенный проход worker](../docs/decisions/001-queue-read-recovery.md)
 - [ADR-004: заголовки безопасности CDN управляются из репозитория](../docs/decisions/004-cdn-security-headers-from-repository.md)
+- [ADR-005. Ежедневная проверка публичного сайта и сертификата](../docs/decisions/005-public-site-health.md)
 - [CDN security headers](cdn-security-headers.md)
 - [Production monitoring decisions](monitoring.md)
 - [Полный monitoring runbook](../docs/monitoring.md)
