@@ -7,9 +7,11 @@
 # Notes:
 # - `yc cdn resource update --static-headers` splits values on commas, so Permissions-Policy
 #   cannot be set through it; this script PATCHes the CDN REST API instead.
-# - The PATCH names its field mask (options.staticHeaders; the REST JSON form is camelCase): without a mask the API resets the
-#   fields that are not sent. The full resource is saved first and every other option is compared
-#   after the update; the script fails if any of them changed.
+# - The PATCH names its field mask (options.staticHeaders; the REST JSON form is camelCase, the
+#   snake_case path is rejected with HTTP 400). The API docs are not consistent about a PATCH without
+#   a mask (the proto keeps the legacy PATCH behaviour; on 2026-11-17 no option was reset), so the mask
+#   is sent to limit the change to static headers. The full resource is saved first and every other
+#   option is compared after the update; the script fails if any of them changed.
 # - Header names are matched case-insensitively. Headers on the resource that the config does not
 #   manage are kept. Removing a header from the config does not remove it from the CDN.
 # - HSTS: hsts.enabled=false removes the header from the CDN, which does NOT revoke the policy in
