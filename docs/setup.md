@@ -378,7 +378,7 @@ done | sort | uniq -c   # ожидается только значение 4
 
 Заголовки не покрывают прямые адреса бакета (`*.website.yandexcloud.net`, `storage.yandexcloud.net/<bucket>`): они отвечают без заголовков. Заявки с этих origin отклоняет проверка `Origin` в функции; закрытие прямого доступа — отдельный пункт `TODO.md`.
 
-Нельзя добавлять `Cross-Origin-Embedder-Policy` (ломает Метрику, GTM и ассеты бакета) и `Cross-Origin-Opener-Policy: same-origin` (рвёт связь GTM Tag Assistant с окном-источником).
+Не добавляйте `Cross-Origin-Embedder-Policy: require-corp`: `tag.js` Метрики и ассеты бакета не отдают `Cross-Origin-Resource-Policy` и будут заблокированы (`gtm.js` его отдаёт; проверено 2026-11-22). `Cross-Origin-Opener-Policy: same-origin` без отдельной проверки тоже не добавляйте: для статического сайта польза мала, а влияние на GTM Tag Assistant, который работает с окном-источником, не проверено.
 
 CSP в этот набор не входит (отдельный пункт `TODO.md`): сайт использует Яндекс Метрику и GTM `GTM-KQT53D6V`, их домены нужно учесть в политике.
 

@@ -122,6 +122,7 @@ GTM `GTM-KQT53D6V` записан стандартными блоками в `pu
 | Версии CDN-библиотек | `package.json`, `scripts/build-static.cjs`; файлы публикуются напрямую в Object Storage |
 | Деплой | `.github/workflows/main.yml`, `npm run deploy:yc` |
 | Автоматические релизы | `scripts/publish-production-release.cjs`, `docs/releases.md` |
+| Заголовки безопасности CDN | `scripts/cdn-security-headers.json`, `scripts/configure-cdn-headers.sh`, проверка в `scripts/smoke-production.cjs`; порядок — `docs/setup.md` |
 
 ## Локальная разработка
 
