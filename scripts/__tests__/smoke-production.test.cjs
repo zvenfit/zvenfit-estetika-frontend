@@ -41,6 +41,20 @@ function response(status, body, headers = {}) {
   };
 }
 
+test('CSP comparison preserves the case of source hashes', () => {
+  const hash = Buffer.alloc(32).toString('base64');
+  const policy = `script-src 'sha256-${hash}'`;
+  const changed = policy.replace('sha256-A', 'sha256-a');
+  const expected = { 'Content-Security-Policy': policy, 'X-Frame-Options': 'DENY' };
+  const headers = { 'content-security-policy': ` ${policy} `, 'x-frame-options': 'deny' };
+  assert.deepEqual(securityHeaderProblems('/', response(200, '', headers), expected), []);
+
+  const drifted = { ...headers, 'content-security-policy': changed };
+  assert.deepEqual(securityHeaderProblems('/', response(200, '', drifted), expected), [
+    `/: Content-Security-Policy is "${changed}", expected "${policy}"`,
+  ]);
+});
+
 test('production smoke rejects insecure non-local site URLs', () => {
   assert.throws(() => normalizeSiteUrl('http://example.com'), /must use HTTPS/);
   assert.equal(normalizeSiteUrl('http://localhost:4173/path'), 'http://localhost:4173');

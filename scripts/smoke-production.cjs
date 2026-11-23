@@ -76,9 +76,17 @@ function expectedSecurityHeaders(config = securityHeadersConfig) {
 function securityHeaderProblems(pathname, response, expected = expectedSecurityHeaders()) {
   const problems = [];
   for (const [name, value] of Object.entries(expected)) {
-    const actual = response.headers.get(name.toLowerCase());
-    if (!actual) problems.push(`${pathname}: missing ${name}`);
-    else if (actual.trim().toLowerCase() !== value.toLowerCase()) {
+    const headerName = name.toLowerCase();
+    const actual = response.headers.get(headerName);
+    if (!actual) {
+      problems.push(`${pathname}: missing ${name}`);
+      continue;
+    }
+    const trimmed = actual.trim();
+    const matches = headerName === 'content-security-policy'
+      ? trimmed === value
+      : trimmed.toLowerCase() === value.toLowerCase();
+    if (!matches) {
       problems.push(`${pathname}: ${name} is "${actual}", expected "${value}"`);
     }
   }
