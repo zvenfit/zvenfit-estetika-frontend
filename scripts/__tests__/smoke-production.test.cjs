@@ -55,6 +55,19 @@ test('CSP comparison preserves the case of source hashes', () => {
   ]);
 });
 
+test('CSP comparison detects a non-breaking space preserved by HTTP Headers', () => {
+  const policy = SECURITY_HEADERS['content-security-policy'];
+  const expected = { 'Content-Security-Policy': policy };
+  const padded = new Headers({ 'Content-Security-Policy': `\t ${policy} \t` });
+  assert.deepEqual(securityHeaderProblems('/', { headers: padded }, expected), []);
+
+  const changed = `${policy}\u00a0`;
+  const headers = new Headers({ 'Content-Security-Policy': changed });
+  assert.deepEqual(securityHeaderProblems('/', { headers }, expected), [
+    `/: Content-Security-Policy is "${changed}", expected "${policy}"`,
+  ]);
+});
+
 test('production smoke rejects insecure non-local site URLs', () => {
   assert.throws(() => normalizeSiteUrl('http://example.com'), /must use HTTPS/);
   assert.equal(normalizeSiteUrl('http://localhost:4173/path'), 'http://localhost:4173');

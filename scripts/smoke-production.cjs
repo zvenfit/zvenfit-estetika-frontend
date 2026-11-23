@@ -82,10 +82,10 @@ function securityHeaderProblems(pathname, response, expected = expectedSecurityH
       problems.push(`${pathname}: missing ${name}`);
       continue;
     }
-    const trimmed = actual.trim();
+    // HTTP field padding is space or tab. Other whitespace can change the CSP value.
     const matches = headerName === 'content-security-policy'
-      ? trimmed === value
-      : trimmed.toLowerCase() === value.toLowerCase();
+      ? actual.replace(/^[ \t]+|[ \t]+$/g, '') === value
+      : actual.trim().toLowerCase() === value.toLowerCase();
     if (!matches) {
       problems.push(`${pathname}: ${name} is "${actual}", expected "${value}"`);
     }
