@@ -8,6 +8,7 @@ const {
   fetchWithRetry,
   hstsProblems,
   normalizeSiteUrl,
+  runHeaderChecks,
   runSmoke,
   securityHeaderProblems,
 } = require('../smoke-production.cjs');
@@ -113,6 +114,51 @@ test('production smoke fails when the CDN omits or alters security headers', asy
     }),
     /CDN security headers mismatch[\s\S]*missing X-Frame-Options[\s\S]*Referrer-Policy is "no-referrer"/,
   );
+});
+
+test('header checks sample only the five public pages and the real 404 without a lead API', async () => {
+  const routes = productionRoutes();
+  const counts = new Map();
+  await runHeaderChecks({
+    fetchImpl: async (url, options) => {
+      assert.equal(options.method, 'HEAD');
+      assert.equal(options.redirect, 'manual');
+      const { pathname } = new URL(url);
+      counts.set(pathname, (counts.get(pathname) || 0) + 1);
+      return routes.get(url);
+    },
+    waitImpl: async () => {},
+    log() {},
+  });
+  assert.deepEqual(Object.fromEntries(counts), {
+    '/': 3, '/form/': 3, '/privacy/': 3, '/personal-data-processing/': 3,
+    '/404.html': 3, '/codex-production-smoke-not-found': 3,
+  });
+});
+
+test('a single bad header sample on the 404 is reported even if the next would pass', async () => {
+  const routes = productionRoutes();
+  let notFoundSamples = 0;
+  await assert.rejects(runHeaderChecks({
+    fetchImpl: async url => {
+      if (url.endsWith('/codex-production-smoke-not-found') && ++notFoundSamples === 2) {
+        return response(404, '', { ...SECURITY_HEADERS, 'x-frame-options': 'SAMEORIGIN' });
+      }
+      return routes.get(url);
+    },
+    waitImpl: async () => {},
+    log() {},
+  }), /sample 2[\s\S]*not-found: X-Frame-Options is "SAMEORIGIN"/);
+});
+
+test('a branded error page served with HTTP 200 fails the headers-only check', async () => {
+  const routes = productionRoutes();
+  await assert.rejects(runHeaderChecks({
+    fetchImpl: async url => url.endsWith('/codex-production-smoke-not-found')
+      ? response(200, '', SECURITY_HEADERS) : routes.get(url),
+    waitImpl: async () => {},
+    log() {},
+  }), /not-found returned 200, expected 404/);
 });
 
 test('HSTS is checked as a rule only when it is enabled in the config', () => {

@@ -2,7 +2,16 @@
 
 const securityHeadersConfig = require('./cdn-security-headers.json');
 
-const DEFAULT_SITE_URL = 'https://estetika.zvenfit.ru';
+const DEFAULT_SITE_URL = `https://${securityHeadersConfig.cname}`;
+const PUBLIC_PAGES = [
+  ['/', /<main[\s>]/i],
+  ['/form/', /id=["']wf-form-tg-send["']/i],
+  ['/privacy/', /<html/i],
+  ['/personal-data-processing/', /<html/i],
+  ['/404.html', /<html/i],
+];
+const NOT_FOUND_PATH = '/codex-production-smoke-not-found';
+const HEADER_SAMPLES = 3;
 const ATTEMPTS = 6;
 const RETRY_MS = 5000;
 const TIMEOUT_MS = 15000;
@@ -97,6 +106,35 @@ function hstsProblems(pathname, response, config = securityHeadersConfig) {
   return problems;
 }
 
+function cdnHeaderProblems(pathname, response, expected) {
+  return [
+    ...securityHeaderProblems(pathname, response, expected),
+    ...hstsProblems(pathname, response),
+  ];
+}
+
+async function runHeaderChecks({
+  siteUrl = process.env.SITE_URL || DEFAULT_SITE_URL,
+  fetchImpl = globalThis.fetch,
+  waitImpl = wait,
+  log = console.log,
+} = {}) {
+  const origin = normalizeSiteUrl(siteUrl);
+  const routes = [...PUBLIC_PAGES.map(([path]) => [path, 200]), [NOT_FOUND_PATH, 404]];
+  const expected = expectedSecurityHeaders();
+  for (let sample = 1; sample <= HEADER_SAMPLES; sample += 1) {
+    for (const [path, status] of routes) {
+      const response = await fetchWithRetry(`${origin}${path}`, { method: 'HEAD', redirect: 'manual' }, [status], {
+        fetchImpl, waitImpl,
+      });
+      // The daily monitor must report a bad edge even if the next response matches.
+      const problems = cdnHeaderProblems(path, response, expected);
+      if (problems.length) throw new Error(`CDN headers (sample ${sample}):\n  ${problems.join('\n  ')}`);
+    }
+  }
+  log(`CDN headers OK: ${routes.length} routes, ${HEADER_SAMPLES} samples each at ${origin}`);
+}
+
 async function runSmoke({
   siteUrl = process.env.SITE_URL || DEFAULT_SITE_URL,
   leadApiUrl = process.env.LEAD_API_URL || '',
@@ -112,10 +150,7 @@ async function runSmoke({
 
   const fetchChecked = (url, options, statuses, validate) =>
     fetchWithRetry(url, options, statuses, { fetchImpl, waitImpl, validate });
-  const withSecurityHeaders = label => response => [
-    ...securityHeaderProblems(label, response, securityHeaders),
-    ...hstsProblems(label, response),
-  ];
+  const withSecurityHeaders = label => response => cdnHeaderProblems(label, response, securityHeaders);
   const assertPage = async (pathname, pattern) => {
     const response = await fetchChecked(`${origin}${pathname}`, {}, [200], withSecurityHeaders(pathname));
     const body = await response.text();
@@ -130,15 +165,10 @@ async function runSmoke({
     }
   };
 
-  await assertPage('/', /<main[\s>]/i);
-  await assertPage('/form/', /id=["']wf-form-tg-send["']/i);
-  await assertPage('/privacy/', /<html/i);
-  await assertPage('/personal-data-processing/', /<html/i);
-  await assertPage('/404.html', /<html/i);
+  for (const [pathname, marker] of PUBLIC_PAGES) await assertPage(pathname, marker);
   await assertRedirect('/documents/privacy-policy.html', '/privacy/');
   await assertRedirect('/documents/personal-data-processing.html', '/personal-data-processing/');
-  const notFoundPath = '/codex-production-smoke-not-found';
-  await fetchChecked(`${origin}${notFoundPath}`, {}, [404], withSecurityHeaders(`${notFoundPath} (404)`));
+  await fetchChecked(`${origin}${NOT_FOUND_PATH}`, {}, [404], withSecurityHeaders(`${NOT_FOUND_PATH} (404)`));
 
   const robots = await fetchChecked(`${origin}/robots.txt`);
   if (!/Sitemap:/i.test(await robots.text())) throw new Error('robots.txt has no Sitemap directive');
@@ -174,7 +204,8 @@ async function runSmoke({
 }
 
 if (require.main === module) {
-  runSmoke().catch(error => {
+  const check = process.argv[2] === '--headers-only' ? runHeaderChecks : runSmoke;
+  check().catch(error => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });
@@ -185,6 +216,7 @@ module.exports = {
   fetchWithRetry,
   hstsProblems,
   normalizeSiteUrl,
+  runHeaderChecks,
   runSmoke,
   securityHeaderProblems,
 };

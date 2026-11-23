@@ -4,7 +4,7 @@
   "repository_uuid": "db7d831f-9d3a-4368-a026-cc2b0f2695af",
   "domain": "zvenfit",
   "product_id": "PROD-002",
-  "project_ids": [],
+  "project_ids": ["PRJ-009"],
   "sensitivity": "sensitive",
   "environments": ["local", "production"],
   "data_artifacts": [],

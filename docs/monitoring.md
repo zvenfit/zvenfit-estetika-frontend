@@ -12,6 +12,11 @@ provider не покрывают полный жизненный цикл эти
 проверенную конфигурацию, а read-only drift check сравнивает семантический desired state с
 экспортированным live snapshot.
 
+Публичный сайт проверяет отдельный GitHub Actions workflow [Site health](../.github/workflows/site-health.yml).
+Он видит заголовки и TLS-сертификат на CDN со стороны посетителя. Настройка уведомлений,
+ручной запуск и разбор ошибок описаны в [runbook сайта](setup.md#ежедневная-проверка-сайта).
+Выбор канала мониторинга закреплён в [ADR-005](decisions/005-public-site-health.md).
+
 ## Taxonomy и источники
 
 | Уровень | Значение |
