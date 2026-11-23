@@ -17,9 +17,15 @@ const securityConfig = require('../cdn-security-headers.json');
 const SECURITY_HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
+  'content-security-policy': 'frame-ancestors https://metrika.yandex.ru',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
 };
+
+test('the CDN contract allows only the Metrika frame ancestor and retains the XFO fallback', () => {
+  assert.equal(securityConfig.headers['Content-Security-Policy'], SECURITY_HEADERS['content-security-policy']);
+  assert.equal(securityConfig.headers['X-Frame-Options'], SECURITY_HEADERS['x-frame-options']);
+});
 
 function response(status, body, headers = {}) {
   return {

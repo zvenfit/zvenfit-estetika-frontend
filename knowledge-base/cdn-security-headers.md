@@ -23,12 +23,12 @@ title: CDN security headers
 - HSTS отложен: отозвать можно только `max-age=0` по рабочему HTTPS, поэтому ступенчато после
   первого автообновления сертификата и с оповещением об истечении. `includeSubDomains`/`preload`
   не использовать (smoke их отклоняет). На апексе `zvenfit.ru` HSTS и preload нет (проверено 2026-11-17).
-- Риск: `X-Frame-Options: DENY` может сломать просмотр карт Метрики; решение владельца, см. `TODO.md`.
+- Политика встраивания для всего ресурса и её влияние на формы описаны в [ADR-006](../docs/decisions/006-metrika-frame-policy.md). Приёмка карт отмечается в [TODO](../TODO.md#безопасность-и-надёжность).
 - `COEP: require-corp` не добавлять: `tag.js` Метрики и ассеты бакета не отдают
   `Cross-Origin-Resource-Policy` и будут заблокированы (`gtm.js` его отдаёт; проверено 2026-11-22).
   `COOP: same-origin` без проверки не добавлять: польза для статического сайта мала, а влияние на
   GTM Tag Assistant не проверено.
-- CSP не входит: нужны домены Яндекс Метрики и GTM `GTM-KQT53D6V`; статический CDN не умеет nonce,
+- Для полной CSP нужны домены Яндекс Метрики и GTM `GTM-KQT53D6V`. Статический CDN не умеет nonce,
   GTM-теги с inline-кодом потребуют `'unsafe-inline'` либо перевода на шаблон Метрики.
 
 Решение: [ADR-004](../docs/decisions/004-cdn-security-headers-from-repository.md).
