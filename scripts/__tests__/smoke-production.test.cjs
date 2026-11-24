@@ -17,9 +17,15 @@ const securityConfig = require('../cdn-security-headers.json');
 const SECURITY_HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
+  'content-security-policy': 'frame-ancestors https://metrika.yandex.ru',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
 };
+
+test('the CDN contract allows only the Metrika frame ancestor and retains the XFO fallback', () => {
+  assert.equal(securityConfig.headers['Content-Security-Policy'], SECURITY_HEADERS['content-security-policy']);
+  assert.equal(securityConfig.headers['X-Frame-Options'], SECURITY_HEADERS['x-frame-options']);
+});
 
 function response(status, body, headers = {}) {
   return {
@@ -34,6 +40,33 @@ function response(status, body, headers = {}) {
     },
   };
 }
+
+test('CSP comparison preserves the case of source hashes', () => {
+  const hash = Buffer.alloc(32).toString('base64');
+  const policy = `script-src 'sha256-${hash}'`;
+  const changed = policy.replace('sha256-A', 'sha256-a');
+  const expected = { 'Content-Security-Policy': policy, 'X-Frame-Options': 'DENY' };
+  const headers = { 'content-security-policy': ` ${policy} `, 'x-frame-options': 'deny' };
+  assert.deepEqual(securityHeaderProblems('/', response(200, '', headers), expected), []);
+
+  const drifted = { ...headers, 'content-security-policy': changed };
+  assert.deepEqual(securityHeaderProblems('/', response(200, '', drifted), expected), [
+    `/: Content-Security-Policy is "${changed}", expected "${policy}"`,
+  ]);
+});
+
+test('CSP comparison detects a non-breaking space preserved by HTTP Headers', () => {
+  const policy = SECURITY_HEADERS['content-security-policy'];
+  const expected = { 'Content-Security-Policy': policy };
+  const padded = new Headers({ 'Content-Security-Policy': `\t ${policy} \t` });
+  assert.deepEqual(securityHeaderProblems('/', { headers: padded }, expected), []);
+
+  const changed = `${policy}\u00a0`;
+  const headers = new Headers({ 'Content-Security-Policy': changed });
+  assert.deepEqual(securityHeaderProblems('/', { headers }, expected), [
+    `/: Content-Security-Policy is "${changed}", expected "${policy}"`,
+  ]);
+});
 
 test('production smoke rejects insecure non-local site URLs', () => {
   assert.throws(() => normalizeSiteUrl('http://example.com'), /must use HTTPS/);
