@@ -29,6 +29,7 @@ title: ZvenFit Estetika project knowledge base
 - [ADR-004: заголовки безопасности CDN управляются из репозитория](../docs/decisions/004-cdn-security-headers-from-repository.md)
 - [ADR-005. Ежедневная проверка публичного сайта и сертификата](../docs/decisions/005-public-site-health.md)
 - [ADR-006. Встраивание страниц сайта в Яндекс Метрику](../docs/decisions/006-metrika-frame-policy.md)
+- [Вебвизор и карта скроллинга — настройка счётчика и маскирование форм](../docs/analytics-events.md#вебвизор-и-карта-скроллинга)
 - [CDN security headers](cdn-security-headers.md)
 - [Production monitoring decisions](monitoring.md)
 - [Полный monitoring runbook](../docs/monitoring.md)
