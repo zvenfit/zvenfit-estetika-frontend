@@ -239,10 +239,10 @@ test('exports cumulative gauges and surfaces collector rejection', async () => {
   await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
 });
 
-test('bounds exporter cleanup stages independently', async () => {
-  for (const [stuckMethod, errorCode] of [
-    ['forceFlush', 'metrics_force_flush_timeout'],
-    ['shutdown', 'metrics_shutdown_timeout'],
+test('bounds a stalled exporter stage under the overall deadline', async () => {
+  for (const [stuckMethod, phase] of [
+    ['forceFlush', 'force_flush'],
+    ['shutdown', 'shutdown'],
   ] as const) {
     const never = () => new Promise<void>(() => {});
     const exporter: PushMetricExporter = {
@@ -259,12 +259,14 @@ test('bounds exporter cleanup stages independently', async () => {
     transport.recordGauge('zvenfit_test_health', 1);
 
     const startedAt = Date.now();
-    await assert.rejects(transport.flush(), { code: errorCode });
+    await assert.rejects(transport.flush(), { code: 'metrics_export_timeout', phase });
     assert.ok(Date.now() - startedAt < 1_000, `${stuckMethod} exceeded the flush deadline`);
   }
 });
 
-test('does not charge sequential lifecycle stages against one shared deadline', async () => {
+// Each stage alone fits the budget, together they do not: the old transport gave
+// every stage its own timeout and returned after up to four budgets.
+test('charges sequential lifecycle stages against one shared deadline', async () => {
   const delay = () => new Promise<void>(resolve => setTimeout(resolve, 20));
   const exporter: PushMetricExporter = {
     export(_metrics, callback) {
@@ -279,7 +281,9 @@ test('does not charge sequential lifecycle stages against one shared deadline', 
   );
   transport.recordGauge('zvenfit_test_health', 1);
 
-  await assert.doesNotReject(transport.flush());
+  const startedAt = Date.now();
+  await assert.rejects(transport.flush(), { code: 'metrics_export_timeout' });
+  assert.ok(Date.now() - startedAt < 1_000);
 });
 
 test('exports zero-valued queue gauges as real samples', async () => {

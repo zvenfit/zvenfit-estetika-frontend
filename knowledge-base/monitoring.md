@@ -81,20 +81,13 @@ retry-worker.
 
 ## OTLP lifecycle timeout
 
-Collect, export, force flush и shutdown — последовательные стадии, поэтому один
-общий deadline создавал ложный `metrics_flush_timeout`, когда каждая стадия сама
-укладывалась в допустимое время.
-
-Принятое решение:
-
-- каждая стадия получает независимый timeout; default — 5 секунд, допустимый
-  диапазон конфигурации `100–5000` мс;
-- зависший force flush возвращает `metrics_force_flush_timeout`;
-- зависший exporter shutdown возвращает `metrics_shutdown_timeout`;
-- callback export очищает собственный timer при любом исходе;
-- успешный flush логирует `monium_metrics_export_completed` с `duration_ms`;
-- ошибка экспорта логируется как warning с `outcome`, `duration_ms`, безопасными
-  `error_type` и `error_code`, но не меняет результат приёма уже сохранённой заявки.
+С ноября 2026 года collect, export, force flush и shutdown укладываются в один общий
+бюджет (default 5 с, диапазон `100–5000` мс), как в клубе после
+[zvenfit-frontend#78](https://github.com/zvenfit/zvenfit-frontend/pull/78)
+([задача](https://github.com/zvenfit/zvenfit-estetika-frontend/issues/52)). Прежние
+независимые timeout стадий позволяли зависшему экспорту удерживать функцию дольше
+бюджета. Таймаут логируется как `metrics_export_timeout` с полем `phase`; ошибка
+экспорта не меняет результат приёма заявки или прохода retry-worker.
 
 Реализация: [`otel-transport.ts`](../functions/telegram-lead/src/observability/otel-transport.ts).
 
