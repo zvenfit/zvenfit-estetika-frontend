@@ -376,3 +376,23 @@ throttling, trigger, direct gauges и YDB storage проверяются тол�
 
 Контракты runtime/config/drift проверяются командами `npm run test:lead-fn` и
 `npm run test:monitoring`.
+
+## Время доставки заявок
+
+`scripts/telegram-delivery-report.cjs` считает недельный отчёт о доставке заявок в Telegram по
+одному read-only снимку YDB (`leads FULL JOIN telegram_outbox`, только `kind='lead_created'`).
+Запрос для консоли YDB записан в начале скрипта. Результат копируется из консоли в файл вне
+репозитория:
+
+```bash
+node scripts/telegram-delivery-report.cjs --week 2026-11-16 --threshold-minutes 10 < snapshot.tsv
+```
+
+Неделя задаётся понедельником по МСК. Отсечение `T` по умолчанию — время снимка. Если `--cutoff`
+раньше снимка, состав когорты и статус недоставленных на `T` помечаются как неточные
+(`cohort_exact=false`): по одному позднему снимку не видно, что было сохранено к `T`. p95 считается
+методом ближайшего ранга.
+Отчёт выводит только агрегаты: доставлено к `T`, доставлено за порог среди заявок старше порога,
+молодые, открытые с возрастом и просрочкой, `failed`, заявки без строки outbox и строки outbox без
+заявки. Число сообщений у получателя по outbox не определяется (`recipient_messages=unknown`).
+Граничные случаи проверяет `npm run test:monitoring`.
