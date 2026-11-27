@@ -96,12 +96,19 @@ function metricErrorType(error: unknown): string {
   return 'exporter';
 }
 
+function metricErrorPhase(error: unknown): { phase?: string } {
+  const phase = error instanceof Error ? (error as Error & { phase?: unknown }).phase : undefined;
+
+  return typeof phase === 'string' ? { phase: phase.slice(0, 32) } : {};
+}
+
 function logMetricError(logger: LoggerLike, event: string, error: unknown, durationMs?: number): void {
   const fields = {
     event,
     outcome: 'failure',
     error_type: event === 'monium_metrics_init_error' ? 'initialization' : metricErrorType(error),
     error_code: metricErrorCode(error),
+    ...metricErrorPhase(error),
     ...(durationMs === undefined ? {} : { duration_ms: Math.max(0, durationMs) }),
   };
 

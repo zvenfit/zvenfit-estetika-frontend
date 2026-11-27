@@ -8,6 +8,11 @@ import {
   type ResourceMetrics,
 } from '@opentelemetry/sdk-metrics';
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { createMetricsAgent, type BeforeConnect } from './metrics-agent';
+
 import type { Meter, MetricAttributes } from '@opentelemetry/api';
 
 const METER_NAME = 'zvenfit-estetika-telegram-lead';
@@ -24,25 +29,54 @@ export interface MetricsTransportOptions {
   timeoutMs: number;
 }
 
-type MetricsExporterFactory = (options: MetricsTransportOptions) => PushMetricExporter;
+type MetricsExporterFactory = (
+  options: MetricsTransportOptions,
+  signal: AbortSignal,
+  beforeConnect: BeforeConnect,
+) => PushMetricExporter;
+
+type MetricsFlushPhase = 'collect' | 'export' | 'force_flush' | 'shutdown';
 
 class OneShotMetricReader extends MetricReader {
   protected async onForceFlush(): Promise<void> {}
+
   protected async onShutdown(): Promise<void> {}
 }
 
 class OtelMetricsTransport implements MetricsTransport {
   private readonly gauges = new Map<string, ReturnType<Meter['createGauge']>>();
+  private readonly provider: MeterProvider;
+  private readonly reader: MetricReader;
+  private exporter?: PushMetricExporter;
+  private readonly exporterFactory: MetricsExporterFactory;
+  private readonly options: MetricsTransportOptions;
+  private readonly controller = new AbortController();
+  private flushPromise?: Promise<void>;
+  private shutdownPromise?: Promise<PromiseSettledResult<void>[]>;
+  private readonly meter: Meter;
+  private deadlineAt = 0;
+  private phase: MetricsFlushPhase = 'collect';
+  // The first real failure outlives a cleanup that later runs out of budget.
+  private failure?: Error;
 
   public constructor(
-    private readonly provider: MeterProvider,
-    private readonly reader: MetricReader,
-    private readonly exporter: PushMetricExporter,
-    private readonly meter: Meter,
-    private readonly timeoutMs: number,
-  ) {}
+    provider: MeterProvider,
+    reader: MetricReader,
+    exporterFactory: MetricsExporterFactory,
+    meter: Meter,
+    options: MetricsTransportOptions,
+  ) {
+    this.provider = provider;
+    this.reader = reader;
+    this.exporterFactory = exporterFactory;
+    this.meter = meter;
+    this.options = options;
+  }
 
   public recordGauge(name: string, value: number, attributes?: MetricAttributes): void {
+    if (this.flushPromise) {
+      return;
+    }
     let gauge = this.gauges.get(name);
     if (!gauge) {
       gauge = this.meter.createGauge(name);
@@ -51,81 +85,149 @@ class OtelMetricsTransport implements MetricsTransport {
     gauge.record(value, attributes);
   }
 
-  public async flush(): Promise<void> {
-    let exportFailure: unknown;
+  public flush(): Promise<void> {
+    this.flushPromise ??= this.flushOnce();
+
+    return this.flushPromise;
+  }
+
+  private async flushOnce(): Promise<void> {
+    this.deadlineAt = Date.now() + this.options.timeoutMs;
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const error = this.failure ?? timeoutError(this.phase);
+        // Set the outcome before aborting: the SDK can treat a truncated 2xx
+        // response as success. Its late callback must never win this race.
+        reject(error);
+        this.controller.abort(error);
+      }, this.options.timeoutMs);
+    });
     try {
-      const { resourceMetrics, errors } = await this.reader.collect({ timeoutMillis: this.timeoutMs });
-      if (errors.length) throw normalizeMetricError(errors[0], 'metrics_collection_failed');
-      if (resourceMetrics.scopeMetrics.length) {
-        await exportCollectedMetrics(this.exporter, resourceMetrics, this.timeoutMs);
+      await Promise.race([this.exportAndShutdown(), deadline]);
+    } finally {
+      clearTimeout(timer);
+      this.controller.abort();
+      // Start cleanup even if collect/forceFlush never returns. This promise
+      // always fulfills with settled results; late failures remain observed.
+      void this.shutdown();
+    }
+  }
+
+  private remainingMs(): number {
+    return Math.max(1, this.deadlineAt - Date.now());
+  }
+
+  // The deadline timer can run late when synchronous work blocks the event loop,
+  // so the clock is also checked before export and before every new connection.
+  private abortIfExpired(): void {
+    if (Date.now() >= this.deadlineAt && !this.controller.signal.aborted) {
+      this.controller.abort(this.failure ?? timeoutError(this.phase));
+    }
+  }
+
+  private throwIfExpired(): void {
+    this.abortIfExpired();
+    this.controller.signal.throwIfAborted();
+  }
+
+  private shutdown(): Promise<PromiseSettledResult<void>[]> {
+    this.shutdownPromise ??= Promise.allSettled([
+      Promise.resolve().then(() => this.provider.shutdown({ timeoutMillis: this.remainingMs() })),
+      Promise.resolve().then(() => this.exporter?.shutdown()),
+    ]);
+
+    return this.shutdownPromise;
+  }
+
+  private async exportAndShutdown(): Promise<void> {
+    const { signal } = this.controller;
+    let exportFailure: Error | undefined;
+
+    try {
+      const { resourceMetrics, errors } = await this.reader.collect({ timeoutMillis: this.remainingMs() });
+      this.throwIfExpired();
+      if (errors.length > 0) {
+        throw normalizeMetricError(errors[0], 'metrics_collection_failed');
       }
-      await withTimeout(
-        this.exporter.forceFlush(),
-        this.timeoutMs,
-        'metrics_force_flush_timeout',
-      );
+      if (resourceMetrics.scopeMetrics.length > 0) {
+        this.phase = 'export';
+        this.exporter = this.exporterFactory({ ...this.options, timeoutMs: this.remainingMs() }, signal, () =>
+          this.abortIfExpired(),
+        );
+        this.throwIfExpired();
+        await exportCollectedMetrics(this.exporter, resourceMetrics, signal);
+        // The network work is done: only an abort that already happened may
+        // discard an acknowledged export. forceFlush() after it is immediate.
+        signal.throwIfAborted();
+        this.phase = 'force_flush';
+        await this.exporter.forceFlush();
+      }
     } catch (error) {
-      exportFailure = normalizeMetricError(error, 'metrics_export_failed');
+      exportFailure = withPhase(normalizeMetricError(error, 'metrics_export_failed'), this.phase);
+      this.failure ??= exportFailure;
     }
 
-    const [providerShutdown, exporterShutdown] = await Promise.all([
-      settle(this.provider.shutdown({ timeoutMillis: this.timeoutMs })),
-      settle(
-        withTimeout(
-          this.exporter.shutdown(),
-          this.timeoutMs,
-          'metrics_shutdown_timeout',
-        ),
-      ),
-    ]);
-    if (exportFailure !== undefined) throw exportFailure;
-    if (providerShutdown.status === 'rejected') throw providerShutdown.reason;
-    if (exporterShutdown.status === 'rejected') throw exporterShutdown.reason;
+    this.phase = 'shutdown';
+    const results = await this.shutdown();
+    // Report the recorded outcome truthfully; the deadline timer, not the
+    // clock, decides whether completed work still counts as a timeout.
+    if (exportFailure !== undefined) {
+      throw exportFailure;
+    }
+    signal.throwIfAborted();
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        throw withPhase(normalizeMetricError(result.reason, 'metrics_shutdown_failed'), 'shutdown');
+      }
+    }
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, code: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      reject(Object.assign(new Error('Metrics lifecycle stage timed out'), { code }));
-    }, timeoutMs);
-  });
-
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
+function timeoutError(phase: MetricsFlushPhase): Error {
+  return Object.assign(new Error('Metrics flush timed out'), { code: 'metrics_export_timeout', phase });
 }
 
-function settle<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {
-  return promise.then(
-    value => ({ status: 'fulfilled', value }),
-    reason => ({ status: 'rejected', reason }),
-  );
+// The phase that ran out of budget or failed is safe to log and tells a
+// delivered export with slow cleanup apart from one that never completed.
+function withPhase(error: Error, phase: MetricsFlushPhase): Error {
+  return 'phase' in error ? error : Object.assign(error, { phase });
 }
 
 function normalizeMetricError(error: unknown, code: string): Error {
-  return error instanceof Error ? error : Object.assign(new Error(code), { code });
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return Object.assign(new Error(code), { code });
 }
 
 function exportCollectedMetrics(
   exporter: PushMetricExporter,
   resourceMetrics: ResourceMetrics,
-  timeoutMs: number,
+  signal: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let completed = false;
-    const timeoutState: { value?: NodeJS.Timeout } = {};
-    const finish = (error?: Error) => {
-      if (completed) return;
+    function finish(error?: Error): void {
+      if (completed) {
+        return;
+      }
       completed = true;
-      if (timeoutState.value) clearTimeout(timeoutState.value);
-      error ? reject(error) : resolve();
-    };
-    timeoutState.value = setTimeout(() => {
-      finish(Object.assign(new Error('Metric export timed out'), { code: 'metrics_export_timeout' }));
-    }, timeoutMs);
+      signal.removeEventListener('abort', onAbort);
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    }
+    function onAbort(): void {
+      finish(normalizeMetricError(signal.reason, 'metrics_export_timeout'));
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
+      signal.throwIfAborted();
       exporter.export(resourceMetrics, result => {
         finish(
           result.code === ExportResultCode.SUCCESS
@@ -139,12 +241,46 @@ function exportCollectedMetrics(
   });
 }
 
-function createOtelExporter(options: MetricsTransportOptions): PushMetricExporter {
+// A custom agent replaces the SDK's own agent factory, which reads the OTLP CA
+// and client certificate from the environment. Read them the same way: the
+// metrics-specific variable wins, an unreadable file is ignored as in the SDK.
+function otlpFileFromEnv(name: 'CERTIFICATE' | 'CLIENT_CERTIFICATE' | 'CLIENT_KEY'): Buffer | undefined {
+  const path = [`OTEL_EXPORTER_OTLP_METRICS_${name}`, `OTEL_EXPORTER_OTLP_${name}`]
+    .map(key => process.env[key])
+    .find(value => value !== undefined && value.trim() !== '');
+  if (path === undefined) {
+    return undefined;
+  }
+  try {
+    return readFileSync(resolve(process.cwd(), path));
+  } catch {
+    return undefined;
+  }
+}
+
+export function otlpTlsOptionsFromEnv(): { ca?: Buffer; cert?: Buffer; key?: Buffer } {
+  const options = {
+    ca: otlpFileFromEnv('CERTIFICATE'),
+    cert: otlpFileFromEnv('CLIENT_CERTIFICATE'),
+    key: otlpFileFromEnv('CLIENT_KEY'),
+  };
+
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
+}
+
+function createOtelExporter(
+  options: MetricsTransportOptions,
+  signal: AbortSignal,
+  beforeConnect: BeforeConnect,
+): PushMetricExporter {
+  const tls = otlpTlsOptionsFromEnv();
+
   return new OTLPMetricExporter({
     url: options.endpoint,
     headers: options.headers,
     timeoutMillis: options.timeoutMs,
     temporalityPreference: AggregationTemporality.CUMULATIVE,
+    httpAgentOptions: protocol => createMetricsAgent(protocol, signal, tls, beforeConnect),
   });
 }
 
@@ -152,7 +288,11 @@ export function createOtelTransport(
   options: MetricsTransportOptions,
   exporterFactory: MetricsExporterFactory = createOtelExporter,
 ): MetricsTransport {
-  const exporter = exporterFactory(options);
+  // The exporter is created lazily after collection; reject a malformed
+  // endpoint now so misconfiguration still surfaces as monium_metrics_init_error.
+  if (!URL.canParse(options.endpoint)) {
+    throw Object.assign(new Error('Invalid metrics endpoint'), { code: 'metrics_endpoint_invalid' });
+  }
   const reader = new OneShotMetricReader({
     // An explicit zero is a real queue-health sample, not missing telemetry.
     aggregationTemporalitySelector: () => AggregationTemporality.CUMULATIVE,
@@ -162,8 +302,8 @@ export function createOtelTransport(
   return new OtelMetricsTransport(
     provider,
     reader,
-    exporter,
+    exporterFactory,
     provider.getMeter(METER_NAME, METER_VERSION),
-    options.timeoutMs,
+    options,
   );
 }

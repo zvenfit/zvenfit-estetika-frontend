@@ -239,10 +239,10 @@ test('exports cumulative gauges and surfaces collector rejection', async () => {
   await assert.rejects(rejectedTransport.flush(), { code: 'collector_rejected' });
 });
 
-test('bounds exporter cleanup stages independently', async () => {
-  for (const [stuckMethod, errorCode] of [
-    ['forceFlush', 'metrics_force_flush_timeout'],
-    ['shutdown', 'metrics_shutdown_timeout'],
+test('bounds a stalled exporter stage under the overall deadline', async () => {
+  for (const [stuckMethod, phase] of [
+    ['forceFlush', 'force_flush'],
+    ['shutdown', 'shutdown'],
   ] as const) {
     const never = () => new Promise<void>(() => {});
     const exporter: PushMetricExporter = {
@@ -259,12 +259,14 @@ test('bounds exporter cleanup stages independently', async () => {
     transport.recordGauge('zvenfit_test_health', 1);
 
     const startedAt = Date.now();
-    await assert.rejects(transport.flush(), { code: errorCode });
+    await assert.rejects(transport.flush(), { code: 'metrics_export_timeout', phase });
     assert.ok(Date.now() - startedAt < 1_000, `${stuckMethod} exceeded the flush deadline`);
   }
 });
 
-test('does not charge sequential lifecycle stages against one shared deadline', async () => {
+// Each stage alone fits the budget, together they do not: the old transport gave
+// every stage its own timeout and returned after up to four budgets.
+test('charges sequential lifecycle stages against one shared deadline', async () => {
   const delay = () => new Promise<void>(resolve => setTimeout(resolve, 20));
   const exporter: PushMetricExporter = {
     export(_metrics, callback) {
@@ -279,7 +281,97 @@ test('does not charge sequential lifecycle stages against one shared deadline', 
   );
   transport.recordGauge('zvenfit_test_health', 1);
 
-  await assert.doesNotReject(transport.flush());
+  const startedAt = Date.now();
+  await assert.rejects(transport.flush(), { code: 'metrics_export_timeout' });
+  assert.ok(Date.now() - startedAt < 1_000);
+});
+
+// The SDK rejects an export at once, then cleanup hangs: the budget still ends
+// the wait, but the log must keep the exporter's own error and phase.
+test('keeps the export failure when cleanup then exhausts the budget', async () => {
+  let shutdownCalled = false;
+  const exporter: PushMetricExporter = {
+    export(_metrics, callback) {
+      callback({
+        code: ExportResultCode.FAILED,
+        error: Object.assign(new Error('Collector rejected'), { code: 'collector_rejected' }),
+      });
+    },
+    async forceFlush() {
+      assert.fail('a failed export must not be flushed');
+    },
+    shutdown() {
+      shutdownCalled = true;
+
+      return new Promise<void>(() => {});
+    },
+  };
+  const transport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 30 },
+    () => exporter,
+  );
+  transport.recordGauge('zvenfit_test_health', 1);
+
+  const startedAt = Date.now();
+  await assert.rejects(transport.flush(), { code: 'collector_rejected', phase: 'export' });
+  assert.ok(shutdownCalled);
+  assert.ok(Date.now() - startedAt < 1_000, 'a hung shutdown exceeded the flush deadline');
+});
+
+function blockEventLoopFor(ms: number): void {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    // Synchronous SDK work or a busy event loop: the deadline timer cannot run.
+  }
+}
+
+test('a budget spent before export starts never calls export', async () => {
+  let exportCalls = 0;
+  const exporter: PushMetricExporter = {
+    export(_metrics, callback) {
+      exportCalls += 1;
+      callback({ code: ExportResultCode.SUCCESS });
+    },
+    async forceFlush() {},
+    async shutdown() {},
+  };
+  const transport = createOtelTransport({ endpoint: 'https://example.test', headers: {}, timeoutMs: 30 }, () => {
+    blockEventLoopFor(60);
+
+    return exporter;
+  });
+  transport.recordGauge('zvenfit_test_health', 1);
+
+  await assert.rejects(transport.flush(), { code: 'metrics_export_timeout', phase: 'export' });
+  assert.equal(exportCalls, 0);
+});
+
+test('a connection attempted after the deadline aborts before the timer callback runs', async () => {
+  let abortedAtConnect: boolean | undefined;
+  let signalSeen: AbortSignal | undefined;
+  const transport = createOtelTransport(
+    { endpoint: 'https://example.test', headers: {}, timeoutMs: 30 },
+    (_options, signal, beforeConnect) => {
+      signalSeen = signal;
+
+      return {
+        export() {
+          // Export started in time; the SDK reaches its agent only after the
+          // event loop was blocked past the deadline.
+          blockEventLoopFor(60);
+          beforeConnect();
+          abortedAtConnect = signal.aborted;
+        },
+        async forceFlush() {},
+        async shutdown() {},
+      };
+    },
+  );
+  transport.recordGauge('zvenfit_test_health', 1);
+
+  await assert.rejects(transport.flush(), { code: 'metrics_export_timeout', phase: 'export' });
+  assert.equal(abortedAtConnect, true);
+  assert.equal(signalSeen?.aborted, true);
 });
 
 test('exports zero-valued queue gauges as real samples', async () => {
