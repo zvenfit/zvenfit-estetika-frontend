@@ -176,10 +176,13 @@ Timer после успешного retry pass и чтения YDB экспор�
 `monium_metrics_init_error` или `monium_metrics_export_error` и не меняет результат приёма заявки.
 Успешный flush пишет диагностическое `monium_metrics_export_completed` с `outcome=success` и
 `duration_ms`; сбой пишет `WARN` с `outcome=failure`, `duration_ms`, безопасными `error_type` и
-`error_code`. Каждый этап OTLP lifecycle — collect, export, force flush и shutdown — получает
-собственный deadline 5 секунд по умолчанию, жёстко ограниченный диапазоном `100–5000` мс.
-Последовательные этапы не расходуют один общий таймер, поэтому нормальный медленный export не
-превращается в ложный `metrics_flush_timeout`, а зависший cleanup остаётся ограничен по времени.
+`error_code`. Весь OTLP lifecycle — collect, export, force flush и shutdown — укладывается в один
+общий бюджет `MONIUM_METRICS_TIMEOUT_MS`: 5000 мс по умолчанию, допустимый диапазон `100–5000` мс.
+Остаток бюджета проверяется таймером, а также перед началом export и перед каждым новым соединением,
+включая повтор SDK. Когда бюджет кончился, лог содержит `error_code=metrics_export_timeout` и `phase` —
+этап, на котором это случилось: `collect` или `export` — выгрузка не завершилась; `force_flush` или
+`shutdown` — collector уже подтвердил выгрузку, задержалась очистка. Если export сам вернул ошибку,
+в лог попадает её код с `phase=export`, даже если после этого зависла очистка.
 
 Эти ошибки вместе с `monium_metrics_misconfigured` считаются независимым log aggregate
 `zvenfit_estetika_monium_metrics_failures_5m`: он остаётся видимым при поломке самого direct OTLP

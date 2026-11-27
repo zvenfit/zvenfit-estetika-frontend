@@ -8,7 +8,10 @@ import {
   type ResourceMetrics,
 } from '@opentelemetry/sdk-metrics';
 
-import { createMetricsAgent } from './metrics-agent';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { createMetricsAgent, type BeforeConnect } from './metrics-agent';
 
 import type { Meter, MetricAttributes } from '@opentelemetry/api';
 
@@ -26,7 +29,11 @@ export interface MetricsTransportOptions {
   timeoutMs: number;
 }
 
-type MetricsExporterFactory = (options: MetricsTransportOptions, signal: AbortSignal) => PushMetricExporter;
+type MetricsExporterFactory = (
+  options: MetricsTransportOptions,
+  signal: AbortSignal,
+  beforeConnect: BeforeConnect,
+) => PushMetricExporter;
 
 type MetricsFlushPhase = 'collect' | 'export' | 'force_flush' | 'shutdown';
 
@@ -49,6 +56,8 @@ class OtelMetricsTransport implements MetricsTransport {
   private readonly meter: Meter;
   private deadlineAt = 0;
   private phase: MetricsFlushPhase = 'collect';
+  // The first real failure outlives a cleanup that later runs out of budget.
+  private failure?: Error;
 
   public constructor(
     provider: MeterProvider,
@@ -87,7 +96,7 @@ class OtelMetricsTransport implements MetricsTransport {
     let timer: NodeJS.Timeout | undefined;
     const deadline = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
-        const error = timeoutError(this.phase);
+        const error = this.failure ?? timeoutError(this.phase);
         // Set the outcome before aborting: the SDK can treat a truncated 2xx
         // response as success. Its late callback must never win this race.
         reject(error);
@@ -109,10 +118,16 @@ class OtelMetricsTransport implements MetricsTransport {
     return Math.max(1, this.deadlineAt - Date.now());
   }
 
-  private throwIfExpired(): void {
+  // The deadline timer can run late when synchronous work blocks the event loop,
+  // so the clock is also checked before export and before every new connection.
+  private abortIfExpired(): void {
     if (Date.now() >= this.deadlineAt && !this.controller.signal.aborted) {
-      this.controller.abort(timeoutError(this.phase));
+      this.controller.abort(this.failure ?? timeoutError(this.phase));
     }
+  }
+
+  private throwIfExpired(): void {
+    this.abortIfExpired();
     this.controller.signal.throwIfAborted();
   }
 
@@ -127,7 +142,7 @@ class OtelMetricsTransport implements MetricsTransport {
 
   private async exportAndShutdown(): Promise<void> {
     const { signal } = this.controller;
-    let exportFailure: unknown;
+    let exportFailure: Error | undefined;
 
     try {
       const { resourceMetrics, errors } = await this.reader.collect({ timeoutMillis: this.remainingMs() });
@@ -137,7 +152,10 @@ class OtelMetricsTransport implements MetricsTransport {
       }
       if (resourceMetrics.scopeMetrics.length > 0) {
         this.phase = 'export';
-        this.exporter = this.exporterFactory({ ...this.options, timeoutMs: this.remainingMs() }, signal);
+        this.exporter = this.exporterFactory({ ...this.options, timeoutMs: this.remainingMs() }, signal, () =>
+          this.abortIfExpired(),
+        );
+        this.throwIfExpired();
         await exportCollectedMetrics(this.exporter, resourceMetrics, signal);
         // The network work is done: only an abort that already happened may
         // discard an acknowledged export. forceFlush() after it is immediate.
@@ -147,6 +165,7 @@ class OtelMetricsTransport implements MetricsTransport {
       }
     } catch (error) {
       exportFailure = withPhase(normalizeMetricError(error, 'metrics_export_failed'), this.phase);
+      this.failure ??= exportFailure;
     }
 
     this.phase = 'shutdown';
@@ -222,13 +241,46 @@ function exportCollectedMetrics(
   });
 }
 
-function createOtelExporter(options: MetricsTransportOptions, signal: AbortSignal): PushMetricExporter {
+// A custom agent replaces the SDK's own agent factory, which reads the OTLP CA
+// and client certificate from the environment. Read them the same way: the
+// metrics-specific variable wins, an unreadable file is ignored as in the SDK.
+function otlpFileFromEnv(name: 'CERTIFICATE' | 'CLIENT_CERTIFICATE' | 'CLIENT_KEY'): Buffer | undefined {
+  const path = [`OTEL_EXPORTER_OTLP_METRICS_${name}`, `OTEL_EXPORTER_OTLP_${name}`]
+    .map(key => process.env[key])
+    .find(value => value !== undefined && value.trim() !== '');
+  if (path === undefined) {
+    return undefined;
+  }
+  try {
+    return readFileSync(resolve(process.cwd(), path));
+  } catch {
+    return undefined;
+  }
+}
+
+export function otlpTlsOptionsFromEnv(): { ca?: Buffer; cert?: Buffer; key?: Buffer } {
+  const options = {
+    ca: otlpFileFromEnv('CERTIFICATE'),
+    cert: otlpFileFromEnv('CLIENT_CERTIFICATE'),
+    key: otlpFileFromEnv('CLIENT_KEY'),
+  };
+
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
+}
+
+function createOtelExporter(
+  options: MetricsTransportOptions,
+  signal: AbortSignal,
+  beforeConnect: BeforeConnect,
+): PushMetricExporter {
+  const tls = otlpTlsOptionsFromEnv();
+
   return new OTLPMetricExporter({
     url: options.endpoint,
     headers: options.headers,
     timeoutMillis: options.timeoutMs,
     temporalityPreference: AggregationTemporality.CUMULATIVE,
-    httpAgentOptions: protocol => createMetricsAgent(protocol, signal),
+    httpAgentOptions: protocol => createMetricsAgent(protocol, signal, tls, beforeConnect),
   });
 }
 

@@ -3,7 +3,13 @@ import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { createServer, type IncomingHttpHeaders, type RequestListener, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type RequestListener,
+  type ServerResponse,
+} from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { createServer as createTcpServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -23,6 +29,7 @@ type Protocol = 'http' | 'https';
 type ExporterFactory = (options: MetricsTransportOptions, signal: AbortSignal) => OTLPMetricExporter;
 let certificates: { key: Buffer; cert: Buffer };
 let certificateDirectory: string;
+let certificatePaths: { key: string; cert: string };
 
 before(() => {
   // Ephemeral test-only key; no committed certificate or disabled TLS checks.
@@ -52,6 +59,7 @@ before(() => {
     { stdio: ['ignore', 'ignore', 'pipe'], timeout: 10000 },
   );
   certificates = { key: readFileSync(key), cert: readFileSync(cert) };
+  certificatePaths = { key, cert };
 });
 after(() => {
   if (certificateDirectory) {
@@ -341,4 +349,92 @@ test('HTTPS handshake stalled before a response is also cancelled', { timeout: 8
   assertTimeout(f.logs);
   await bounded(disconnected.promise);
   assert.equal(sockets.size, 0);
+});
+
+// The production factory must keep the SDK's environment TLS settings: the CA
+// that trusts the collector and the client certificate it requires (mTLS).
+for (const [name, env] of [
+  [
+    'metrics-specific CA, shared client certificate',
+    (paths: typeof certificatePaths) => ({
+      OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE: paths.cert,
+      OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE: paths.cert,
+      OTEL_EXPORTER_OTLP_CLIENT_KEY: paths.key,
+    }),
+  ],
+  [
+    'shared CA, metrics-specific client certificate',
+    (paths: typeof certificatePaths) => ({
+      OTEL_EXPORTER_OTLP_CERTIFICATE: paths.cert,
+      OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE: paths.cert,
+      OTEL_EXPORTER_OTLP_METRICS_CLIENT_KEY: paths.key,
+    }),
+  ],
+] as const) {
+  test(`HTTPS with mTLS via the production factory: ${name}`, { timeout: 8000 }, async t => {
+    const variables = env(certificatePaths);
+    const previous = Object.fromEntries(Object.keys(variables).map(key => [key, process.env[key]]));
+    Object.assign(process.env, variables);
+    t.after(() => {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+    const clientCertificates: (string | undefined)[] = [];
+    const server = createHttpsServer(
+      { ...certificates, ca: certificates.cert, requestCert: true, rejectUnauthorized: true },
+      (request, response) => {
+        clientCertificates.push(
+          (request.socket as import('node:tls').TLSSocket).getPeerCertificate().subject?.CN,
+        );
+        request.resume();
+        response.writeHead(200, { 'content-type': 'application/x-protobuf' });
+        response.end();
+      },
+    );
+    t.after(async () => {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+
+    const f = metrics(`https://127.0.0.1:${address.port}/v1/metrics`);
+    await bounded(f.metrics.flush());
+    assert.equal(f.logs.length, 1);
+    assert.equal(f.logs[0]?.event, 'monium_metrics_export_completed');
+    assert.deepEqual(clientCertificates, ['localhost']);
+  });
+}
+
+// Every new connection, the first one and each SDK retry, asks the caller first.
+test('the agent consults the deadline guard before each new connection', { timeout: 8000 }, async t => {
+  const server = await collector(t, 'http', 'success');
+  const controller = new AbortController();
+  let calls = 0;
+  const agent = createMetricsAgent('http:', controller.signal, {}, () => {
+    calls += 1;
+    if (calls === 2) {
+      controller.abort(new Error('deadline passed'));
+    }
+  });
+  const get = () =>
+    new Promise<number | string>(resolve => {
+      const request = httpRequest(server.url, { agent, method: 'POST' }, response => {
+        response.resume();
+        response.once('end', () => resolve(response.statusCode ?? 0));
+      });
+      request.once('error', error => resolve((error as NodeJS.ErrnoException).code ?? 'error'));
+      request.end();
+    });
+
+  assert.equal(await bounded(get()), 200);
+  assert.equal(await bounded(get()), 'ABORT_ERR');
+  assert.equal(calls, 2);
+  assert.equal(server.requests.length, 1);
 });

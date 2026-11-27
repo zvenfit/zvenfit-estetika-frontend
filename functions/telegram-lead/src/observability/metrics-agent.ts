@@ -5,7 +5,13 @@ import { connect as connectTls, type ConnectionOptions } from 'node:tls';
 
 type ConnectionCallback = (error: Error | null, socket?: Socket) => void;
 
-function rejectAfterAbort(signal: AbortSignal, callback: ConnectionCallback): boolean {
+// Called synchronously before every new connection, including an SDK retry. It
+// lets the caller abort when its deadline passed while the event loop was busy
+// and the deadline timer has not run yet.
+export type BeforeConnect = () => void;
+
+function rejectAfterAbort(signal: AbortSignal, beforeConnect: BeforeConnect | undefined, callback: ConnectionCallback): boolean {
+  beforeConnect?.();
   if (!signal.aborted) {
     return false;
   }
@@ -23,34 +29,44 @@ function rejectAfterAbort(signal: AbortSignal, callback: ConnectionCallback): bo
 
 class MetricsHttpAgent extends HttpAgent {
   private readonly signal: AbortSignal;
+  private readonly beforeConnect?: BeforeConnect;
 
-  public constructor(signal: AbortSignal) {
+  public constructor(signal: AbortSignal, beforeConnect?: BeforeConnect) {
     super({ keepAlive: false });
     this.signal = signal;
+    this.beforeConnect = beforeConnect;
   }
 
   public createConnection(options: NetConnectOpts, callback: ConnectionCallback) {
-    return rejectAfterAbort(this.signal, callback) ? undefined : connectTcp(options);
+    return rejectAfterAbort(this.signal, this.beforeConnect, callback) ? undefined : connectTcp(options);
   }
 }
 
 class MetricsHttpsAgent extends HttpsAgent {
   private readonly signal: AbortSignal;
+  private readonly beforeConnect?: BeforeConnect;
 
-  public constructor(signal: AbortSignal, options: AgentOptions) {
+  public constructor(signal: AbortSignal, options: AgentOptions, beforeConnect?: BeforeConnect) {
     super({ ...options, keepAlive: false, maxCachedSessions: 0 });
     this.signal = signal;
+    this.beforeConnect = beforeConnect;
   }
 
   public createConnection(options: ConnectionOptions, callback: ConnectionCallback) {
-    return rejectAfterAbort(this.signal, callback) ? undefined : connectTls(options);
+    return rejectAfterAbort(this.signal, this.beforeConnect, callback) ? undefined : connectTls(options);
   }
 }
 
 // Each invocation owns its agents. TLS verification remains enabled; options
-// allow a local test collector's CA without changing process-wide TLS settings.
-export function createMetricsAgent(protocol: string, signal: AbortSignal, options: AgentOptions = {}) {
-  const agent = protocol === 'http:' ? new MetricsHttpAgent(signal) : new MetricsHttpsAgent(signal, options);
+// carry the OTLP CA and mTLS settings without changing process-wide TLS settings.
+export function createMetricsAgent(
+  protocol: string,
+  signal: AbortSignal,
+  options: AgentOptions = {},
+  beforeConnect?: BeforeConnect,
+) {
+  const agent =
+    protocol === 'http:' ? new MetricsHttpAgent(signal, beforeConnect) : new MetricsHttpsAgent(signal, options, beforeConnect);
   if (signal.aborted) {
     agent.destroy();
   } else {
